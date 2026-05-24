@@ -10,7 +10,7 @@ import 'package:magicf/models/game_tree.dart';
 import 'package:magicf/models/move.dart';
 import 'package:magicf/services/cloud_db.dart';
 import 'package:magicf/services/cloud_review.dart';
-import 'package:magicf/services/cloud_review.dart';
+import 'package:magicf/services/engine_review.dart';
 import 'package:magicf/services/engine_manager.dart';
 import 'package:magicf/services/opening_book.dart';
 import 'package:magicf/utils/constants.dart';
@@ -33,6 +33,9 @@ class GameViewModel extends ChangeNotifier {
 
   /// 云库客户端
   final CloudDBClient cloudDB = CloudDBClient();
+
+  /// 云库查询结果
+  CloudQueryResult? cloudResult;
 
   /// 云库复盘
   CloudReviewResult? cloudReviewResult;
@@ -73,17 +76,13 @@ class GameViewModel extends ChangeNotifier {
   /// 最佳着法提示（来自引擎或云库）
   String? bestMoveHint;
 
-  /// 云库查询结果
-  CloudQueryResult? cloudResult;
-
-  /// 云库复盘结果
-  CloudReviewResult? cloudReviewResult;
-
-  /// 云库复盘进度 (0.0-1.0, null when not reviewing)
-  double? cloudReviewProgress;
-
-  /// 云库复盘服务
-  final CloudReviewService _cloudReviewService = CloudReviewService();
+  /// 引擎复盘
+  EngineReviewResult? engineReviewResult;
+  double? engineReviewProgress;
+  late final EngineReviewService _engineReviewService = EngineReviewService(
+    manager: engineManager,
+  );
+  bool get isEngineReviewing => _engineReviewService.isRunning;
 
   /// 当前残局挑战
   EndgamePuzzle? currentPuzzle;
@@ -549,6 +548,84 @@ class GameViewModel extends ChangeNotifier {
   bool get isBookmarkPanelVisible => _leftPanel == 'bookmark';
   bool get isLibraryPanelVisible => _leftPanel == 'library';
 
+  // === 右侧面板模式 ===
+  /// 'analysis' 或 'review'
+  String _rightPanel = 'analysis';
+  String get rightPanel => _rightPanel;
+  void toggleRightPanel() {
+    _rightPanel = _rightPanel == 'analysis' ? 'review' : 'analysis';
+    notifyListeners();
+  }
+
+  bool get isAnalysisPanel => _rightPanel == 'analysis';
+  bool get isReviewPanel => _rightPanel == 'review';
+
+  // === 引擎复盘 ===
+
+  /// 引擎复盘：从棋谱树根节点复盘到当前位置
+  Future<void> startEngineReview() async {
+    if (!engineManager.isReady) return;
+    final moves = gameTree.movesFromRoot;
+    if (moves.isEmpty) return;
+
+    final fenList = <String>[];
+    final iccsList = <String>[];
+    final chineseList = <String>[];
+
+    final path = <GameTreeNode>[];
+    var tempNode = gameTree.current;
+    while (tempNode != null) {
+      path.add(tempNode);
+      tempNode = tempNode.parent;
+    }
+    final pathRev = path.reversed.toList();
+
+    for (int i = 0; i < pathRev.length - 1; i++) {
+      fenList.add(pathRev[i].fen);
+      final move = pathRev[i + 1].move!;
+      iccsList.add(MoveNotation.toICCS(move));
+      chineseList.add(MoveNotation.toChinese(move));
+    }
+
+    engineReviewProgress = 0.0;
+    notifyListeners();
+
+    final result = await _engineReviewService.reviewGame(
+      fenList: fenList,
+      playedMoveICCS: iccsList,
+      playedMoveChinese: chineseList,
+      depth: engineManager.depth,
+      timeMs: engineManager.timeMs,
+      onProgress: (current, total) {
+        engineReviewProgress = total > 0 ? current / total : 0.0;
+        notifyListeners();
+      },
+    );
+
+    engineReviewResult = result;
+    engineReviewProgress = null;
+    notifyListeners();
+  }
+
+  /// 取消引擎复盘
+  void cancelEngineReview() {
+    _engineReviewService.cancel();
+    engineReviewProgress = null;
+    notifyListeners();
+  }
+
+  /// 清除引擎复盘结果
+  void clearEngineReview() {
+    engineReviewResult = null;
+    notifyListeners();
+  }
+
+  /// 清除云库复盘结果
+  void clearCloudReview() {
+    cloudReviewResult = null;
+    notifyListeners();
+  }
+
   // === 导航操作 ===
 
   /// 前进一步
@@ -613,9 +690,6 @@ class GameViewModel extends ChangeNotifier {
 
   /// 当前节点的变着列表
   List<GameTreeNode> get variations => gameTree.current?.children ?? [];
-
-  /// 是否正在云库复盘
-  bool get isCloudReviewing => _cloudReviewService.isRunning;
 
   /// 云库复盘：从棋谱树根节点复盘到当前位置
   Future<void> startCloudReview() async {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/game.dart';
 import '../models/game_mode.dart';
@@ -11,6 +12,7 @@ import '../widgets/common/engine_control_panel.dart';
 import '../widgets/common/game_library_panel.dart';
 import '../widgets/common/move_history_panel.dart';
 import '../widgets/common/opening_browser.dart';
+import '../widgets/common/review_panel.dart';
 import 'pgn_dialog.dart';
 import 'settings_dialog.dart';
 
@@ -34,7 +36,7 @@ class GameScreen extends StatelessWidget {
               children: [
                 // 顶部栏：模式选择 + 导航
                 _buildTopBar(context, vm),
-                // 主内容区：棋盘 + 着法列表
+                // 主内容区：左侧面板 + 棋盘 + 右侧面板
                 Expanded(child: _buildMainArea(context, vm)),
                 // 引擎控制面板
                 EngineControlPanel(
@@ -104,6 +106,32 @@ class GameScreen extends StatelessWidget {
             style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
           const Spacer(),
+          // 左侧面板切换按钮
+          _sidePanelButton(
+            icon: Icons.bookmark_border,
+            activeIcon: Icons.bookmark,
+            isActive: vm.isBookmarkPanelVisible,
+            tooltip: '收藏',
+            onPressed: vm.showBookmarkPanel,
+          ),
+          _sidePanelButton(
+            icon: Icons.folder_open,
+            activeIcon: Icons.folder,
+            isActive: vm.isLibraryPanelVisible,
+            tooltip: '棋谱库',
+            onPressed: vm.showLibraryPanel,
+          ),
+          // 右侧面板切换按钮
+          _sidePanelButton(
+            icon: vm.isAnalysisPanel ? Icons.analytics : Icons.replay,
+            isActive: false,
+            tooltip: vm.isAnalysisPanel ? '切换到复盘' : '切换到分析',
+            onPressed: vm.toggleRightPanel,
+            label: vm.isAnalysisPanel ? '分析' : '复盘',
+          ),
+          const SizedBox(width: 8),
+          const VerticalDivider(color: Colors.white24, width: 1),
+          const SizedBox(width: 8),
           // 右侧操作
           IconButton(
             icon: const Icon(Icons.folder_open, size: 18),
@@ -137,7 +165,7 @@ class GameScreen extends StatelessWidget {
             icon: const Icon(Icons.content_copy, size: 18),
             color: Colors.white70,
             tooltip: '复制 FEN',
-            onPressed: () {}, // TODO
+            onPressed: () => _copyFen(context, vm),
           ),
           IconButton(
             icon: const Icon(Icons.settings, size: 18),
@@ -187,10 +215,56 @@ class GameScreen extends StatelessWidget {
     );
   }
 
-  /// 主内容区：棋盘 + 着法列表 + 分析面板
+  /// 侧边面板切换按钮
+  Widget _sidePanelButton({
+    required IconData icon,
+    IconData? activeIcon,
+    required bool isActive,
+    required String tooltip,
+    required VoidCallback onPressed,
+    String? label,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: TextButton(
+        onPressed: onPressed,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isActive ? (activeIcon ?? icon) : icon,
+              size: 16,
+              color: isActive ? const Color(0xFFF5DEB3) : Colors.white70,
+            ),
+            if (label != null) ...[
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isActive ? const Color(0xFFF5DEB3) : Colors.white70,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ],
+        ),
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          backgroundColor: isActive ? Colors.white.withOpacity(0.1) : null,
+        ),
+      ),
+    );
+  }
+
+  /// 主内容区：左侧面板 + 棋盘 + 右侧面板
   Widget _buildMainArea(BuildContext context, GameViewModel vm) {
     return Row(
       children: [
+        // 左侧面板（收藏/棋谱库）
+        if (vm.leftPanel != 'none')
+          SizedBox(width: 260, child: _buildLeftPanel(context, vm)),
         // 棋盘区域
         Expanded(
           flex: 3,
@@ -213,9 +287,9 @@ class GameScreen extends StatelessWidget {
             ),
           ),
         ),
-        // 右侧面板：着法列表 + 分析
+        // 右侧面板：着法列表 + 分析/复盘
         SizedBox(
-          width: 240,
+          width: 260,
           child: Column(
             children: [
               // 着法列表
@@ -225,26 +299,90 @@ class GameScreen extends StatelessWidget {
                   moves: vm.movesFromRoot,
                   currentIndex: vm.depth - 1,
                   onTapMove: (index) {
-                    // TODO: 跳转到指定着法
+                    vm.goToStart();
+                    for (int i = 0; i < index; i++) {
+                      if (vm.canGoForward) vm.goForward();
+                    }
                   },
                 ),
               ),
-              // 分析面板
+              // 分析面板 或 复盘面板
               Expanded(
                 flex: 3,
-                child: AnalysisPanel(
-                  bestMove: vm.engineBestMove ?? vm.bestMoveHint,
-                  cloudResult: vm.cloudResult,
-                  isAnalyzing: vm.isAnalyzing || vm.engineManager.isThinking,
-                  onBestMoveTap: (iccs) {
-                    vm.playEngineMove(iccs);
-                  },
-                ),
+                child: vm.isAnalysisPanel
+                    ? AnalysisPanel(
+                        bestMove: vm.engineBestMove ?? vm.bestMoveHint,
+                        cloudResult: vm.cloudResult,
+                        isAnalyzing:
+                            vm.isAnalyzing || vm.engineManager.isThinking,
+                        onBestMoveTap: (iccs) {
+                          vm.playEngineMove(iccs);
+                        },
+                      )
+                    : const ReviewPanel(),
               ),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  /// 左侧面板内容
+  Widget _buildLeftPanel(BuildContext context, GameViewModel vm) {
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(right: BorderSide(color: Colors.white12, width: 1)),
+      ),
+      child: Column(
+        children: [
+          // 面板标题栏
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            color: Colors.black.withOpacity(0.2),
+            child: Row(
+              children: [
+                Icon(
+                  vm.isBookmarkPanelVisible ? Icons.bookmark : Icons.folder,
+                  size: 16,
+                  color: const Color(0xFFF5DEB3),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  vm.isBookmarkPanelVisible ? '收藏' : '棋谱库',
+                  style: const TextStyle(
+                    color: Color(0xFFF5DEB3),
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 16),
+                  color: Colors.white54,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: vm.hideLeftPanel,
+                ),
+              ],
+            ),
+          ),
+          // 面板内容
+          Expanded(
+            child: vm.isBookmarkPanelVisible
+                ? const BookmarkPanel()
+                : GameLibraryPanel(
+                    viewModel: vm,
+                    onImportPGN: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => PGNOpenDialog(viewModel: vm),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -364,6 +502,25 @@ class GameScreen extends StatelessWidget {
             '云库缓存: ${vm.cloudDB.cache.size}',
             style: const TextStyle(color: Colors.white54, fontSize: 11),
           ),
+          // 复盘状态
+          if (vm.isCloudReviewing) ...[
+            const SizedBox(width: 8),
+            const Icon(Icons.cloud, color: Colors.blue, size: 12),
+            const SizedBox(width: 2),
+            Text(
+              '云库复盘中... ${(vm.cloudReviewProgress! * 100).toInt()}%',
+              style: const TextStyle(color: Colors.blue, fontSize: 11),
+            ),
+          ],
+          if (vm.isEngineReviewing) ...[
+            const SizedBox(width: 8),
+            const Icon(Icons.smart_toy, color: Colors.blue, size: 12),
+            const SizedBox(width: 2),
+            Text(
+              '引擎复盘中... ${(vm.engineReviewProgress! * 100).toInt()}%',
+              style: const TextStyle(color: Colors.blue, fontSize: 11),
+            ),
+          ],
         ],
       ),
     );
@@ -399,6 +556,19 @@ class GameScreen extends StatelessWidget {
             child: const Text('加载'),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 复制 FEN 到剪贴板
+  void _copyFen(BuildContext context, GameViewModel vm) {
+    final fen = vm.gameTree.currentFen ?? '';
+    Clipboard.setData(ClipboardData(text: fen));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('FEN 已复制到剪贴板'),
+        duration: Duration(seconds: 1),
+        backgroundColor: Color(0xFF3E2723),
       ),
     );
   }
