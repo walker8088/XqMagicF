@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:multi_split_view/multi_split_view.dart';
 import 'package:provider/provider.dart';
 import '../models/game.dart';
 import '../models/game_mode.dart';
@@ -16,13 +17,53 @@ import '../widgets/common/review_panel.dart';
 import 'pgn_dialog.dart';
 import 'settings_dialog.dart';
 
-class GameScreen extends StatelessWidget {
+class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
+
+  @override
+  State<GameScreen> createState() => _GameScreenState();
+}
+
+class _GameScreenState extends State<GameScreen> {
+  late final MultiSplitViewController _splitController;
+
+  @override
+  void initState() {
+    super.initState();
+    _splitController = MultiSplitViewController(
+      areas: [
+        // 棋盘区域 (flex)
+        Area(flex: 1),
+        // 右侧面板 (固定宽度)
+        Area(size: 280, min: 200, max: 500),
+      ],
+    );
+  }
+
+  @override
+  void dispose() {
+    _splitController.dispose();
+    super.dispose();
+  }
+
+  /// 更新分栏布局
+  void _updateSplitAreas(GameViewModel vm) {
+    final areas = <Area>[];
+    if (vm.leftPanel != 'none') {
+      areas.add(Area(size: 260, min: 200, max: 500));
+    }
+    areas.add(Area(flex: 1));
+    areas.add(Area(size: 280, min: 200, max: 500));
+    _splitController.areas = areas;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<GameViewModel>(
       builder: (context, vm, _) {
+        // 更新分栏以匹配面板状态
+        _updateSplitAreas(vm);
+
         return Scaffold(
           body: Container(
             decoration: const BoxDecoration(
@@ -34,10 +75,25 @@ class GameScreen extends StatelessWidget {
             ),
             child: Column(
               children: [
-                // 顶部栏：模式选择 + 导航
+                // 顶部栏
                 _buildTopBar(context, vm),
-                // 主内容区：左侧面板 + 棋盘 + 右侧面板
-                Expanded(child: _buildMainArea(context, vm)),
+                // 主内容区：可拖拽分栏
+                Expanded(
+                  child: MultiSplitViewTheme(
+                    data: MultiSplitViewThemeData(
+                      dividerPainter: DividerPainters.grooved2(
+                        backgroundColor: const Color(0xFF2E1A0E),
+                        color: const Color(0xFFF5DEB3).withOpacity(0.3),
+                        thickness: 2,
+                      ),
+                    ),
+                    child: MultiSplitView(
+                      axis: Axis.horizontal,
+                      controller: _splitController,
+                      builder: (context, area) => _buildArea(context, vm, area),
+                    ),
+                  ),
+                ),
                 // 引擎控制面板
                 EngineControlPanel(
                   analysisMode: vm.analysisMode,
@@ -59,6 +115,85 @@ class GameScreen extends StatelessWidget {
     );
   }
 
+  /// 根据 area.index 构建对应内容
+  Widget _buildArea(BuildContext context, GameViewModel vm, Area area) {
+    final hasLeftPanel = vm.leftPanel != 'none';
+    final areaIndex = hasLeftPanel ? area.index : area.index;
+
+    // 重新计算索引：如果有左侧面板，0=左侧, 1=棋盘, 2=右侧
+    // 如果没有左侧面板，0=棋盘, 1=右侧
+    if (hasLeftPanel) {
+      if (areaIndex == 0) return _buildLeftPanel(context, vm);
+      if (areaIndex == 1) return _buildBoardArea(context, vm);
+      if (areaIndex == 2) return _buildRightPanel(context, vm);
+    } else {
+      if (areaIndex == 0) return _buildBoardArea(context, vm);
+      if (areaIndex == 1) return _buildRightPanel(context, vm);
+    }
+    return const SizedBox.shrink();
+  }
+
+  /// 棋盘区域
+  Widget _buildBoardArea(BuildContext context, GameViewModel vm) {
+    return Center(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final availableWidth = constraints.maxWidth * 0.95;
+          final availableHeight = constraints.maxHeight * 0.95;
+          final cellSizeFromWidth =
+              availableWidth /
+              (AppConstants.boardCols + AppConstants.paddingCells * 2);
+          final cellSizeFromHeight =
+              availableHeight /
+              (AppConstants.boardRows + AppConstants.paddingCells * 2);
+          final cellSize = cellSizeFromWidth < cellSizeFromHeight
+              ? cellSizeFromWidth
+              : cellSizeFromHeight;
+          return ChessBoard(cellSize: cellSize, viewModel: vm);
+        },
+      ),
+    );
+  }
+
+  /// 右侧面板：着法列表 + 分析/复盘
+  Widget _buildRightPanel(BuildContext context, GameViewModel vm) {
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(left: BorderSide(color: Colors.white12, width: 1)),
+      ),
+      child: Column(
+        children: [
+          // 着法列表
+          Expanded(
+            flex: 2,
+            child: MoveHistoryPanel(
+              moves: vm.movesFromRoot,
+              currentIndex: vm.depth - 1,
+              onTapMove: (index) {
+                vm.goToStart();
+                for (int i = 0; i < index; i++) {
+                  if (vm.canGoForward) vm.goForward();
+                }
+              },
+            ),
+          ),
+          // 分析面板 或 复盘面板
+          Expanded(
+            flex: 3,
+            child: vm.isAnalysisPanel
+                ? AnalysisPanel(
+                    bestMove: vm.engineBestMove ?? vm.bestMoveHint,
+                    cloudResult: vm.cloudResult,
+                    isAnalyzing: vm.isAnalyzing || vm.engineManager.isThinking,
+                    onBestMoveTap: (iccs) => vm.playEngineMove(iccs),
+                  )
+                : const ReviewPanel(),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 顶部栏
   Widget _buildTopBar(BuildContext context, GameViewModel vm) {
     return Container(
@@ -66,7 +201,6 @@ class GameScreen extends StatelessWidget {
       color: Colors.black.withOpacity(0.3),
       child: Row(
         children: [
-          // 应用标题
           const Text(
             '象棋魔术师',
             style: TextStyle(
@@ -76,7 +210,6 @@ class GameScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 16),
-          // 模式选择
           DropdownButton<GameMode>(
             value: vm.mode,
             dropdownColor: const Color(0xFF3E2723),
@@ -90,10 +223,8 @@ class GameScreen extends StatelessWidget {
           const SizedBox(width: 16),
           const VerticalDivider(color: Colors.white24, width: 1),
           const SizedBox(width: 8),
-          // 开局浏览器按钮
           _openBookButton(context, vm),
           const SizedBox(width: 8),
-          // 导航按钮
           _navButton(Icons.skip_previous, vm.goToStart),
           _navButton(Icons.navigate_before, vm.canGoBack ? vm.goBack : null),
           _navButton(
@@ -132,7 +263,6 @@ class GameScreen extends StatelessWidget {
           const SizedBox(width: 8),
           const VerticalDivider(color: Colors.white24, width: 1),
           const SizedBox(width: 8),
-          // 右侧操作
           IconButton(
             icon: const Icon(Icons.folder_open, size: 18),
             color: Colors.white70,
@@ -258,76 +388,6 @@ class GameScreen extends StatelessWidget {
     );
   }
 
-  /// 主内容区：左侧面板 + 棋盘 + 右侧面板
-  Widget _buildMainArea(BuildContext context, GameViewModel vm) {
-    return Row(
-      children: [
-        // 左侧面板（收藏/棋谱库）
-        if (vm.leftPanel != 'none')
-          SizedBox(width: 260, child: _buildLeftPanel(context, vm)),
-        // 棋盘区域
-        Expanded(
-          flex: 3,
-          child: Center(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final availableWidth = constraints.maxWidth * 0.95;
-                final availableHeight = constraints.maxHeight * 0.95;
-                final cellSizeFromWidth =
-                    availableWidth /
-                    (AppConstants.boardCols + AppConstants.paddingCells * 2);
-                final cellSizeFromHeight =
-                    availableHeight /
-                    (AppConstants.boardRows + AppConstants.paddingCells * 2);
-                final cellSize = cellSizeFromWidth < cellSizeFromHeight
-                    ? cellSizeFromWidth
-                    : cellSizeFromHeight;
-                return ChessBoard(cellSize: cellSize, viewModel: vm);
-              },
-            ),
-          ),
-        ),
-        // 右侧面板：着法列表 + 分析/复盘
-        SizedBox(
-          width: 260,
-          child: Column(
-            children: [
-              // 着法列表
-              Expanded(
-                flex: 2,
-                child: MoveHistoryPanel(
-                  moves: vm.movesFromRoot,
-                  currentIndex: vm.depth - 1,
-                  onTapMove: (index) {
-                    vm.goToStart();
-                    for (int i = 0; i < index; i++) {
-                      if (vm.canGoForward) vm.goForward();
-                    }
-                  },
-                ),
-              ),
-              // 分析面板 或 复盘面板
-              Expanded(
-                flex: 3,
-                child: vm.isAnalysisPanel
-                    ? AnalysisPanel(
-                        bestMove: vm.engineBestMove ?? vm.bestMoveHint,
-                        cloudResult: vm.cloudResult,
-                        isAnalyzing:
-                            vm.isAnalyzing || vm.engineManager.isThinking,
-                        onBestMoveTap: (iccs) {
-                          vm.playEngineMove(iccs);
-                        },
-                      )
-                    : const ReviewPanel(),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   /// 左侧面板内容
   Widget _buildLeftPanel(BuildContext context, GameViewModel vm) {
     return Container(
@@ -336,7 +396,6 @@ class GameScreen extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // 面板标题栏
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             color: Colors.black.withOpacity(0.2),
@@ -367,7 +426,6 @@ class GameScreen extends StatelessWidget {
               ],
             ),
           ),
-          // 面板内容
           Expanded(
             child: vm.isBookmarkPanelVisible
                 ? const BookmarkPanel()
@@ -393,7 +451,6 @@ class GameScreen extends StatelessWidget {
       color: Colors.black.withOpacity(0.4),
       child: Row(
         children: [
-          // 回合指示
           Container(
             width: 10,
             height: 10,
@@ -419,7 +476,6 @@ class GameScreen extends StatelessWidget {
             style: const TextStyle(color: Colors.white, fontSize: 13),
           ),
           const SizedBox(width: 24),
-          // ECCO 开局信息
           if (vm.currentOpening != null) ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -437,7 +493,6 @@ class GameScreen extends StatelessWidget {
             ),
             const SizedBox(width: 24),
           ],
-          // 游戏状态
           if (vm.state == GameState.checkmate)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -454,7 +509,6 @@ class GameScreen extends StatelessWidget {
                 ),
               ),
             ),
-          // 残局挑战状态
           if (vm.mode == GameMode.engineEndGame &&
               vm.currentPuzzle != null) ...[
             const SizedBox(width: 16),
@@ -472,7 +526,6 @@ class GameScreen extends StatelessWidget {
             ],
           ],
           const Spacer(),
-          // 引擎状态
           if (vm.engineManager.isThinking) ...[
             const SizedBox(width: 8),
             const SizedBox(
@@ -497,12 +550,10 @@ class GameScreen extends StatelessWidget {
               style: const TextStyle(color: Colors.green, fontSize: 11),
             ),
           ],
-          // 云库缓存信息
           Text(
             '云库缓存: ${vm.cloudDB.cache.size}',
             style: const TextStyle(color: Colors.white54, fontSize: 11),
           ),
-          // 复盘状态
           if (vm.isCloudReviewing) ...[
             const SizedBox(width: 8),
             const Icon(Icons.cloud, color: Colors.blue, size: 12),
@@ -526,7 +577,6 @@ class GameScreen extends StatelessWidget {
     );
   }
 
-  /// 编辑局面对话框
   void _showEditFenDialog(BuildContext context, GameViewModel vm) {
     final controller = TextEditingController(
       text: vm.gameTree.currentFen ?? '',
@@ -560,7 +610,6 @@ class GameScreen extends StatelessWidget {
     );
   }
 
-  /// 复制 FEN 到剪贴板
   void _copyFen(BuildContext context, GameViewModel vm) {
     final fen = vm.gameTree.currentFen ?? '';
     Clipboard.setData(ClipboardData(text: fen));
