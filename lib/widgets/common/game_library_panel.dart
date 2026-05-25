@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:magicf/services/local_db.dart';
-import 'package:magicf/viewmodels/game_viewmodel.dart';
+import 'package:xqmagic/services/local_db.dart';
+import 'package:xqmagic/viewmodels/game_viewmodel.dart';
 
 /// 棋库面板：浏览、搜索、加载已保存的棋局
 class GameLibraryPanel extends StatefulWidget {

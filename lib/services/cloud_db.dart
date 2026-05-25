@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-import 'package:magicf/utils/lru_cache.dart';
+import 'package:xqmagic/utils/lru_cache.dart';
 
 /// 云端棋库查询结果
 class CloudQueryResult {
@@ -82,7 +82,9 @@ class CloudDBClient {
     _isQuerying = true;
 
     try {
-      final url = Uri.parse('$baseUrl?action=queryall&board=$positionFen');
+      final url = Uri.parse(
+        baseUrl,
+      ).replace(queryParameters: {'action': 'queryall', 'board': positionFen});
       final response = await http.get(url).timeout(const Duration(seconds: 10));
 
       if (response.statusCode != 200) {

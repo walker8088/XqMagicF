@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:magicf/viewmodels/game_viewmodel.dart';
-import 'package:magicf/services/engine_review.dart';
+import 'package:xqmagic/services/engine_review.dart';
+import 'package:xqmagic/viewmodels/game_viewmodel.dart';
+import 'review_shared.dart';
 
 /// 引擎复盘面板：对当前棋谱进行引擎逐着分析评估
 class EngineReviewPanel extends StatelessWidget {
@@ -19,7 +20,8 @@ class EngineReviewPanel extends StatelessWidget {
               _buildHeader(context, vm),
               const Divider(color: Color(0xFFF5DEB3), height: 1),
               if (vm.engineReviewProgress != null) _buildProgress(vm),
-              if (vm.engineReviewResult != null) _buildResult(context, vm),
+              if (vm.engineReviewResult != null)
+                _buildResult(context, vm.engineReviewResult!, vm),
               if (vm.engineReviewResult == null &&
                   vm.engineReviewProgress == null)
                 _buildEmpty(context, vm),
@@ -137,13 +139,22 @@ class EngineReviewPanel extends StatelessWidget {
     );
   }
 
-  Widget _buildResult(BuildContext context, GameViewModel vm) {
-    final result = vm.engineReviewResult!;
+  Widget _buildResult(
+    BuildContext context,
+    EngineReviewResult result,
+    GameViewModel vm,
+  ) {
+    final depthSetting = vm.engineManager.depth;
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSummary(result),
+          ReviewSummary(
+            totalMoves: result.totalMoves,
+            accuracyMoves: result.accuracyMoves,
+            badMoves: result.badMoves,
+            averageDiff: result.averageDiff,
+          ),
           const Divider(color: Colors.white12, height: 1),
           Expanded(
             child: ListView.builder(
@@ -151,7 +162,7 @@ class EngineReviewPanel extends StatelessWidget {
               itemCount: result.moves.length,
               itemBuilder: (context, index) {
                 final move = result.moves[index];
-                return _EngineMoveTile(move: move, vm: vm);
+                return _buildMoveTile(move, vm, depthSetting);
               },
             ),
           ),
@@ -160,205 +171,57 @@ class EngineReviewPanel extends StatelessWidget {
     );
   }
 
-  Widget _buildSummary(EngineReviewResult result) {
-    final accuracy = result.totalMoves > 0
-        ? (result.accuracyMoves / result.totalMoves * 100).toStringAsFixed(1)
-        : '0.0';
-    return Padding(
-      padding: const EdgeInsets.all(8),
-      child: Row(
-        children: [
-          _summaryItem('${result.totalMoves}', '总着法', Colors.white70),
-          const SizedBox(width: 12),
-          _summaryItem(accuracy, '准确率', Colors.green),
-          const SizedBox(width: 12),
-          _summaryItem(
-            '${result.badMoves}',
-            '劣着',
-            result.badMoves > 0 ? Colors.red : Colors.white38,
-          ),
-          const SizedBox(width: 12),
-          _summaryItem(
-            result.averageDiff.toStringAsFixed(0),
-            '平均偏离',
-            result.averageDiff < -50 ? Colors.orange : Colors.white70,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _summaryItem(String value, String label, Color color) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            color: color,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(color: Colors.white54, fontSize: 10),
-        ),
-      ],
-    );
-  }
-}
-
-class _EngineMoveTile extends StatelessWidget {
-  final EngineReviewMove move;
-  final GameViewModel vm;
-
-  const _EngineMoveTile({required this.move, required this.vm});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _jumpToMove(context),
-        borderRadius: BorderRadius.circular(6),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    '${move.moveNumber}.',
-                    style: const TextStyle(
-                      color: Colors.white38,
-                      fontSize: 11,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    move.moveChinese,
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
-                  ),
-                  const Spacer(),
-                  _qualityBadge(move.qualityMark),
-                  Text(
-                    move.diff >= 0 ? '+${move.diff}' : '${move.diff}',
-                    style: TextStyle(
-                      color: _diffColor(move.diff),
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                ],
-              ),
-              // 引擎分析详情
-              Padding(
-                padding: const EdgeInsets.only(top: 2, left: 24),
-                child: Row(
-                  children: [
-                    Text(
-                      'D:${move.depth}',
-                      style: const TextStyle(
-                        color: Colors.white38,
-                        fontSize: 10,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    if (move.bestMoveICCS != null)
-                      Text(
-                        '推荐: ${move.bestMoveICCS}',
-                        style: const TextStyle(
-                          color: Colors.white54,
-                          fontSize: 11,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    if (move.bestScore != null) ...[
-                      const SizedBox(width: 6),
-                      Text(
-                        '${move.bestScore}',
-                        style: const TextStyle(
-                          color: Colors.white54,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              // PV 预览
-              if (move.pv.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 1, left: 24),
-                  child: Text(
-                    'PV: ${move.pv.take(3).join(" ")}',
-                    style: const TextStyle(
-                      color: Colors.white24,
-                      fontSize: 10,
-                      fontFamily: 'monospace',
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _qualityBadge(String mark) {
-    Color color;
-    switch (mark) {
-      case '★':
-        color = Colors.green;
-      case '✓':
-        color = Colors.blue;
-      case '○':
-        color = Colors.orange;
-      case '✗':
-        color = Colors.deepOrange;
-      case '✗✗':
-        color = Colors.red;
-      default:
-        color = Colors.grey;
+  Widget _buildMoveTile(EngineReviewMove move, GameViewModel vm, int depth) {
+    // 构建最佳着法提示
+    String? bestMoveHint;
+    if (move.bestMoveICCS != null) {
+      bestMoveHint = '推荐: ${move.bestMoveICCS}';
+      if (move.bestScore != null) {
+        bestMoveHint += '  (${move.bestScore})';
+      }
     }
-    return Container(
-      margin: const EdgeInsets.only(right: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
-        border: Border.all(color: color.withOpacity(0.5)),
-        borderRadius: BorderRadius.circular(3),
+
+    // 引擎特有的额外信息
+    final extraInfo = <Widget>[
+      Text(
+        'D:${move.depth}',
+        style: const TextStyle(color: Colors.white38, fontSize: 10),
       ),
-      child: Text(
-        mark,
-        style: TextStyle(
-          color: color,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
+    ];
+    if (move.pv.isNotEmpty) {
+      extraInfo.add(
+        Text(
+          ' PV: ${move.pv.take(3).join(" ")}',
+          style: const TextStyle(
+            color: Colors.white24,
+            fontSize: 10,
+            fontFamily: 'monospace',
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
-      ),
+      );
+    }
+
+    return ReviewMoveTile(
+      moveNumber: move.moveNumber,
+      moveChinese: move.moveChinese,
+      diff: move.diff,
+      qualityMark: move.qualityMark,
+      bestMoveHint: bestMoveHint,
+      extraInfo:
+          extraInfo.isNotEmpty
+              ? Row(children: extraInfo)
+              : null,
+      onTap: () => _jumpToMove(move.moveNumber, vm),
     );
   }
 
-  Color _diffColor(int diff) {
-    if (diff >= -5) return Colors.green;
-    if (diff >= -30) return Colors.lightGreen;
-    if (diff >= -70) return Colors.orange;
-    if (diff >= -100) return Colors.deepOrange;
-    return Colors.red;
-  }
-
-  void _jumpToMove(BuildContext context) {
+  void _jumpToMove(int moveNumber, GameViewModel vm) {
     final moves = vm.movesFromRoot;
-    if (move.moveNumber <= moves.length) {
+    if (moveNumber <= moves.length) {
       vm.goToStart();
-      for (int i = 0; i < move.moveNumber - 1; i++) {
+      for (int i = 0; i < moveNumber - 1; i++) {
         if (vm.canGoForward) vm.goForward();
       }
     }

@@ -1,10 +1,10 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:magicf/services/pgn_service.dart';
-import 'package:magicf/utils/app_settings.dart';
-import 'package:magicf/utils/fen.dart';
-import 'package:magicf/viewmodels/game_viewmodel.dart';
+import 'package:xqmagic/services/pgn_service.dart';
+import 'package:xqmagic/utils/app_settings.dart';
+import 'package:xqmagic/utils/fen.dart';
+import 'package:xqmagic/viewmodels/game_viewmodel.dart';
 
 /// PGN 文件打开对话框
 /// 提供简易文件浏览器，浏览 .pgn 文件并选择要加载的对局

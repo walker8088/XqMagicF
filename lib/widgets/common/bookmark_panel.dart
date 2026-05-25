@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:magicf/services/local_db.dart';
-import 'package:magicf/viewmodels/game_viewmodel.dart';
+import 'package:xqmagic/services/local_db.dart';
+import 'package:xqmagic/viewmodels/game_viewmodel.dart';
 import 'package:provider/provider.dart';
 
 /// 书签/收藏面板：管理收藏的棋局局面和最近打开的文件

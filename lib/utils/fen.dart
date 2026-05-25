@@ -1,7 +1,7 @@
-import 'package:magicf/models/board.dart';
-import 'package:magicf/models/chess_piece.dart';
-import 'package:magicf/utils/constants.dart';
-import 'package:magicf/utils/position.dart';
+import 'package:xqmagic/models/board.dart';
+import 'package:xqmagic/models/chess_piece.dart';
+import 'package:xqmagic/utils/constants.dart';
+import 'package:xqmagic/utils/coord.dart';
 
 /// FEN (Forsyth-Edwards Notation) for Chinese Chess (Xiangqi)
 /// Format: rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR r
@@ -17,13 +17,13 @@ class FenParser {
   /// Convert piece type and color to FEN character
   static String pieceToFenChar(PieceType type, PieceColor color) {
     final char = switch (type) {
-      PieceType.general => 'k',
+      PieceType.king => 'k',
       PieceType.advisor => 'a',
-      PieceType.elephant => 'b', // bishop
-      PieceType.horse => 'n',
-      PieceType.chariot => 'r',
+      PieceType.bishop => 'b', // bishop
+      PieceType.knight => 'n',
+      PieceType.rook => 'r',
       PieceType.cannon => 'c',
-      PieceType.soldier => 'p',
+      PieceType.pawn => 'p',
     };
     return color == PieceColor.red ? char.toUpperCase() : char;
   }
@@ -34,13 +34,13 @@ class FenParser {
     final lower = char.toLowerCase();
     final color = char == lower ? PieceColor.black : PieceColor.red;
     final type = switch (lower) {
-      'k' => PieceType.general,
+      'k' => PieceType.king,
       'a' => PieceType.advisor,
-      'b' => PieceType.elephant,
-      'n' => PieceType.horse,
-      'r' => PieceType.chariot,
+      'b' => PieceType.bishop,
+      'n' => PieceType.knight,
+      'r' => PieceType.rook,
       'c' => PieceType.cannon,
-      'p' => PieceType.soldier,
+      'p' => PieceType.pawn,
       _ => null,
     };
     if (type == null) return null;
@@ -48,13 +48,16 @@ class FenParser {
   }
 
   /// Generate FEN string from board state
+  /// FEN row 0 = top of board (Black side, our row 9)
+  /// FEN row 9 = bottom of board (Red side, our row 0)
   static String generate(Board board, PieceColor activeColor) {
     final rows = <String>[];
-    for (int row = 0; row < AppConstants.boardRows; row++) {
+    for (int fenRow = 0; fenRow < AppConstants.boardRows; fenRow++) {
+      final row = AppConstants.boardRows - 1 - fenRow;
       int emptyCount = 0;
       String rowStr = '';
       for (int col = 0; col < AppConstants.boardCols; col++) {
-        final piece = board.getPiece(Position(col, row));
+        final piece = board.getPiece(Coord(col, row));
         if (piece == null) {
           emptyCount++;
         } else {
@@ -73,6 +76,8 @@ class FenParser {
   }
 
   /// Parse FEN string and populate the board
+  /// FEN row 0 = top of board (Black side) → our row 9
+  /// FEN row 9 = bottom of board (Red side) → our row 0
   static PieceColor parse(String fen, Board board) {
     board.clear();
 
@@ -82,14 +87,15 @@ class FenParser {
         ? PieceColor.black
         : PieceColor.red;
 
-    final rows = boardStr.split('/');
+    final fenRows = boardStr.split('/');
     for (
-      int row = 0;
-      row < rows.length && row < AppConstants.boardRows;
-      row++
+      int fenRow = 0;
+      fenRow < fenRows.length && fenRow < AppConstants.boardRows;
+      fenRow++
     ) {
+      final row = AppConstants.boardRows - 1 - fenRow;
       int col = 0;
-      for (final char in rows[row].split('')) {
+      for (final char in fenRows[fenRow].split('')) {
         if (int.tryParse(char) != null) {
           col += int.parse(char);
         } else {
@@ -97,11 +103,7 @@ class FenParser {
           if (result != null) {
             final (type, color) = result;
             board.putPiece(
-              ChessPiece(
-                type: type,
-                color: color,
-                position: Position(col, row),
-              ),
+              ChessPiece(type: type, color: color, coord: Coord(col, row)),
             );
           }
           col++;

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:magicf/services/cloud_db.dart';
-import 'package:magicf/services/uci_engine.dart';
-import 'package:magicf/utils/constants.dart';
+import 'package:xqmagic/services/cloud_db.dart';
+import 'package:xqmagic/services/uci_engine.dart';
+import 'package:xqmagic/utils/constants.dart';
+import 'package:xqmagic/viewmodels/game_viewmodel.dart';
 
 /// Represents a single principal variation line from engine analysis.
 class EnginePVLine {
@@ -51,6 +52,88 @@ class EnginePVLine {
 
   /// Get the first move (best move in this line) in ICCS format
   String get bestMove => pv.isNotEmpty ? pv.first : '';
+}
+
+/// 实时引擎分析面板：自动监听 GameViewModel 并显示实时 PV 线路
+///
+/// 这是 `AnalysisPanel` 的状态化包装器，监听引擎分析更新
+/// 并将 `EngineInfo` 自动转换为 `EnginePVLine` 格式
+class LiveAnalysisPanel extends StatefulWidget {
+  const LiveAnalysisPanel({
+    super.key,
+    required this.viewModel,
+    this.cloudResult,
+    this.onBestMoveTap,
+  });
+
+  final GameViewModel viewModel;
+  final CloudQueryResult? cloudResult;
+  final void Function(String iccs)? onBestMoveTap;
+
+  @override
+  State<LiveAnalysisPanel> createState() => _LiveAnalysisPanelState();
+}
+
+class _LiveAnalysisPanelState extends State<LiveAnalysisPanel> {
+  late final VoidCallback _listener;
+
+  @override
+  void initState() {
+    super.initState();
+    _listener = _onViewModelChanged;
+    widget.viewModel.addListener(_listener);
+  }
+
+  @override
+  void dispose() {
+    widget.viewModel.removeListener(_listener);
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant LiveAnalysisPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.viewModel != widget.viewModel) {
+      oldWidget.viewModel.removeListener(_listener);
+      widget.viewModel.addListener(_listener);
+    }
+  }
+
+  void _onViewModelChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = widget.viewModel;
+    final infos = vm.engineInfos;
+
+    // Convert EngineInfo list to EnginePVLine list, sorted by multipv
+    final pvLines = infos
+        .map((info) => EnginePVLine.fromEngineInfo(info))
+        .toList()
+      ..sort((a, b) {
+        final idxA = infos.indexWhere((i) => i.bestMoveICCS == a.bestMove);
+        final idxB = infos.indexWhere((i) => i.bestMoveICCS == b.bestMove);
+        return idxA.compareTo(idxB);
+      });
+
+    return AnalysisPanel(
+      engineInfo: vm.engineManager.isReady
+          ? EngineInfo(
+              depth: 0,
+              score: 0,
+              isMate: false,
+              pv: [],
+            )
+          : null,
+      cloudResult: widget.cloudResult,
+      bestMove: vm.engineBestMove,
+      isAnalyzing: vm.isAnalyzing || vm.engineManager.isThinking,
+      pvLines: pvLines,
+      onBestMoveTap: widget.onBestMoveTap,
+    );
+  }
 }
 
 /// Combined analysis panel showing engine analysis and cloud database results.

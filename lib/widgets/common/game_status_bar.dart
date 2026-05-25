@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:magicf/utils/constants.dart';
-import 'package:magicf/models/game.dart';
+import 'package:xqmagic/utils/constants.dart';
+import 'package:xqmagic/models/game_state.dart';
 
 class GameStatusBar extends StatelessWidget {
   const GameStatusBar({
@@ -22,11 +22,17 @@ class GameStatusBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _buildTurnIndicator('红方', AppConstants.redPieceColor,
-              currentTurn == PieceColor.red),
+          _buildTurnIndicator(
+            '红方',
+            AppConstants.redPieceColor,
+            currentTurn == PieceColor.red,
+          ),
           const SizedBox(width: 32),
-          _buildTurnIndicator('黑方', AppConstants.blackPieceColor,
-              currentTurn == PieceColor.black),
+          _buildTurnIndicator(
+            '黑方',
+            AppConstants.blackPieceColor,
+            currentTurn == PieceColor.black,
+          ),
           if (gameState == GameState.checkmate) ...[
             const SizedBox(width: 32),
             Container(
@@ -37,7 +43,10 @@ class GameStatusBar extends StatelessWidget {
               ),
               child: const Text(
                 '胜负已分',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],

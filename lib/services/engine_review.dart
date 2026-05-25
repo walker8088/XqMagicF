@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:magicf/services/engine_manager.dart';
-import 'package:magicf/services/uci_engine.dart';
+import 'package:xqmagic/services/engine_manager.dart';
+import 'package:xqmagic/services/uci_engine.dart';
 
 /// 引擎复盘：单步着法评估结果
 class EngineReviewMove {

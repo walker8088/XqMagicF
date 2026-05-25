@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:magicf/models/game_mode.dart';
+import 'package:xqmagic/models/game_mode.dart';
 
 /// 引擎控制面板：分析模式、深度、线程、哈希、MultiPV
 class EngineControlPanel extends StatelessWidget {

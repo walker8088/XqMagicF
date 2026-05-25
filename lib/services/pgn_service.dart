@@ -1,12 +1,13 @@
 import 'dart:io';
 
-import 'package:magicf/models/chess_piece.dart';
-import 'package:magicf/models/game_tree.dart';
-import 'package:magicf/models/move.dart';
-import 'package:magicf/utils/constants.dart';
-import 'package:magicf/utils/fen.dart';
-import 'package:magicf/utils/move_notation.dart';
-import 'package:magicf/utils/position.dart';
+import 'package:xqmagic/models/board.dart';
+import 'package:xqmagic/models/chess_piece.dart';
+import 'package:xqmagic/models/game_tree.dart';
+import 'package:xqmagic/models/move.dart';
+import 'package:xqmagic/utils/constants.dart';
+import 'package:xqmagic/utils/fen.dart';
+import 'package:xqmagic/utils/move_notation.dart';
+import 'package:xqmagic/utils/coord.dart';
 
 /// Result of a Chinese Chess game
 enum GameResult {
@@ -116,8 +117,8 @@ class _ParsedMove {
     this.color = PieceColor.red,
   });
 
-  final Position from;
-  final Position to;
+  final Coord from;
+  final Coord to;
   PieceColor color;
   String comment = '';
   final List<String> nags = [];
@@ -499,14 +500,14 @@ class PGNService {
     String startingFen,
     List<PGNParseError> errors,
   ) {
-    final board = _SimpleBoard();
-    _SimpleBoard.parseBoard(startingFen, board);
+    final board = Board();
+    FenParser.parse(startingFen, board);
 
     var currentNode = gameTree.root;
 
     for (final move in moves) {
       // Compute FEN before the move
-      final fenBefore = _SimpleBoard.generateBoard(board, move.color);
+      final fenBefore = FenParser.generate(board, move.color);
 
       // Apply move to board
       final moveRecord = _applyMoveToBoard(board, move, errors);
@@ -524,7 +525,7 @@ class PGNService {
       final nextColor = move.color == PieceColor.red
           ? PieceColor.black
           : PieceColor.red;
-      final fenAfter = _SimpleBoard.generateBoard(board, nextColor);
+      final fenAfter = FenParser.generate(board, nextColor);
 
       // Add to game tree
       currentNode = currentNode.addMainLine(fenAfter, moveRecord);
@@ -555,8 +556,8 @@ class PGNService {
     String fenBefore,
     List<PGNParseError> errors,
   ) {
-    final board = _SimpleBoard();
-    _SimpleBoard.parseBoard(fenBefore, board);
+    final board = Board();
+    FenParser.parse(fenBefore, board);
 
     var currentNode = parentNode;
 
@@ -567,7 +568,7 @@ class PGNService {
       final nextColor = move.color == PieceColor.red
           ? PieceColor.black
           : PieceColor.red;
-      final fenAfter = _SimpleBoard.generateBoard(board, nextColor);
+      final fenAfter = FenParser.generate(board, nextColor);
 
       currentNode = currentNode.addVariation(fenAfter, moveRecord);
 
@@ -581,7 +582,7 @@ class PGNService {
   }
 
   MoveRecord? _applyMoveToBoard(
-    _SimpleBoard board,
+    Board board,
     _ParsedMove move,
     List<PGNParseError> errors,
   ) {
@@ -612,7 +613,7 @@ class PGNService {
     final movedPiece = ChessPiece(
       type: piece.type,
       color: piece.color,
-      position: move.to,
+      coord: move.to,
     );
     board.putPiece(movedPiece);
 
@@ -856,121 +857,7 @@ class _MoveTextWriterState {
 }
 
 /// Simple board implementation for move application during PGN parsing.
-/// Mirrors the Board API needed by FenParser.parse/generate without
-/// requiring the full Board model, keeping the PGN service self-contained.
-class _SimpleBoard {
-  _SimpleBoard();
-
-  static const int boardCols = 9;
-  static const int boardRows = 10;
-
-  final Map<Position, ChessPiece> _pieces = {};
-
-  ChessPiece? getPiece(Position pos) => _pieces[pos];
-
-  void putPiece(ChessPiece piece) {
-    _pieces[piece.position] = piece;
-  }
-
-  void removePiece(Position pos) {
-    _pieces.remove(pos);
-  }
-
-  void clear() {
-    _pieces.clear();
-  }
-
-  /// Convert piece type and color to FEN character
-  static String _pieceToFenChar(PieceType type, PieceColor color) {
-    final char = switch (type) {
-      PieceType.general => 'k',
-      PieceType.advisor => 'a',
-      PieceType.elephant => 'b',
-      PieceType.horse => 'n',
-      PieceType.chariot => 'r',
-      PieceType.cannon => 'c',
-      PieceType.soldier => 'p',
-    };
-    return color == PieceColor.red ? char.toUpperCase() : char;
-  }
-
-  /// Convert FEN character to piece type and color
-  static (PieceType, PieceColor)? _fenCharToPiece(String char) {
-    if (char.isEmpty) return null;
-    final lower = char.toLowerCase();
-    final color = char == lower ? PieceColor.black : PieceColor.red;
-    final type = switch (lower) {
-      'k' => PieceType.general,
-      'a' => PieceType.advisor,
-      'b' => PieceType.elephant,
-      'n' => PieceType.horse,
-      'r' => PieceType.chariot,
-      'c' => PieceType.cannon,
-      'p' => PieceType.soldier,
-      _ => null,
-    };
-    if (type == null) return null;
-    return (type, color);
-  }
-
-  /// Generate FEN string from board state
-  static String generateBoard(_SimpleBoard board, PieceColor activeColor) {
-    final rows = <String>[];
-    for (int row = 0; row < boardRows; row++) {
-      int emptyCount = 0;
-      String rowStr = '';
-      for (int col = 0; col < boardCols; col++) {
-        final piece = board.getPiece(Position(col, row));
-        if (piece == null) {
-          emptyCount++;
-        } else {
-          if (emptyCount > 0) {
-            rowStr += emptyCount.toString();
-            emptyCount = 0;
-          }
-          rowStr += _pieceToFenChar(piece.type, piece.color);
-        }
-      }
-      if (emptyCount > 0) rowStr += emptyCount.toString();
-      rows.add(rowStr);
-    }
-    final boardStr = rows.join('/');
-    return '$boardStr ${activeColor == PieceColor.red ? "r" : "b"}';
-  }
-
-  /// Parse FEN string and populate the board
-  static void parseBoard(String fen, _SimpleBoard board) {
-    board.clear();
-
-    final parts = fen.trim().split(' ');
-    final boardStr = parts[0];
-
-    final fenRows = boardStr.split('/');
-    for (int row = 0; row < fenRows.length && row < boardRows; row++) {
-      int col = 0;
-      for (final char in fenRows[row].split('')) {
-        final emptyCount = int.tryParse(char);
-        if (emptyCount != null) {
-          col += emptyCount;
-        } else {
-          final result = _fenCharToPiece(char);
-          if (result != null) {
-            final (type, color) = result;
-            board.putPiece(
-              ChessPiece(
-                type: type,
-                color: color,
-                position: Position(col, row),
-              ),
-            );
-          }
-          col++;
-        }
-      }
-    }
-  }
-}
-
+/// Uses 2D array _grid[row][col] internally, consistent with Board.
 /// Tokenizer for PGN move text
 class _MoveTextTokenizer {
   _MoveTextTokenizer(String text) {

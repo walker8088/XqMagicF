@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:magicf/services/opening_book.dart';
-import 'package:magicf/viewmodels/game_viewmodel.dart';
+import 'package:xqmagic/services/opening_book.dart';
+import 'package:xqmagic/viewmodels/game_viewmodel.dart';
 
 /// 开局浏览器对话框
 /// 显示所有 ECCO 开局分类，支持搜索和选择开局

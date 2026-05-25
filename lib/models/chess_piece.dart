@@ -1,27 +1,23 @@
 import '../utils/constants.dart';
-import '../utils/position.dart';
+import '../utils/coord.dart';
 
 /// 棋子模型
 class ChessPiece {
   const ChessPiece({
     required this.type,
     required this.color,
-    required this.position,
+    required this.coord,
   });
 
   final PieceType type;
   final PieceColor color;
-  final Position position;
+  final Coord coord;
 
-  ChessPiece copyWith({
-    PieceType? type,
-    PieceColor? color,
-    Position? position,
-  }) {
+  ChessPiece copyWith({PieceType? type, PieceColor? color, Coord? coord}) {
     return ChessPiece(
       type: type ?? this.type,
       color: color ?? this.color,
-      position: position ?? this.position,
+      coord: coord ?? this.coord,
     );
   }
 
@@ -31,8 +27,8 @@ class ChessPiece {
       other is ChessPiece &&
           type == other.type &&
           color == other.color &&
-          position == other.position;
+          coord == other.coord;
 
   @override
-  int get hashCode => type.hashCode ^ color.hashCode ^ position.hashCode;
+  int get hashCode => type.hashCode ^ color.hashCode ^ coord.hashCode;
 }

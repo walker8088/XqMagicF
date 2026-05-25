@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:magicf/services/uci_engine.dart';
+import 'package:xqmagic/services/uci_engine.dart';
 
 /// Manages the lifecycle and analysis requests for a UCI Xiangqi engine.
 ///
@@ -98,6 +98,13 @@ class EngineManager extends ChangeNotifier {
   void setMultiPV(int n) {
     if (n < 1) return;
     _multiPV = n;
+    notifyListeners();
+  }
+
+  /// Set Skill Level for the engine (0-20, UCI standard).
+  void setSkillLevel(int level) {
+    if (level < 0 || level > 20) return;
+    _customOptions['Skill Level'] = level;
     notifyListeners();
   }
 

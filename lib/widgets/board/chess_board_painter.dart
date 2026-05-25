@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:magicf/utils/constants.dart';
-import 'package:magicf/utils/position.dart';
-import '../../models/chess_piece.dart';
-import '../../viewmodels/game_viewmodel.dart';
+import 'package:xqmagic/models/board_render_data.dart';
+import 'package:xqmagic/models/chess_piece.dart';
+import 'package:xqmagic/utils/constants.dart';
+import 'package:xqmagic/utils/coord.dart';
 
+/// 棋盘绘制器
+/// 接收 [BoardRenderData] 纯数据对象，不依赖 ViewModel
 class ChessBoardPainter extends SimplePainter {
   ChessBoardPainter({
     required this.cellSize,
     required this.paddingCells,
-    required this.viewModel,
-    this.inCheckPosition,
+    required this.renderData,
   });
 
   final double cellSize;
   final int paddingCells;
-  final GameViewModel viewModel;
-  final Position? inCheckPosition;
+  final BoardRenderData renderData;
 
   /// 棋盘线区域相对于 Container 的偏移
   double get gridOffset => cellSize * paddingCells;
@@ -41,13 +41,13 @@ class ChessBoardPainter extends SimplePainter {
     // 竖线（9条）
     for (int col = 0; col < AppConstants.boardCols; col++) {
       final x = _gridX(col);
-      // 上半部分（row 0-4）
+      // 红方部分（row 0-4，渲染在下方）
       canvas.drawLine(
         Offset(x, _gridY(0)),
         Offset(x, _gridY(4)),
         col == 0 || col == AppConstants.boardCols - 1 ? thickPaint : linePaint,
       );
-      // 下半部分（row 5-9）
+      // 黑方部分（row 5-9，渲染在上方）
       canvas.drawLine(
         Offset(x, _gridY(5)),
         Offset(x, _gridY(9)),
@@ -66,7 +66,7 @@ class ChessBoardPainter extends SimplePainter {
     }
 
     // 九宫斜线
-    // 黑方九宫（上方）
+    // 红方九宫（下方，row 0-2）
     canvas.drawLine(
       Offset(_gridX(3), _gridY(0)),
       Offset(_gridX(5), _gridY(2)),
@@ -77,7 +77,7 @@ class ChessBoardPainter extends SimplePainter {
       Offset(_gridX(3), _gridY(2)),
       linePaint,
     );
-    // 红方九宫（下方）
+    // 黑方九宫（上方，row 7-9）
     canvas.drawLine(
       Offset(_gridX(3), _gridY(7)),
       Offset(_gridX(5), _gridY(9)),
@@ -91,10 +91,6 @@ class ChessBoardPainter extends SimplePainter {
 
     // 楚河汉界
     _drawRiverText(canvas, canvasSize);
-
-    // 九宫格边框加粗
-    // 左右外侧边框（row 0-2 和 row 7-9）
-    // 已由竖线覆盖
 
     // 起始位置标记（小十字）
     _drawStartMarkers(canvas, linePaint);
@@ -133,11 +129,10 @@ class ChessBoardPainter extends SimplePainter {
   }
 
   void _drawStartMarkers(Canvas canvas, Paint paint) {
-    // 炮和兵的起始位置小十字标记
     final markerPositions = <int, List<int>>{
-      1: [2, 7], // 炮
-      7: [2, 7], // 炮
-      0: [3, 6], // 兵/卒
+      1: [2, 7],
+      7: [2, 7],
+      0: [3, 6],
       2: [3, 6],
       4: [3, 6],
       6: [3, 6],
@@ -173,7 +168,6 @@ class ChessBoardPainter extends SimplePainter {
       canvas.drawLine(Offset(sx, sy), Offset(ex, ey), paint);
     }
 
-    // 只画外侧的角
     if (col > 0) {
       drawLine(-1, -1);
       drawLine(-1, 1);
@@ -185,38 +179,46 @@ class ChessBoardPainter extends SimplePainter {
   }
 
   void _drawMoveHints(Canvas canvas) {
-    if (viewModel.selectedPosition == null) return;
+    if (renderData.selectedPosition == null) return;
 
     final hintPaint = Paint()
       ..color = AppConstants.moveHintColor
       ..style = PaintingStyle.fill;
 
-    for (final pos in viewModel.possibleMoves) {
+    for (final pos in renderData.possibleMoves) {
       final cx = _gridX(pos.col);
       final cy = _gridY(pos.row);
-      final existingPiece = viewModel.currentBoard.getPiece(pos);
 
-      if (existingPiece != null) {
-        // 可吃子位置：画圆环
-        final ringPaint = Paint()
-          ..color = AppConstants.selectedColor
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 3;
-        canvas.drawCircle(Offset(cx, cy), cellSize * 0.45, ringPaint);
-      } else {
-        // 空位：画小圆点
-        canvas.drawCircle(Offset(cx, cy), cellSize * 0.1, hintPaint);
+      if (renderData.isPossibleMove(pos)) {
+        final existingPiece = _pieceAt(pos);
+        if (existingPiece != null) {
+          final ringPaint = Paint()
+            ..color = AppConstants.selectedColor
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 3;
+          canvas.drawCircle(Offset(cx, cy), cellSize * 0.45, ringPaint);
+        } else {
+          canvas.drawCircle(Offset(cx, cy), cellSize * 0.1, hintPaint);
+        }
       }
     }
   }
 
+  ChessPiece? _pieceAt(Coord pos) {
+    for (final piece in renderData.pieces) {
+      if (piece.coord == pos) return piece;
+    }
+    return null;
+  }
+
   void _drawPieces(Canvas canvas) {
-    for (final piece in viewModel.currentBoard.pieces.values) {
-      final cx = _gridX(piece.position.col);
-      final cy = _gridY(piece.position.row);
-      final isSelected = viewModel.isPositionSelected(piece.position);
+    for (final piece in renderData.pieces) {
+      final cx = _gridX(piece.coord.col);
+      final cy = _gridY(piece.coord.row);
+      final isSelected = renderData.isPositionSelected(piece.coord);
       final isInCheck =
-          inCheckPosition != null && inCheckPosition == piece.position;
+          renderData.inCheckPosition != null &&
+          renderData.inCheckPosition == piece.coord;
 
       _drawPieceAt(canvas, piece, cx, cy, isSelected, isInCheck);
     }
@@ -232,7 +234,6 @@ class ChessBoardPainter extends SimplePainter {
   ) {
     final radius = cellSize * AppConstants.pieceRadiusRatio;
 
-    // 将军高亮 - 红色光晕（在棋子之前绘制，位于底层）
     if (isInCheck) {
       canvas.drawCircle(
         Offset(cx, cy),
@@ -295,7 +296,7 @@ class ChessBoardPainter extends SimplePainter {
       );
     }
 
-    // 将军高亮 - 红色圆环（在棋子之后绘制，覆盖在边缘）
+    // 将军高亮
     if (isInCheck) {
       canvas.drawCircle(
         Offset(cx, cy),
@@ -330,14 +331,15 @@ class ChessBoardPainter extends SimplePainter {
   }
 
   double _gridX(int col) => gridOffset + col * cellSize;
-  double _gridY(int row) => gridOffset + row * cellSize;
+  double _gridY(int row) =>
+      gridOffset + (AppConstants.boardRows - 1 - row) * cellSize;
 
   @override
   bool shouldRepaint(covariant ChessBoardPainter oldDelegate) =>
-      inCheckPosition != oldDelegate.inCheckPosition;
+      renderData.inCheckPosition != oldDelegate.renderData.inCheckPosition;
 }
 
-/// 简化版 CustomPainter，始终重绘（由 Provider 触发 widget 重建）
+/// 简化版 CustomPainter，始终重绘
 class SimplePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {}

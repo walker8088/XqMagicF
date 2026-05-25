@@ -40,13 +40,13 @@ class AppConstants {
 enum PieceColor { red, black }
 
 enum PieceType {
-  general,    // 将/帅
-  advisor,    // 士/仕
-  elephant,   // 象/相
-  horse,      // 马/傌
-  chariot,    // 车/俥
-  cannon,     // 炮/砲
-  soldier,    // 卒/兵
+  king, // 将/帅
+  advisor, // 士/仕
+  bishop, // 象/相
+  knight, // 马/傌
+  rook, // 车/俥
+  cannon, // 炮/砲
+  pawn, // 卒/兵
 }
 
 extension PieceTypeExtension on PieceType {

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:magicf/services/cloud_db.dart';
+import 'package:xqmagic/services/cloud_db.dart';
 
 /// 云库复盘：单步着法评估
 class CloudReviewMove {

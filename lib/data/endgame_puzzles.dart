@@ -1,5 +1,3 @@
-import 'package:magicf/utils/position.dart';
-
 /// 残局练习数据
 /// 每个残局包含：名称、FEN 局面、解法（着法序列）
 class EndgamePuzzle {

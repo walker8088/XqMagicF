@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:magicf/game/game_engine.dart';
-import 'package:magicf/utils/constants.dart';
-import 'package:magicf/utils/position.dart';
+import 'package:xqmagic/game/game_engine.dart';
+import 'package:xqmagic/models/board_render_data.dart';
+import 'package:xqmagic/utils/constants.dart';
+import 'package:xqmagic/utils/coord.dart';
 import '../../viewmodels/game_viewmodel.dart';
 import 'chess_board_painter.dart';
 
@@ -20,22 +21,31 @@ class ChessBoard extends StatelessWidget {
   double get boardHeight =>
       cellSize * (AppConstants.boardRows + AppConstants.paddingCells * 2);
 
-  /// 计算当前被将军的将/帅位置
-  Position? _getInCheckPosition() {
+  /// 构建渲染数据（从 ViewModel 提取纯数据）
+  BoardRenderData _buildRenderData() {
     final fen = viewModel.gameTree.currentFen;
-    if (fen == null) return null;
+    Coord? inCheckPos;
 
-    final engine = GameEngine(fen);
-    if (!engine.isInCheck(viewModel.currentTurn)) return null;
-
-    // 查找被将军方的将/帅位置
-    for (final piece in viewModel.currentBoard.pieces.values) {
-      if (piece.type == PieceType.general &&
-          piece.color == viewModel.currentTurn) {
-        return piece.position;
+    if (fen != null) {
+      final engine = GameEngine(fen);
+      if (engine.isInCheck(viewModel.currentTurn)) {
+        for (final piece in engine.board.pieces.values) {
+          if (piece.type == PieceType.king &&
+              piece.color == viewModel.currentTurn) {
+            inCheckPos = piece.coord;
+            break;
+          }
+        }
       }
     }
-    return null;
+
+    return BoardRenderData(
+      pieces: viewModel.currentBoard.pieces.values.toList(),
+      selectedPosition: viewModel.selectedPosition,
+      possibleMoves: viewModel.possibleMoves,
+      lastMove: viewModel.lastMove,
+      inCheckPosition: inCheckPos,
+    );
   }
 
   @override
@@ -45,14 +55,15 @@ class ChessBoard extends StatelessWidget {
         final localPosition = details.localPosition;
         final col =
             (localPosition.dx / cellSize).round() - AppConstants.paddingCells;
-        final row =
+        final rawRow =
             (localPosition.dy / cellSize).round() - AppConstants.paddingCells;
+        final row = (AppConstants.boardRows - 1) - rawRow;
 
         if (col >= 0 &&
             col < AppConstants.boardCols &&
             row >= 0 &&
             row < AppConstants.boardRows) {
-          viewModel.selectPiece(Position(col, row));
+          viewModel.selectPiece(Coord(col, row));
         }
       },
       child: Container(
@@ -74,8 +85,7 @@ class ChessBoard extends StatelessWidget {
           painter: ChessBoardPainter(
             cellSize: cellSize,
             paddingCells: AppConstants.paddingCells,
-            viewModel: viewModel,
-            inCheckPosition: _getInCheckPosition(),
+            renderData: _buildRenderData(),
           ),
         ),
       ),

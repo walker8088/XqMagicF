@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:path_provider/path_provider.dart';
+import 'package:xqmagic/utils/storage_service.dart';
 
 /// 书签数据模型
 class Bookmark {
@@ -191,18 +191,7 @@ class BookmarkService {
   final List<Bookmark> _bookmarks = [];
   bool _initialized = false;
 
-  Future<Directory> get _storageDir async {
-    final dir = await getApplicationSupportDirectory();
-    return Directory('${dir.path}/magicf');
-  }
-
-  Future<File> get _file async {
-    final dir = await _storageDir;
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
-    }
-    return File('${dir.path}/$_fileName');
-  }
+  Future<File> get _file => StorageService.getFile(_fileName);
 
   Future<void> _ensureInitialized() async {
     if (_initialized) return;
@@ -342,18 +331,7 @@ class GameRecordService {
   final List<SavedGame> _games = [];
   bool _initialized = false;
 
-  Future<Directory> get _storageDir async {
-    final dir = await getApplicationSupportDirectory();
-    return Directory('${dir.path}/magicf');
-  }
-
-  Future<File> get _file async {
-    final dir = await _storageDir;
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
-    }
-    return File('${dir.path}/$_fileName');
-  }
+  Future<File> get _file => StorageService.getFile(_fileName);
 
   Future<void> _ensureInitialized() async {
     if (_initialized) return;
@@ -510,18 +488,7 @@ class RecentFilesService {
   final List<RecentFileEntry> _entries = [];
   bool _initialized = false;
 
-  Future<Directory> get _storageDir async {
-    final dir = await getApplicationSupportDirectory();
-    return Directory('${dir.path}/magicf');
-  }
-
-  Future<File> get _file async {
-    final dir = await _storageDir;
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
-    }
-    return File('${dir.path}/$_fileName');
-  }
+  Future<File> get _file => StorageService.getFile(_fileName);
 
   Future<void> _ensureInitialized() async {
     if (_initialized) return;

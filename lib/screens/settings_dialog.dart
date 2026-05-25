@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:magicf/utils/app_settings.dart';
+import 'package:provider/provider.dart';
+import 'package:xqmagic/utils/app_settings.dart';
+import 'package:xqmagic/viewmodels/game_viewmodel.dart';
 
 /// 设置对话框
 ///
@@ -16,6 +18,16 @@ class SettingsDialog extends StatefulWidget {
     );
   }
 
+  /// Show settings dialog and apply changes to the running engine.
+  static Future<void> showAndApply(BuildContext context) async {
+    await show(context);
+    // After dialog closes, apply settings to the engine if it's running
+    if (context.mounted) {
+      final vm = context.read<GameViewModel>();
+      await vm.syncSettingsToEngine();
+    }
+  }
+
   @override
   State<SettingsDialog> createState() => _SettingsDialogState();
 }
@@ -27,6 +39,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
   late int _engineTime; // seconds
   late int _engineThreads;
   late int _engineHash; // MB
+  late int _engineSkillLevel; // 0-20
   late int _multiPV;
 
   // Display settings
@@ -52,6 +65,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
     _engineTime = 5; // Default 5s, stored as seconds
     _engineThreads = settings.engineThreads;
     _engineHash = settings.engineHash;
+    _engineSkillLevel = settings.engineSkillLevel;
     _multiPV = settings.multiPV;
 
     _boardScale = settings.boardScale;
@@ -69,6 +83,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
     await settings.setEngineDepth(_engineDepth);
     await settings.setEngineThreads(_engineThreads);
     await settings.setEngineHash(_engineHash);
+    await settings.setEngineSkillLevel(_engineSkillLevel);
     await settings.setMultiPV(_multiPV);
 
     await settings.setBoardScale(_boardScale);
@@ -216,6 +231,17 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   DropdownMenuItem(value: 1024, child: Text('1024 MB')),
                 ],
                 onChanged: (v) => setState(() => _engineHash = v ?? 256),
+              ),
+              const SizedBox(height: 12),
+              _buildSlider(
+                context: context,
+                label: 'Skill Level',
+                value: _engineSkillLevel.toDouble(),
+                min: 0,
+                max: 20,
+                divisions: 20,
+                onChanged: (v) => setState(() => _engineSkillLevel = v.round()),
+                displayValue: '$_engineSkillLevel',
               ),
               const SizedBox(height: 12),
               _buildSlider(

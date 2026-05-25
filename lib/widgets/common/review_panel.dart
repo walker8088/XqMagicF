@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:magicf/widgets/common/cloud_review_panel.dart';
-import 'package:magicf/widgets/common/engine_review_panel.dart';
+import 'package:xqmagic/widgets/common/cloud_review_panel.dart';
+import 'package:xqmagic/widgets/common/engine_review_panel.dart';
 
 /// 复盘面板：在云库复盘和引擎复盘之间切换
 class ReviewPanel extends StatefulWidget {

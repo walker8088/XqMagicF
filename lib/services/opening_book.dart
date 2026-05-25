@@ -1,4 +1,4 @@
-import 'package:magicf/utils/lru_cache.dart';
+import 'package:xqmagic/utils/lru_cache.dart';
 
 /// 着法来源
 enum OpeningSource {

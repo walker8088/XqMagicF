@@ -1,23 +1,24 @@
 import 'package:flutter/foundation.dart';
-import 'package:magicf/data/endgame_puzzles.dart';
-import 'package:magicf/game/game_engine.dart';
-import 'package:magicf/game/move_validator.dart';
-import 'package:magicf/models/board.dart';
-import 'package:magicf/models/chess_piece.dart';
-import 'package:magicf/models/game.dart';
-import 'package:magicf/models/game_mode.dart';
-import 'package:magicf/models/game_tree.dart';
-import 'package:magicf/models/move.dart';
-import 'package:magicf/services/cloud_db.dart';
-import 'package:magicf/services/cloud_review.dart';
-import 'package:magicf/services/engine_review.dart';
-import 'package:magicf/services/engine_manager.dart';
-import 'package:magicf/services/opening_book.dart';
-import 'package:magicf/utils/constants.dart';
-import 'package:magicf/utils/fen.dart';
-import 'package:magicf/utils/move_notation.dart';
-import 'package:magicf/utils/position.dart';
-import 'package:magicf/utils/sound_manager.dart';
+import 'package:xqmagic/data/endgame_puzzles.dart';
+import 'package:xqmagic/game/game_engine.dart';
+import 'package:xqmagic/models/board.dart';
+import 'package:xqmagic/models/chess_piece.dart';
+import 'package:xqmagic/models/game_state.dart';
+import 'package:xqmagic/models/game_mode.dart';
+import 'package:xqmagic/models/game_tree.dart';
+import 'package:xqmagic/models/move.dart';
+import 'package:xqmagic/services/cloud_db.dart';
+import 'package:xqmagic/services/cloud_review.dart';
+import 'package:xqmagic/services/engine_review.dart';
+import 'package:xqmagic/services/engine_manager.dart';
+import 'package:xqmagic/services/uci_engine.dart';
+import 'package:xqmagic/services/opening_book.dart';
+import 'package:xqmagic/utils/app_settings.dart';
+import 'package:xqmagic/utils/constants.dart';
+import 'package:xqmagic/utils/move_notation.dart';
+import 'package:xqmagic/utils/fen.dart';
+import 'package:xqmagic/utils/coord.dart';
+import 'package:xqmagic/utils/sound_manager.dart';
 
 /// 游戏视图模型：管理 UI 状态
 class GameViewModel extends ChangeNotifier {
@@ -67,8 +68,8 @@ class GameViewModel extends ChangeNotifier {
   bool get isAnalyzing => _isAnalyzing;
 
   /// 当前选中位置
-  Position? selectedPosition;
-  List<Position> possibleMoves = [];
+  Coord? selectedPosition;
+  List<Coord> possibleMoves = [];
 
   /// 上一步走法（用于高亮）
   MoveRecord? lastMove;
@@ -94,24 +95,29 @@ class GameViewModel extends ChangeNotifier {
 
   void _init() {
     gameTree.initStandard();
-    _loadBoardFromTree();
     engine = GameEngine(gameTree.current!.fen);
+
+    // 监听云库查询结果
+    cloudDB.addListener((result) {
+      cloudResult = result;
+      debugPrint(
+        '[GameViewModel] 云库查询: ${result?.moves.length ?? 0} 条着法, '
+        '最佳=${result?.bestMove ?? "无"}',
+      );
+      notifyListeners();
+    });
   }
 
-  /// 从棋谱树加载棋盘
-  void _loadBoardFromTree() {
+  /// 从棋谱树同步引擎状态
+  void _syncEngineFromTree() {
     final fen = gameTree.currentFen;
     if (fen != null) {
-      final parts = fen.split(' ');
-      _activeColor = parts.length > 1 && parts[1] == 'b'
-          ? PieceColor.black
-          : PieceColor.red;
+      engine = GameEngine(fen);
     }
   }
 
-  /// 当前回合方
-  PieceColor _activeColor = PieceColor.red;
-  PieceColor get currentTurn => _activeColor;
+  /// 当前回合方（委托给引擎）
+  PieceColor get currentTurn => engine.currentTurn;
 
   /// 游戏状态
   GameState _state = GameState.playing;
@@ -133,8 +139,7 @@ class GameViewModel extends ChangeNotifier {
   void _loadPuzzle() {
     if (currentPuzzle == null) return;
     gameTree.initFromFen(currentPuzzle!.fen);
-    _loadBoardFromTree();
-    engine = GameEngine(gameTree.current!.fen);
+    _syncEngineFromTree();
     selectedPosition = null;
     possibleMoves = [];
     puzzleSolutionIndex = 0;
@@ -163,8 +168,7 @@ class GameViewModel extends ChangeNotifier {
   /// 新局
   void newGame() {
     gameTree.initStandard();
-    _loadBoardFromTree();
-    engine = GameEngine(gameTree.current!.fen);
+    _syncEngineFromTree();
     selectedPosition = null;
     possibleMoves = [];
     lastMove = null;
@@ -183,8 +187,7 @@ class GameViewModel extends ChangeNotifier {
   /// 编辑局面：从 FEN 加载
   void loadFromFen(String fen) {
     gameTree.initFromFen(fen);
-    _loadBoardFromTree();
-    engine = GameEngine(fen);
+    _syncEngineFromTree();
     selectedPosition = null;
     possibleMoves = [];
     lastMove = null;
@@ -195,7 +198,7 @@ class GameViewModel extends ChangeNotifier {
   }
 
   /// 选择棋子
-  void selectPiece(Position pos) {
+  void selectPiece(Coord pos) {
     if (state == GameState.checkmate) return;
 
     // 残局模式：如果轮到人走且是红方，验证是否走的是解法中的着法
@@ -234,10 +237,14 @@ class GameViewModel extends ChangeNotifier {
     }
   }
 
-  void _handlePuzzleMove(Position from, Position to) {
+  void _handlePuzzleMove(Coord from, Coord to) {
+    final piece = _getPieceAt(from);
+    if (piece == null) return;
+
     final moveRecord = MoveRecord(
       from: from,
       to: to,
+      pieceType: piece.type,
       capturedPiece: _getPieceAt(to),
       color: currentTurn,
     );
@@ -272,9 +279,12 @@ class GameViewModel extends ChangeNotifier {
     if (puzzleSolutionIndex < currentPuzzle!.solution.length) {
       final iccs = currentPuzzle!.solution[puzzleSolutionIndex];
       final (from, to) = MoveNotation.fromICCS(iccs);
+      final piece = _getPieceAt(from);
+      if (piece == null) return;
       final moveRecord = MoveRecord(
         from: from,
         to: to,
+        pieceType: piece.type,
         capturedPiece: _getPieceAt(to),
         color: currentTurn,
       );
@@ -283,7 +293,7 @@ class GameViewModel extends ChangeNotifier {
     }
   }
 
-  void _movePiece(Position from, Position to) {
+  void _movePiece(Coord from, Coord to) {
     final piece = _getPieceAt(from);
     if (piece == null) return;
 
@@ -291,6 +301,7 @@ class GameViewModel extends ChangeNotifier {
     final moveRecord = MoveRecord(
       from: from,
       to: to,
+      pieceType: piece.type,
       capturedPiece: _getPieceAt(to),
       color: currentTurn,
     );
@@ -301,126 +312,69 @@ class GameViewModel extends ChangeNotifier {
   }
 
   void _executeMove(MoveRecord move) {
-    // 更新棋谱树
-    final fenAfter = _simulateMove(move);
-    gameTree.makeMove(move, fenAfter);
+    // 走子前生成中文记谱（需要当前棋盘状态处理同线多子）
+    final notation = MoveNotation.toText(engine.board.pieces, move);
+    final moveWithNotation = move.withNotation(notation);
 
-    lastMove = move;
+    // 在引擎上执行走子，然后记录新 FEN 到棋谱树
+    engine.forceMove(move.from, move.to);
+    final fenAfter = engine.currentFen;
+    gameTree.makeMove(moveWithNotation, fenAfter);
+
+    lastMove = moveWithNotation;
     selectedPosition = null;
     possibleMoves = [];
     bestMoveHint = null;
     cloudResult = null;
 
-    // 切换回合
-    _activeColor = currentTurn == PieceColor.red
-        ? PieceColor.black
-        : PieceColor.red;
-
     _checkGameEnd();
     notifyListeners();
 
-    // 播放音效
+    _playMoveSound(moveWithNotation);
+    _triggerAutoAnalysis();
+  }
+
+  /// 播放走子音效（与核心逻辑分离）
+  void _playMoveSound(MoveRecord move) {
+    if (!soundEnabled) return;
     if (move.capturedPiece != null) {
       SoundManager.instance.playCapture();
     } else {
       SoundManager.instance.playMove();
     }
+  }
 
-    // 触发云库查询（如果需要）
+  /// 触发自动分析（云库/引擎）
+  void _triggerAutoAnalysis() {
+    // 云库查询
     if (_priorityMode == PriorityMode.cloud &&
         (_mode == GameMode.free || _mode == GameMode.engineOnline)) {
       _queryCloudForPosition();
     }
 
-    // 触发引擎分析（引擎辅助/连线模式）
+    // 引擎分析
     if (_mode == GameMode.engineAssist || _mode == GameMode.engineOnline) {
       _triggerEngineAnalysis();
     }
 
-    // 引擎对战模式：引擎走棋
+    // 引擎对战
     if (_mode == GameMode.engineFight) {
       _triggerEngineFightMove();
     }
   }
 
-  /// 模拟走子并返回新 FEN
-  String _simulateMove(MoveRecord move) {
-    final board = Board();
-    FenParser.parse(gameTree.currentFen!, board);
-    board.movePiece(move.from, move.to);
-    final nextColor = currentTurn == PieceColor.red
-        ? PieceColor.black
-        : PieceColor.red;
-    return FenParser.generate(board, nextColor);
-  }
+  /// 获取合法走法（委托给引擎）
+  List<MoveRecord> _getLegalMoves(Coord from) => engine.getLegalMoves(from);
 
-  List<MoveRecord> _getLegalMoves(Position from) {
-    final piece = _getPieceAt(from);
-    if (piece == null) return [];
+  /// 获取当前棋盘（委托给引擎）
+  Board get currentBoard => engine.board;
 
-    final board = Board();
-    FenParser.parse(gameTree.currentFen!, board);
+  /// 获取指定位置的棋子（委托给引擎）
+  ChessPiece? _getPieceAt(Coord pos) => engine.board.getPiece(pos);
 
-    final allPieces = board.pieces.values.toList();
-    final obstacles = allPieces.map((p) => p.position).toList();
-    final moves = <MoveRecord>[];
-
-    for (int col = 0; col < AppConstants.boardCols; col++) {
-      for (int row = 0; row < AppConstants.boardRows; row++) {
-        final to = Position(col, row);
-        final targetPiece = board.getPiece(to);
-        if (targetPiece != null && targetPiece.color == piece.color) continue;
-
-        final pieceObstacles = obstacles.where((p) => p != to).toList();
-        if (MoveValidator.isValidMove(
-          type: piece.type,
-          color: piece.color,
-          from: from,
-          to: to,
-          obstacles: pieceObstacles,
-        )) {
-          moves.add(
-            MoveRecord(
-              from: from,
-              to: to,
-              capturedPiece: targetPiece,
-              color: piece.color,
-            ),
-          );
-        }
-      }
-    }
-    return moves;
-  }
-
-  /// 获取当前棋盘（从 FEN 解析）
-  Board get currentBoard {
-    final board = Board();
-    final fen = gameTree.currentFen;
-    if (fen != null) {
-      FenParser.parse(fen, board);
-    }
-    return board;
-  }
-
-  ChessPiece? _getPieceAt(Position pos) {
-    final board = Board();
-    FenParser.parse(gameTree.currentFen!, board);
-    return board.getPiece(pos);
-  }
-
+  /// 检查游戏是否结束
   void _checkGameEnd() {
-    final board = Board();
-    FenParser.parse(gameTree.currentFen!, board);
-
-    final redGeneral = board.pieces.values.any(
-      (p) => p.type == PieceType.general && p.color == PieceColor.red,
-    );
-    final blackGeneral = board.pieces.values.any(
-      (p) => p.type == PieceType.general && p.color == PieceColor.black,
-    );
-
-    if (!redGeneral || !blackGeneral) {
+    if (engine.isCheckmate(engine.currentTurn)) {
       _state = GameState.checkmate;
     } else {
       _state = GameState.playing;
@@ -469,6 +423,7 @@ class GameViewModel extends ChangeNotifier {
       final moveRecord = MoveRecord(
         from: from,
         to: to,
+        pieceType: piece.type,
         capturedPiece: _getPieceAt(to),
         color: currentTurn,
       );
@@ -519,24 +474,34 @@ class GameViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 将 AppSettings 中的配置同步到运行中的引擎
+  /// 在设置对话框保存后调用
+  Future<void> syncSettingsToEngine() async {
+    final settings = AppSettings.instance;
+    engineManager.setDepth(settings.engineDepth);
+    engineManager.setThreads(settings.engineThreads);
+    engineManager.setHash(settings.engineHash);
+    engineManager.setSkillLevel(settings.engineSkillLevel);
+    engineManager.setMultiPV(settings.multiPV);
+    await engineManager.applyConfiguration();
+  }
+
   /// 获取引擎最佳着法（用于显示箭头提示）
   String? get engineBestMove => engineManager.getCurrentBestMove();
 
   /// 获取引擎评估分数
   int? get engineScore => engineManager.getCurrentScore();
 
+  /// 获取引擎所有 PV 线路
+  List<EngineInfo> get engineInfos => engineManager.allInfos;
+
   // === 面板可见性 ===
 
-  /// 当前显示的左侧面板: 'none', 'bookmark', 'library'
+  /// 当前显示的面板: 'none', 'cloud'
   String _leftPanel = 'none';
   String get leftPanel => _leftPanel;
-  void showBookmarkPanel() {
-    _leftPanel = _leftPanel == 'bookmark' ? 'none' : 'bookmark';
-    notifyListeners();
-  }
-
-  void showLibraryPanel() {
-    _leftPanel = _leftPanel == 'library' ? 'none' : 'library';
+  void showCloudPanel() {
+    _leftPanel = _leftPanel == 'cloud' ? 'none' : 'cloud';
     notifyListeners();
   }
 
@@ -545,19 +510,12 @@ class GameViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool get isBookmarkPanelVisible => _leftPanel == 'bookmark';
-  bool get isLibraryPanelVisible => _leftPanel == 'library';
+  bool get isCloudPanelVisible => _leftPanel == 'cloud';
 
-  // === 右侧面板模式 ===
-  /// 'analysis' 或 'review'
-  String _rightPanel = 'analysis';
+  // === 右侧面板：复盘 ===
+  final String _rightPanel = 'review';
   String get rightPanel => _rightPanel;
-  void toggleRightPanel() {
-    _rightPanel = _rightPanel == 'analysis' ? 'review' : 'analysis';
-    notifyListeners();
-  }
 
-  bool get isAnalysisPanel => _rightPanel == 'analysis';
   bool get isReviewPanel => _rightPanel == 'review';
 
   // === 引擎复盘 ===
@@ -568,23 +526,19 @@ class GameViewModel extends ChangeNotifier {
     final moves = gameTree.movesFromRoot;
     if (moves.isEmpty) return;
 
+    final pathRev = gameTree.getPathToCurrent();
+
     final fenList = <String>[];
     final iccsList = <String>[];
     final chineseList = <String>[];
-
-    final path = <GameTreeNode>[];
-    var tempNode = gameTree.current;
-    while (tempNode != null) {
-      path.add(tempNode);
-      tempNode = tempNode.parent;
-    }
-    final pathRev = path.reversed.toList();
 
     for (int i = 0; i < pathRev.length - 1; i++) {
       fenList.add(pathRev[i].fen);
       final move = pathRev[i + 1].move!;
       iccsList.add(MoveNotation.toICCS(move));
-      chineseList.add(MoveNotation.toChinese(move));
+      final boardBefore = Board();
+      FenParser.parse(pathRev[i].fen, boardBefore);
+      chineseList.add(MoveNotation.toText(boardBefore.pieces, move));
     }
 
     engineReviewProgress = 0.0;
@@ -628,51 +582,42 @@ class GameViewModel extends ChangeNotifier {
 
   // === 导航操作 ===
 
+  void _clearSelection() {
+    selectedPosition = null;
+    possibleMoves = [];
+  }
+
+  void _syncAndClear() {
+    _syncEngineFromTree();
+    _clearSelection();
+    notifyListeners();
+  }
+
   /// 前进一步
   bool goForward({int? variationIndex}) {
     final result = gameTree.goForward(variationIndex: variationIndex);
-    if (result) {
-      _loadBoardFromTree();
-      selectedPosition = null;
-      possibleMoves = [];
-      notifyListeners();
-    }
+    if (result) _syncAndClear();
     return result;
   }
 
   /// 后退一步
   bool goBack() {
     final result = gameTree.goBack();
-    if (result) {
-      _loadBoardFromTree();
-      selectedPosition = null;
-      possibleMoves = [];
-      notifyListeners();
-    }
+    if (result) _syncAndClear();
     return result;
   }
 
   /// 回到开始
   bool goToStart() {
     final result = gameTree.goToStart();
-    if (result) {
-      _loadBoardFromTree();
-      selectedPosition = null;
-      possibleMoves = [];
-      notifyListeners();
-    }
+    if (result) _syncAndClear();
     return result;
   }
 
   /// 回到主变着
   bool goToMainLine() {
     final result = gameTree.goToMainLine();
-    if (result) {
-      _loadBoardFromTree();
-      selectedPosition = null;
-      possibleMoves = [];
-      notifyListeners();
-    }
+    if (result) _syncAndClear();
     return result;
   }
 
@@ -688,6 +633,24 @@ class GameViewModel extends ChangeNotifier {
   /// 走法序列
   List<MoveRecord> get movesFromRoot => gameTree.movesFromRoot;
 
+  /// 走法序列的中文记法（优先使用 MoveRecord 中已存储的记谱）
+  List<String> get moveNotations {
+    final path = gameTree.getPathToCurrent();
+    final notations = <String>[];
+    for (int i = 0; i < path.length - 1; i++) {
+      final move = path[i + 1].move!;
+      // 优先使用已存储的记谱，否则重新生成
+      if (move.notation != null && move.notation!.isNotEmpty) {
+        notations.add(move.notation!);
+      } else {
+        final boardBefore = Board();
+        FenParser.parse(path[i].fen, boardBefore);
+        notations.add(MoveNotation.toText(boardBefore.pieces, move));
+      }
+    }
+    return notations;
+  }
+
   /// 当前节点的变着列表
   List<GameTreeNode> get variations => gameTree.current?.children ?? [];
 
@@ -696,26 +659,19 @@ class GameViewModel extends ChangeNotifier {
     final moves = gameTree.movesFromRoot;
     if (moves.isEmpty) return;
 
-    // 收集 FEN 列表和走法列表（从根节点遍历到当前节点）
+    final pathRev = gameTree.getPathToCurrent();
+
     final fenList = <String>[];
     final iccsList = <String>[];
     final chineseList = <String>[];
 
-    // 构建从根到当前的路径
-    final path = <GameTreeNode>[];
-    var tempNode = gameTree.current;
-    while (tempNode != null) {
-      path.add(tempNode);
-      tempNode = tempNode.parent;
-    }
-    final pathRev = path.reversed.toList();
-
-    // path[0] 是根节点，path[1] 是第一步后的节点，以此类推
     for (int i = 0; i < pathRev.length - 1; i++) {
       fenList.add(pathRev[i].fen);
       final move = pathRev[i + 1].move!;
       iccsList.add(MoveNotation.toICCS(move));
-      chineseList.add(MoveNotation.toChinese(move));
+      final boardBefore = Board();
+      FenParser.parse(pathRev[i].fen, boardBefore);
+      chineseList.add(MoveNotation.toText(boardBefore.pieces, move));
     }
 
     cloudReviewProgress = 0.0;
@@ -743,8 +699,8 @@ class GameViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool isPositionSelected(Position pos) => selectedPosition == pos;
-  bool isPossibleMove(Position pos) => possibleMoves.contains(pos);
+  bool isPositionSelected(Coord pos) => selectedPosition == pos;
+  bool isPossibleMove(Coord pos) => possibleMoves.contains(pos);
 
   // === 开局识别 ===
 

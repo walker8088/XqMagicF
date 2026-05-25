@@ -80,6 +80,10 @@ class AppSettings {
   int get engineHash => get<int>('engine_hash', 256);
   Future<void> setEngineHash(int mb) => set('engine_hash', mb);
 
+  int get engineSkillLevel => get<int>('engine_skill_level', 20);
+  Future<void> setEngineSkillLevel(int level) =>
+      set('engine_skill_level', level);
+
   String get enginePath => get<String>('engine_path', '');
   Future<void> setEnginePath(String path) => set('engine_path', path);
 

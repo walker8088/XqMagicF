@@ -2,20 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:multi_split_view/multi_split_view.dart';
 import 'package:provider/provider.dart';
-import '../models/game.dart';
+import '../models/game_state.dart';
 import '../models/game_mode.dart';
 import '../utils/constants.dart';
 import '../viewmodels/game_viewmodel.dart';
 import '../widgets/board/chess_board.dart';
 import '../widgets/common/analysis_panel.dart';
-import '../widgets/common/bookmark_panel.dart';
-import '../widgets/common/engine_control_panel.dart';
-import '../widgets/common/game_library_panel.dart';
 import '../widgets/common/move_history_panel.dart';
 import '../widgets/common/opening_browser.dart';
 import '../widgets/common/review_panel.dart';
 import 'pgn_dialog.dart';
-import 'settings_dialog.dart';
+import 'package:xqmagic/screens/settings_dialog.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
@@ -26,6 +23,7 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> {
   late MultiSplitViewController _splitController;
+  late MultiSplitViewController _verticalSplitController;
   String _lastLeftPanel = '';
 
   @override
@@ -39,11 +37,19 @@ class _GameScreenState extends State<GameScreen> {
         Area(size: 280, min: 200, max: 500),
       ],
     );
+    // 垂直分栏：主内容区和底部面板
+    _verticalSplitController = MultiSplitViewController(
+      areas: [
+        Area(flex: 3, min: 200), // 主内容区（棋盘）
+        Area(size: 120, min: 80, max: 300), // 底部引擎分析面板
+      ],
+    );
   }
 
   @override
   void dispose() {
     _splitController.dispose();
+    _verticalSplitController.dispose();
     super.dispose();
   }
 
@@ -79,39 +85,53 @@ class _GameScreenState extends State<GameScreen> {
                     data: MultiSplitViewThemeData(
                       dividerPainter: DividerPainters.grooved2(
                         backgroundColor: const Color(0xFF2E1A0E),
-                        color: const Color(0xFFF5DEB3).withOpacity(0.3),
-                        thickness: 2,
+                        color: const Color(0xFFF5DEB3).withOpacity(0.5),
+                        thickness: 4,
                       ),
                     ),
                     child: MultiSplitView(
-                      axis: Axis.horizontal,
-                      controller: _splitController,
-                      builder: (context, area) {
-                        switch (area.index) {
+                      axis: Axis.vertical,
+                      controller: _verticalSplitController,
+                      builder: (context, vArea) {
+                        switch (vArea.index) {
                           case 0:
-                            return vm.leftPanel != 'none'
-                                ? _buildLeftPanel(context, vm)
-                                : const SizedBox.shrink();
+                            // 主内容区：水平三栏（左面板、棋盘、右面板）
+                            return MultiSplitViewTheme(
+                              data: MultiSplitViewThemeData(
+                                dividerPainter: DividerPainters.grooved2(
+                                  backgroundColor: const Color(0xFF2E1A0E),
+                                  color: const Color(0xFFF5DEB3).withOpacity(0.3),
+                                  thickness: 2,
+                                ),
+                              ),
+                              child: MultiSplitView(
+                                axis: Axis.horizontal,
+                                controller: _splitController,
+                                builder: (context, area) {
+                                  switch (area.index) {
+                                    case 0:
+                                      return vm.leftPanel != 'none'
+                                          ? _buildLeftPanel(context, vm)
+                                          : const SizedBox.shrink();
+                                    case 1:
+                                      return _buildBoardArea(context, vm);
+                                    case 2:
+                                      return _buildRightPanel(context, vm);
+                                    default:
+                                      return const SizedBox.shrink();
+                                  }
+                                },
+                              ),
+                            );
                           case 1:
-                            return _buildBoardArea(context, vm);
-                          case 2:
-                            return _buildRightPanel(context, vm);
+                            // 底部面板：引擎分析
+                            return _buildBottomPanel(context, vm);
                           default:
                             return const SizedBox.shrink();
                         }
                       },
                     ),
                   ),
-                ),
-                EngineControlPanel(
-                  analysisMode: vm.analysisMode,
-                  priorityMode: vm.priorityMode,
-                  multiPV: vm.multiPV,
-                  isAnalyzing: vm.isAnalyzing,
-                  onAnalysisModeChanged: vm.setAnalysisMode,
-                  onPriorityModeChanged: vm.setPriorityMode,
-                  onMultiPVChanged: vm.setMultiPV,
-                  onToggleAnalysis: () => vm.toggleAnalysis(),
                 ),
                 _buildStatusBar(vm),
               ],
@@ -154,6 +174,7 @@ class _GameScreenState extends State<GameScreen> {
             flex: 2,
             child: MoveHistoryPanel(
               moves: vm.movesFromRoot,
+              notations: vm.moveNotations,
               currentIndex: vm.depth - 1,
               onTapMove: (index) {
                 vm.goToStart();
@@ -165,14 +186,7 @@ class _GameScreenState extends State<GameScreen> {
           ),
           Expanded(
             flex: 3,
-            child: vm.isAnalysisPanel
-                ? AnalysisPanel(
-                    bestMove: vm.engineBestMove ?? vm.bestMoveHint,
-                    cloudResult: vm.cloudResult,
-                    isAnalyzing: vm.isAnalyzing || vm.engineManager.isThinking,
-                    onBestMoveTap: (iccs) => vm.playEngineMove(iccs),
-                  )
-                : const ReviewPanel(),
+            child: const ReviewPanel(),
           ),
         ],
       ),
@@ -222,25 +236,11 @@ class _GameScreenState extends State<GameScreen> {
           ),
           const Spacer(),
           _sidePanelButton(
-            icon: Icons.bookmark_border,
-            activeIcon: Icons.bookmark,
-            isActive: vm.isBookmarkPanelVisible,
-            tooltip: '收藏',
-            onPressed: vm.showBookmarkPanel,
-          ),
-          _sidePanelButton(
-            icon: Icons.folder_open,
-            activeIcon: Icons.folder,
-            isActive: vm.isLibraryPanelVisible,
-            tooltip: '棋谱库',
-            onPressed: vm.showLibraryPanel,
-          ),
-          _sidePanelButton(
-            icon: vm.isAnalysisPanel ? Icons.analytics : Icons.replay,
-            isActive: false,
-            tooltip: vm.isAnalysisPanel ? '切换到复盘' : '切换到分析',
-            onPressed: vm.toggleRightPanel,
-            label: vm.isAnalysisPanel ? '分析' : '复盘',
+            icon: Icons.cloud_outlined,
+            activeIcon: Icons.cloud,
+            isActive: vm.isCloudPanelVisible,
+            tooltip: '云库查询',
+            onPressed: vm.showCloudPanel,
           ),
           const SizedBox(width: 8),
           const VerticalDivider(color: Colors.white24, width: 1),
@@ -279,7 +279,7 @@ class _GameScreenState extends State<GameScreen> {
             icon: const Icon(Icons.settings, size: 18),
             color: Colors.white70,
             tooltip: '设置',
-            onPressed: () => SettingsDialog.show(context),
+            onPressed: () => SettingsDialog.showAndApply(context),
           ),
           IconButton(
             icon: const Icon(Icons.refresh, size: 18),
@@ -377,15 +377,15 @@ class _GameScreenState extends State<GameScreen> {
             color: Colors.black.withOpacity(0.2),
             child: Row(
               children: [
-                Icon(
-                  vm.isBookmarkPanelVisible ? Icons.bookmark : Icons.folder,
+                const Icon(
+                  Icons.cloud,
                   size: 16,
-                  color: const Color(0xFFF5DEB3),
+                  color: Color(0xFFF5DEB3),
                 ),
                 const SizedBox(width: 6),
-                Text(
-                  vm.isBookmarkPanelVisible ? '收藏' : '棋谱库',
-                  style: const TextStyle(
+                const Text(
+                  '云库查询',
+                  style: TextStyle(
                     color: Color(0xFFF5DEB3),
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
@@ -403,19 +403,148 @@ class _GameScreenState extends State<GameScreen> {
             ),
           ),
           Expanded(
-            child: vm.isBookmarkPanelVisible
-                ? const BookmarkPanel()
-                : GameLibraryPanel(
-                    viewModel: vm,
-                    onImportPGN: () {
-                      showDialog(
-                        context: context,
-                        builder: (_) => PGNOpenDialog(viewModel: vm),
-                      );
-                    },
+            child: vm.cloudResult != null
+                ? CloudMoveList(
+                    moves: vm.cloudResult!.moves,
+                    bestScore: vm.cloudResult!.bestScore,
+                    onMoveTap: (iccs) => vm.playEngineMove(iccs),
+                  )
+                : Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.cloud_outlined,
+                            size: 48,
+                            color: Colors.white24,
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            '走棋后自动查询云库',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white54,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 底部面板：引擎控制 + 引擎分析合并
+  Widget _buildBottomPanel(BuildContext context, GameViewModel vm) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      color: Colors.black.withOpacity(0.3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // === 左侧：引擎控制 ===
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  // 分析开关
+                  ElevatedButton.icon(
+                    onPressed: () => vm.toggleAnalysis(),
+                    icon: Icon(
+                      vm.isAnalyzing ? Icons.pause : Icons.play_arrow,
+                      size: 16,
+                    ),
+                    label: Text(vm.isAnalyzing ? '停止' : '分析'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: vm.isAnalyzing ? Colors.red : Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      textStyle: const TextStyle(fontSize: 12),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // 分析模式
+                  _dropdown(
+                    value: vm.analysisMode,
+                    items: EngineAnalysisMode.values,
+                    label: (m) => m.label,
+                    onChanged: vm.setAnalysisMode,
+                    tooltip: '分析模式',
+                  ),
+                  const SizedBox(width: 8),
+                  // 优先级模式
+                  _dropdown(
+                    value: vm.priorityMode,
+                    items: PriorityMode.values,
+                    label: (m) => m.label,
+                    onChanged: vm.setPriorityMode,
+                    tooltip: '优先级',
+                  ),
+                  const SizedBox(width: 8),
+                  // MultiPV
+                  const Text('PV:', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  const SizedBox(width: 4),
+                  SizedBox(
+                    width: 50,
+                    child: DropdownButton<int>(
+                      value: vm.multiPV,
+                      isDense: true,
+                      dropdownColor: const Color(0xFF3E2723),
+                      underline: const SizedBox.shrink(),
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      items: List.generate(5, (i) => i + 1)
+                          .map((v) => DropdownMenuItem(value: v, child: Text('$v')))
+                          .toList(),
+                      onChanged: (v) => v != null ? vm.setMultiPV(v) : null,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(width: 16),
+          const VerticalDivider(color: Colors.white24, width: 1),
+          const SizedBox(width: 16),
+          // === 右侧：引擎分析结果（实时 PV 线路） ===
+          Expanded(
+            child: LiveAnalysisPanel(
+              viewModel: vm,
+              cloudResult: vm.cloudResult,
+              onBestMoveTap: (iccs) => vm.playEngineMove(iccs),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dropdown<T>({
+    required T value,
+    required List<T> items,
+    required String Function(T) label,
+    required void Function(T) onChanged,
+    String? tooltip,
+  }) {
+    return Tooltip(
+      message: tooltip ?? '',
+      child: DropdownButton<T>(
+        value: value,
+        isDense: true,
+        dropdownColor: const Color(0xFF3E2723),
+        underline: const SizedBox.shrink(),
+        style: const TextStyle(color: Colors.white, fontSize: 12),
+        items: items.map((item) {
+          return DropdownMenuItem(value: item, child: Text(label(item)));
+        }).toList(),
+        onChanged: (v) => v != null ? onChanged(v) : null,
       ),
     );
   }

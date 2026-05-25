@@ -99,9 +99,11 @@ class UCIEngine {
         return false;
       }
 
+      // 使用绝对路径，避免 cmd /c 无法解析相对路径
+      final absolutePath = engineFile.absolute.path;
       _process = await Process.start(
-        Platform.isWindows ? 'cmd' : _enginePath,
-        Platform.isWindows ? ['/c', _enginePath] : [],
+        Platform.isWindows ? 'cmd' : absolutePath,
+        Platform.isWindows ? ['/c', absolutePath] : [],
         workingDirectory: engineFile.parent.path,
       );
 
@@ -136,13 +138,31 @@ class UCIEngine {
         _log('>> $cmd');
       }, onError: (e) => _log('stdin error: $e'));
 
-      // Send UCI command and wait for uciok
+      // Send UCI/UCCI command and wait for uciok/ucciok
       await _sendCommand('uci');
-      final uciOk = await _waitForPattern('uciok', timeout: _startupTimeout);
+      final uciOk = await _waitForPattern(
+        'uciok',
+        timeout: const Duration(seconds: 5),
+      );
       if (!uciOk) {
-        _emitEvent(EngineError('Engine did not respond to uci command'));
-        await stop();
-        return false;
+        // UCI failed - engine may have exited (UCCI-only engines like eleeye)
+        _log('UCI failed, restarting engine to try UCCI protocol...');
+        await _cleanupProcess();
+        await _startProcess(engineFile, absolutePath);
+
+        await _sendCommand('ucci');
+        final ucciOk = await _waitForPattern(
+          'ucciok',
+          timeout: _startupTimeout,
+        );
+        if (!ucciOk) {
+          _emitEvent(
+            EngineError('Engine did not respond to uci or ucci command'),
+          );
+          await stop();
+          return false;
+        }
+        _log('Engine using UCCI protocol');
       }
 
       // Send isready and wait for readyok
@@ -194,6 +214,48 @@ class UCIEngine {
   Future<bool> restart() async {
     await stop();
     return start();
+  }
+
+  /// Kill the process without sending quit (for protocol fallback).
+  Future<void> _cleanupProcess() async {
+    await _stdinSubscription?.cancel();
+    _stdinSubscription = null;
+    _process?.kill();
+    _process = null;
+    _isRunning = false;
+  }
+
+  /// Start a new engine process (extracted from start() for reuse).
+  Future<void> _startProcess(File engineFile, String absolutePath) async {
+    _process = await Process.start(
+      Platform.isWindows ? 'cmd' : absolutePath,
+      Platform.isWindows ? ['/c', absolutePath] : [],
+      workingDirectory: engineFile.parent.path,
+    );
+    _isRunning = true;
+    _log('Engine process started (PID: ${_process!.pid})');
+    _process!.stdout
+        .transform(systemEncoding.decoder)
+        .transform(const LineSplitter())
+        .listen(
+          _handleEngineOutput,
+          onDone: _handleEngineExit,
+          onError: _handleEngineError,
+        );
+    _process!.stderr
+        .transform(systemEncoding.decoder)
+        .transform(const LineSplitter())
+        .listen(
+          (line) => _log('STDERR: $line'),
+          onDone: () {},
+          onError: (e) => _emitEvent(EngineError('Engine stderr: $e')),
+        );
+    _stdinSubscription = _stdinController.stream.listen((cmd) {
+      if (_process != null) {
+        _process!.stdin.writeln(cmd);
+      }
+      _log('>> $cmd');
+    }, onError: (e) => _log('stdin error: $e'));
   }
 
   // ---- UCI Commands ----
@@ -366,7 +428,8 @@ class UCIEngine {
   }
 
   /// Get the best move for the current position (blocking).
-  /// Returns the best move in ICCS format, or null if no move found.
+  /// Returns the best move in ICCS algebraic format (e.g. "h7e7"),
+  /// which is identical to UCI engine output. Returns null if no move found.
   Future<String?> getBestMove({
     required String fen,
     int depth = 15,
@@ -406,67 +469,41 @@ class UCIEngine {
 
   // ---- Move Format Conversion ----
 
-  /// Convert ICCS move format (col1row1col2row2) to UCI move format.
-  /// ICCS: "1214" (col=1, row=2 to col=1, row=4)
-  /// UCI: "h2e2" style (file letter + rank digit)
-  ///
-  /// Chinese Chess UCI uses files a-i (left to right, col 0-8)
-  /// and ranks 0-9 (bottom to top from engine's perspective).
-  ///
-  /// For Xiangqi engines, row in FEN is 0=top, 9=bottom.
-  /// UCI engines typically use: rank = 9 - row (so rank 0 = FEN row 9 = red's back rank).
-  static String iccsToUCI(String iccsMove) {
-    if (iccsMove.length != 4) return iccsMove;
+  /// ICCS is the standard algebraic coordinate format used by Xiangqi engines.
+  /// Format: file(a-i) + rank(0-9) + file(a-i) + rank(0-9)
+  /// Example: "h7e7" means from file h(7), rank 7 to file e(4), rank 7.
+  /// This is identical to UCI engine move output — no separate "UCI format" exists.
 
-    final fromCol = int.tryParse(iccsMove[0]) ?? 0;
-    final fromRow = int.tryParse(iccsMove[1]) ?? 0;
-    final toCol = int.tryParse(iccsMove[2]) ?? 0;
-    final toRow = int.tryParse(iccsMove[3]) ?? 0;
+  /// Convert numeric internal format (e.g. "7747") to ICCS algebraic (e.g. "h7e7").
+  static String numericToICCS(String numericMove) {
+    if (numericMove.length != 4) return numericMove;
 
-    return convertToUCIMove(fromCol, fromRow, toCol, toRow);
+    final fromCol = int.tryParse(numericMove[0]) ?? 0;
+    final fromRow = int.tryParse(numericMove[1]) ?? 0;
+    final toCol = int.tryParse(numericMove[2]) ?? 0;
+    final toRow = int.tryParse(numericMove[3]) ?? 0;
+
+    return coordsToICCS(fromCol, fromRow, toCol, toRow);
   }
 
-  /// Convert UCI move format back to ICCS format.
-  static String uciToICCS(String uciMove) {
-    if (uciMove.length < 4) return uciMove;
+  /// Convert ICCS algebraic (e.g. "h7e7") to numeric internal format (e.g. "7747").
+  static String iccsToNumeric(String iccsMove) {
+    if (iccsMove.length < 4) return iccsMove;
 
-    // Parse UCI format: file (a-i) + rank (0-9)
-    final fromCol = _fileToCol(uciMove[0]);
-    final fromRank = int.tryParse(uciMove[1]) ?? 0;
-    final toCol = _fileToCol(uciMove[2]);
-    final toRank = int.tryParse(uciMove[3]) ?? 0;
+    final fromCol = _fileToCol(iccsMove[0]);
+    final fromRank = int.tryParse(iccsMove[1]) ?? 0;
+    final toCol = _fileToCol(iccsMove[2]);
+    final toRank = int.tryParse(iccsMove[3]) ?? 0;
 
-    // Convert ranks back to FEN rows
-    final fromRow = 9 - fromRank;
-    final toRow = 9 - toRank;
-
-    return '$fromCol$fromRow$toCol$toRow';
+    return '$fromCol$fromRank$toCol$toRank';
   }
 
-  /// Convert (col, row) in FEN coordinates to UCI move string.
-  static String convertToUCIMove(
-    int fromCol,
-    int fromRow,
-    int toCol,
-    int toRow,
-  ) {
+  /// Convert (col, row) coordinates to ICCS algebraic move string.
+  /// Our row 0 = bottom (Red's back rank), row 9 = top (Black's back rank).
+  static String coordsToICCS(int fromCol, int fromRow, int toCol, int toRow) {
     final fromFile = _colToFile(fromCol);
-    final fromRank = 9 - fromRow;
     final toFile = _colToFile(toCol);
-    final toRank = 9 - toRow;
-    return '$fromFile$fromRank$toFile$toRank';
-  }
-
-  /// Convert UCI move string to ICCS format (col1row1col2row2).
-  static String convertToICCS(String uciMove) {
-    if (uciMove.length < 4) return uciMove;
-    final fromCol = _fileToCol(uciMove[0]);
-    final fromRank = int.tryParse(uciMove[1]) ?? 0;
-    final toCol = _fileToCol(uciMove[2]);
-    final toRank = int.tryParse(uciMove[3]) ?? 0;
-    final fromRow = 9 - fromRank;
-    final toRow = 9 - toRank;
-    return '$fromCol$fromRow$toCol$toRow';
+    return '$fromFile$fromRow$toFile$toRow';
   }
 
   static String _colToFile(int col) {
@@ -568,13 +605,12 @@ class UCIEngine {
         timeMs: _bestInfo?.timeMs ?? 0,
       );
 
-      // Convert to ICCS for the event
-      final iccsMove = convertToICCS(uciMove);
-      _emitEvent(EngineBestMove(iccsMove, uciMove: uciMove));
+      // Engine outputs ICCS algebraic directly (e.g. "h7e7")
+      _emitEvent(EngineBestMove(uciMove));
 
-      // Complete the best move completer if waiting
+      // Complete the best move completer if waiting (ICCS algebraic)
       if (_bestMoveCompleter != null && !_bestMoveCompleter!.isCompleted) {
-        _bestMoveCompleter!.complete(iccsMove);
+        _bestMoveCompleter!.complete(uciMove);
         _bestMoveCompleter = null;
       }
     }
@@ -885,10 +921,11 @@ class EngineAnalysisUpdate extends EngineEvent {
 }
 
 /// Engine found the best move.
+/// Both [iccsMove] fields use ICCS algebraic format (e.g. "h7e7"),
+/// which is identical to the UCI engine output format.
 class EngineBestMove extends EngineEvent {
-  EngineBestMove(this.iccsMove, {this.uciMove});
+  EngineBestMove(this.iccsMove);
   final String iccsMove;
-  final String? uciMove;
 }
 
 /// Engine process exited.
@@ -955,14 +992,12 @@ class EngineInfo {
   /// The engine reports from the perspective of the side to move.
   int get adjustedScore => isMate ? score : score;
 
-  /// Get the best move from the PV in ICCS format.
+  /// Get the best move from the PV in ICCS algebraic format.
+  /// PV moves are already in ICCS format (identical to UCI output).
   String get bestMoveICCS {
     if (pv.isEmpty) return '';
-    return UCIEngine.convertToICCS(pv.first);
+    return pv.first;
   }
-
-  /// Get the best move from the PV in UCI format.
-  String get bestMoveUCI => pv.isNotEmpty ? pv.first : '';
 
   @override
   String toString() {

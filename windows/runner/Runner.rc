@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.magicf" "\0"
-            VALUE "FileDescription", "magicf" "\0"
+            VALUE "CompanyName", "com.xqmagic" "\0"
+            VALUE "FileDescription", "xqmagic" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "magicf" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.magicf. All rights reserved." "\0"
-            VALUE "OriginalFilename", "magicf.exe" "\0"
-            VALUE "ProductName", "magicf" "\0"
+            VALUE "InternalName", "xqmagic" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 com.xqmagic. All rights reserved." "\0"
+            VALUE "OriginalFilename", "xqmagic.exe" "\0"
+            VALUE "ProductName", "xqmagic" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

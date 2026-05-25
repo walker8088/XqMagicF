@@ -1,6 +1,5 @@
-import 'package:magicf/models/move.dart';
-import 'package:magicf/utils/fen.dart';
-import 'package:magicf/utils/position.dart';
+import 'package:xqmagic/models/move.dart';
+import 'package:xqmagic/utils/fen.dart';
 
 /// 棋谱节点：用于存储走子历史、支持变着和回溯
 /// 结构为一棵走子树，每个节点代表一个局面
@@ -182,6 +181,17 @@ class GameTree {
       }
     }
     return true;
+  }
+
+  /// 从根到当前的节点路径（不含当前节点自身）
+  List<GameTreeNode> getPathToCurrent() {
+    final path = <GameTreeNode>[];
+    var node = _current;
+    while (node != null) {
+      path.add(node);
+      node = node.parent;
+    }
+    return path.reversed.toList();
   }
 
   /// 当前局面 FEN
