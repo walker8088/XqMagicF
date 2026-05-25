@@ -8,8 +8,6 @@ import 'package:xqmagic/models/game_mode.dart';
 import 'package:xqmagic/models/game_tree.dart';
 import 'package:xqmagic/models/move.dart';
 import 'package:xqmagic/services/cloud_db.dart';
-import 'package:xqmagic/services/cloud_review.dart';
-import 'package:xqmagic/services/engine_review.dart';
 import 'package:xqmagic/services/engine_manager.dart';
 import 'package:xqmagic/services/uci_engine.dart';
 import 'package:xqmagic/services/opening_book.dart';
@@ -37,12 +35,6 @@ class GameViewModel extends ChangeNotifier {
 
   /// 云库查询结果
   CloudQueryResult? cloudResult;
-
-  /// 云库复盘
-  CloudReviewResult? cloudReviewResult;
-  double? cloudReviewProgress;
-  final CloudReviewService _cloudReviewService = CloudReviewService();
-  bool get isCloudReviewing => _cloudReviewService.isRunning;
 
   /// 引擎管理器
   final EngineManager engineManager = EngineManager(logEnabled: true);
@@ -77,14 +69,6 @@ class GameViewModel extends ChangeNotifier {
   /// 最佳着法提示（来自引擎或云库）
   String? bestMoveHint;
 
-  /// 引擎复盘
-  EngineReviewResult? engineReviewResult;
-  double? engineReviewProgress;
-  late final EngineReviewService _engineReviewService = EngineReviewService(
-    manager: engineManager,
-  );
-  bool get isEngineReviewing => _engineReviewService.isRunning;
-
   /// 当前残局挑战
   EndgamePuzzle? currentPuzzle;
   int puzzleSolutionIndex = 0;
@@ -106,6 +90,14 @@ class GameViewModel extends ChangeNotifier {
       );
       notifyListeners();
     });
+
+    // 转发引擎状态变更通知到 UI
+    engineManager.addListener(() {
+      notifyListeners();
+    });
+
+    // 初始化时查询开局局面的云库结果
+    _queryCloudForPosition();
   }
 
   /// 从棋谱树同步引擎状态
@@ -174,8 +166,6 @@ class GameViewModel extends ChangeNotifier {
     lastMove = null;
     bestMoveHint = null;
     cloudResult = null;
-    cloudReviewResult = null;
-    cloudReviewProgress = null;
     _state = GameState.playing;
     puzzleCompleted = false;
     puzzleSolutionIndex = 0;
@@ -191,8 +181,6 @@ class GameViewModel extends ChangeNotifier {
     selectedPosition = null;
     possibleMoves = [];
     lastMove = null;
-    cloudReviewResult = null;
-    cloudReviewProgress = null;
     _state = GameState.playing;
     notifyListeners();
   }
@@ -294,6 +282,8 @@ class GameViewModel extends ChangeNotifier {
   }
 
   void _movePiece(Coord from, Coord to) {
+    if (_state != GameState.playing) return;
+
     final piece = _getPieceAt(from);
     if (piece == null) return;
 
@@ -346,9 +336,8 @@ class GameViewModel extends ChangeNotifier {
 
   /// 触发自动分析（云库/引擎）
   void _triggerAutoAnalysis() {
-    // 云库查询
-    if (_priorityMode == PriorityMode.cloud &&
-        (_mode == GameMode.free || _mode == GameMode.engineOnline)) {
+    // 云库查询：走子后自动查询
+    if (_mode == GameMode.free || _mode == GameMode.engineOnline) {
       _queryCloudForPosition();
     }
 
@@ -374,6 +363,12 @@ class GameViewModel extends ChangeNotifier {
 
   /// 检查游戏是否结束
   void _checkGameEnd() {
+    // 检查上一步是否吃掉了敌方的将/帅
+    if (lastMove?.capturedPiece?.type == PieceType.king) {
+      _state = GameState.checkmate;
+      return;
+    }
+
     if (engine.isCheckmate(engine.currentTurn)) {
       _state = GameState.checkmate;
     } else {
@@ -383,9 +378,9 @@ class GameViewModel extends ChangeNotifier {
 
   /// 云库查询当前局面
   void _queryCloudForPosition() {
-    final boardFen = gameTree.currentBoardFen;
-    if (boardFen == null) return;
-    cloudDB.query(boardFen);
+    final fen = gameTree.currentFen;
+    if (fen == null) return;
+    cloudDB.query(fen);
   }
 
   // === 引擎相关 ===
@@ -415,6 +410,8 @@ class GameViewModel extends ChangeNotifier {
 
   /// 执行引擎走子（ICCS 格式）
   void playEngineMove(String iccs) {
+    if (_state != GameState.playing) return;
+
     try {
       final (from, to) = MoveNotation.fromICCS(iccs);
       final piece = _getPieceAt(from);
@@ -457,8 +454,14 @@ class GameViewModel extends ChangeNotifier {
 
   /// 加载引擎
   Future<bool> loadEngine(String enginePath) async {
+    // 加载前同步协议设置
+    engineManager.setProtocol(AppSettings.instance.engineProtocol);
     final success = await engineManager.loadEngine(enginePath: enginePath);
     if (success) {
+      // 加载成功自动切换到引擎辅助模式
+      if (_mode == GameMode.free) {
+        _mode = GameMode.engineAssist;
+      }
       engineManager.setDepth(_analysisMode.depth);
       engineManager.setTimeMs(_analysisMode.timeMs);
       engineManager.setMultiPV(_multiPV);
@@ -478,6 +481,7 @@ class GameViewModel extends ChangeNotifier {
   /// 在设置对话框保存后调用
   Future<void> syncSettingsToEngine() async {
     final settings = AppSettings.instance;
+    engineManager.setProtocol(settings.engineProtocol);
     engineManager.setDepth(settings.engineDepth);
     engineManager.setThreads(settings.engineThreads);
     engineManager.setHash(settings.engineHash);
@@ -498,7 +502,7 @@ class GameViewModel extends ChangeNotifier {
   // === 面板可见性 ===
 
   /// 当前显示的面板: 'none', 'cloud'
-  String _leftPanel = 'none';
+  String _leftPanel = 'cloud';
   String get leftPanel => _leftPanel;
   void showCloudPanel() {
     _leftPanel = _leftPanel == 'cloud' ? 'none' : 'cloud';
@@ -512,73 +516,8 @@ class GameViewModel extends ChangeNotifier {
 
   bool get isCloudPanelVisible => _leftPanel == 'cloud';
 
-  // === 右侧面板：复盘 ===
-  final String _rightPanel = 'review';
-  String get rightPanel => _rightPanel;
-
-  bool get isReviewPanel => _rightPanel == 'review';
-
-  // === 引擎复盘 ===
-
-  /// 引擎复盘：从棋谱树根节点复盘到当前位置
-  Future<void> startEngineReview() async {
-    if (!engineManager.isReady) return;
-    final moves = gameTree.movesFromRoot;
-    if (moves.isEmpty) return;
-
-    final pathRev = gameTree.getPathToCurrent();
-
-    final fenList = <String>[];
-    final iccsList = <String>[];
-    final chineseList = <String>[];
-
-    for (int i = 0; i < pathRev.length - 1; i++) {
-      fenList.add(pathRev[i].fen);
-      final move = pathRev[i + 1].move!;
-      iccsList.add(MoveNotation.toICCS(move));
-      final boardBefore = Board();
-      FenParser.parse(pathRev[i].fen, boardBefore);
-      chineseList.add(MoveNotation.toText(boardBefore.pieces, move));
-    }
-
-    engineReviewProgress = 0.0;
-    notifyListeners();
-
-    final result = await _engineReviewService.reviewGame(
-      fenList: fenList,
-      playedMoveICCS: iccsList,
-      playedMoveChinese: chineseList,
-      depth: engineManager.depth,
-      timeMs: engineManager.timeMs,
-      onProgress: (current, total) {
-        engineReviewProgress = total > 0 ? current / total : 0.0;
-        notifyListeners();
-      },
-    );
-
-    engineReviewResult = result;
-    engineReviewProgress = null;
-    notifyListeners();
-  }
-
-  /// 取消引擎复盘
-  void cancelEngineReview() {
-    _engineReviewService.cancel();
-    engineReviewProgress = null;
-    notifyListeners();
-  }
-
-  /// 清除引擎复盘结果
-  void clearEngineReview() {
-    engineReviewResult = null;
-    notifyListeners();
-  }
-
-  /// 清除云库复盘结果
-  void clearCloudReview() {
-    cloudReviewResult = null;
-    notifyListeners();
-  }
+  /// 云库是否正在查询中
+  bool get isCloudQuerying => cloudDB.isQuerying;
 
   // === 导航操作 ===
 
@@ -633,6 +572,26 @@ class GameViewModel extends ChangeNotifier {
   /// 走法序列
   List<MoveRecord> get movesFromRoot => gameTree.movesFromRoot;
 
+  /// 完整主变着线（不受当前导航位置影响）
+  List<MoveRecord> get mainLineMoves => gameTree.mainLineMoves;
+
+  /// 完整主变着线的中文记法
+  List<String> get mainLineNotations {
+    final path = gameTree.mainLinePath;
+    final notations = <String>[];
+    for (int i = 0; i < path.length - 1; i++) {
+      final move = path[i + 1].move!;
+      if (move.notation != null && move.notation!.isNotEmpty) {
+        notations.add(move.notation!);
+      } else {
+        final boardBefore = Board();
+        FenParser.parse(path[i].fen, boardBefore);
+        notations.add(MoveNotation.toText(boardBefore.pieces, move));
+      }
+    }
+    return notations;
+  }
+
   /// 走法序列的中文记法（优先使用 MoveRecord 中已存储的记谱）
   List<String> get moveNotations {
     final path = gameTree.getPathToCurrent();
@@ -654,51 +613,6 @@ class GameViewModel extends ChangeNotifier {
   /// 当前节点的变着列表
   List<GameTreeNode> get variations => gameTree.current?.children ?? [];
 
-  /// 云库复盘：从棋谱树根节点复盘到当前位置
-  Future<void> startCloudReview() async {
-    final moves = gameTree.movesFromRoot;
-    if (moves.isEmpty) return;
-
-    final pathRev = gameTree.getPathToCurrent();
-
-    final fenList = <String>[];
-    final iccsList = <String>[];
-    final chineseList = <String>[];
-
-    for (int i = 0; i < pathRev.length - 1; i++) {
-      fenList.add(pathRev[i].fen);
-      final move = pathRev[i + 1].move!;
-      iccsList.add(MoveNotation.toICCS(move));
-      final boardBefore = Board();
-      FenParser.parse(pathRev[i].fen, boardBefore);
-      chineseList.add(MoveNotation.toText(boardBefore.pieces, move));
-    }
-
-    cloudReviewProgress = 0.0;
-    notifyListeners();
-
-    final result = await _cloudReviewService.reviewGame(
-      fenList: fenList,
-      playedMoveICCS: iccsList,
-      playedMoveChinese: chineseList,
-      onProgress: (current, total) {
-        cloudReviewProgress = total > 0 ? current / total : 0.0;
-        notifyListeners();
-      },
-    );
-
-    cloudReviewResult = result;
-    cloudReviewProgress = null;
-    notifyListeners();
-  }
-
-  /// 取消云库复盘
-  void cancelCloudReview() {
-    _cloudReviewService.cancel();
-    cloudReviewProgress = null;
-    notifyListeners();
-  }
-
   bool isPositionSelected(Coord pos) => selectedPosition == pos;
   bool isPossibleMove(Coord pos) => possibleMoves.contains(pos);
 
@@ -706,8 +620,8 @@ class GameViewModel extends ChangeNotifier {
 
   /// 当前局面的 ECCO 开局信息（从开局库查询）
   OpeningInfo? get currentOpening {
-    final boardFen = gameTree.currentBoardFen;
-    if (boardFen == null) return null;
-    return OpeningBookService.instance.lookup(boardFen);
+    final fen = gameTree.currentFen;
+    if (fen == null) return null;
+    return OpeningBookService.instance.lookup(fen);
   }
 }

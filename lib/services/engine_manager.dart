@@ -11,12 +11,23 @@ import 'package:xqmagic/services/uci_engine.dart';
 /// - Cancelling ongoing analysis
 /// - Getting best moves for engine-vs-human (fight) mode
 /// - Engine state management
+/// Manages the lifecycle and analysis requests for a UCI/UCCI Xiangqi engine.
 class EngineManager extends ChangeNotifier {
   EngineManager({String? defaultEnginePath, this.logEnabled = false})
     : _defaultEnginePath = defaultEnginePath;
 
   final String? _defaultEnginePath;
   final bool logEnabled;
+
+  /// 引擎协议类型：'uci'、'ucci'、'auto'
+  String _protocol = 'auto';
+  String get protocol => _protocol;
+  void setProtocol(String protocol) {
+    if (protocol == 'uci' || protocol == 'ucci' || protocol == 'auto') {
+      _protocol = protocol;
+      notifyListeners();
+    }
+  }
 
   UCIEngine? _engine;
   EngineState _state = EngineState.idle;
@@ -157,7 +168,11 @@ class EngineManager extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _engine = UCIEngine(enginePath: path, logEnabled: logEnabled);
+      _engine = UCIEngine(
+        enginePath: path,
+        logEnabled: logEnabled,
+        protocol: _protocol,
+      );
 
       // Subscribe to engine events
       _eventSubscription = _engine!.events.listen(_onEngineEvent);
@@ -421,7 +436,7 @@ class EngineManager extends ChangeNotifier {
       (info) => info.multipv == 1,
       orElse: () => _allInfos.first,
     );
-    return best.score;
+    return best.adjustedScore;
   }
 
   /// Check if the current evaluation indicates a mate.

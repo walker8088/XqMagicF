@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'utils/app_settings.dart';
 import 'viewmodels/game_viewmodel.dart';
 import 'screens/game_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AppSettings.instance.init();
   runApp(const ChessApp());
 }
 

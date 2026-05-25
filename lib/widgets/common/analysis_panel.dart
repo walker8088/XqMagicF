@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:xqmagic/models/chess_piece.dart';
+import 'package:xqmagic/models/move.dart';
 import 'package:xqmagic/services/cloud_db.dart';
 import 'package:xqmagic/services/uci_engine.dart';
 import 'package:xqmagic/utils/constants.dart';
+import 'package:xqmagic/utils/coord.dart';
+import 'package:xqmagic/utils/move_notation.dart';
 import 'package:xqmagic/viewmodels/game_viewmodel.dart';
 
 /// Represents a single principal variation line from engine analysis.
@@ -39,10 +43,11 @@ class EnginePVLine {
 
   /// Factory constructor to create from EngineInfo
   factory EnginePVLine.fromEngineInfo(EngineInfo info) {
+    final convertedScore = info.adjustedScore;
     return EnginePVLine(
       depth: info.depth,
-      score: info.score,
-      mateIn: info.isMate ? info.score : null,
+      score: convertedScore,
+      mateIn: info.isMate ? convertedScore : null,
       pv: info.pv,
       nodes: info.nodes,
       nps: info.nps,
@@ -62,12 +67,10 @@ class LiveAnalysisPanel extends StatefulWidget {
   const LiveAnalysisPanel({
     super.key,
     required this.viewModel,
-    this.cloudResult,
     this.onBestMoveTap,
   });
 
   final GameViewModel viewModel;
-  final CloudQueryResult? cloudResult;
   final void Function(String iccs)? onBestMoveTap;
 
   @override
@@ -127,7 +130,6 @@ class _LiveAnalysisPanelState extends State<LiveAnalysisPanel> {
               pv: [],
             )
           : null,
-      cloudResult: widget.cloudResult,
       bestMove: vm.engineBestMove,
       isAnalyzing: vm.isAnalyzing || vm.engineManager.isThinking,
       pvLines: pvLines,
@@ -169,14 +171,11 @@ class AnalysisPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minWidth: 200, maxWidth: 300),
       padding: const EdgeInsets.all(8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildHeader(context),
-          const Divider(height: 16),
           if (isAnalyzing) _buildAnalyzingIndicator(context),
           if (bestMove != null && !isAnalyzing) _buildBestMove(context),
           if (pvLines.isNotEmpty) ...[
@@ -439,7 +438,6 @@ class AnalysisPanel extends StatelessWidget {
         const SizedBox(height: 4),
         CloudMoveList(
           moves: cloudResult!.moves,
-          bestScore: cloudResult!.bestScore,
           onMoveTap: onBestMoveTap,
         ),
       ],
@@ -525,22 +523,26 @@ class ScoreDisplay extends StatelessWidget {
 class CloudMoveList extends StatelessWidget {
   const CloudMoveList({
     super.key,
+    this.pieces,
+    this.activeColor,
     required this.moves,
-    this.bestScore = 0,
-    this.maxMoves = 8,
+    this.maxMoves = 10,
     this.onMoveTap,
   });
+
+  /// 当前棋盘棋子映射（用于生成中文记谱）
+  final Map<Coord, ChessPiece>? pieces;
+
+  /// 当前走子方
+  final PieceColor? activeColor;
 
   /// List of cloud moves
   final List<CloudMoveInfo> moves;
 
-  /// Best score for calculating quality marks
-  final int bestScore;
-
   /// Maximum number of moves to display
   final int maxMoves;
 
-  /// Callback when a move is tapped
+  /// Callback when a move is tapped (ICCS format)
   final void Function(String iccs)? onMoveTap;
 
   @override
@@ -573,6 +575,9 @@ class CloudMoveList extends StatelessWidget {
   }
 
   Widget _buildMoveRow(CloudMoveInfo move, bool isBest) {
+    // 将 ICCS 转为中文记谱
+    final chineseNotation = _iccsToChinese(move.iccs);
+
     return InkWell(
       onTap: onMoveTap != null ? () => onMoveTap!(move.iccs) : null,
       borderRadius: BorderRadius.circular(4),
@@ -584,84 +589,75 @@ class CloudMoveList extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Quality mark
-            SizedBox(width: 20, child: _buildQualityMark(move)),
-            const SizedBox(width: 2),
-            // Move notation
+            // 序号
             SizedBox(
-              width: 52,
+              width: 20,
               child: Text(
-                '${move.iccs.substring(0, 2)}-${move.iccs.substring(2)}',
+                '${moves.indexOf(move) + 1}.',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
+                  color: isBest ? Colors.amber : Colors.white38,
+                ),
+                textAlign: TextAlign.right,
+              ),
+            ),
+            const SizedBox(width: 6),
+            // 中文着法
+            Expanded(
+              child: Text(
+                chineseNotation,
+                style: TextStyle(
+                  fontSize: 13,
                   fontWeight: isBest ? FontWeight.bold : FontWeight.normal,
                   color: isBest ? Colors.white : Colors.white70,
                 ),
               ),
             ),
-            const SizedBox(width: 6),
-            // Score
-            SizedBox(
-              width: 52,
-              child: ScoreDisplay(score: move.score, small: true),
-            ),
-            const SizedBox(width: 6),
-            // Win rate
-            SizedBox(
-              width: 36,
-              child: Text(
-                '${move.winRate}%',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: _winRateColor(move.winRate),
-                ),
-              ),
-            ),
-            const SizedBox(width: 6),
-            // Frequency
-            SizedBox(
-              width: 32,
-              child: Text(
-                move.frequency.toString(),
-                style: const TextStyle(fontSize: 10, color: Colors.white54),
-                textAlign: TextAlign.right,
-              ),
-            ),
+            const SizedBox(width: 8),
+            // 分数
+            _buildScoreDisplay(move.score),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildQualityMark(CloudMoveInfo move) {
-    final mark = move.qualityMark;
-    Color? markColor;
-
-    if (mark.contains('★')) {
-      markColor = const Color(0xFF00CC44); // Good
-    } else if (mark.contains('✓')) {
-      markColor = Colors.blue; // OK
-    } else if (mark.contains('✗')) {
-      markColor = const Color(0xFFFF4444); // Bad
-    }
-
-    if (mark.isEmpty) {
-      // Best move indicator
-      return const Text(
-        '★',
-        style: TextStyle(fontSize: 11, color: Colors.amber),
+  /// 将 ICCS 转为中文记谱
+  String _iccsToChinese(String iccs) {
+    if (pieces == null || activeColor == null) return iccs;
+    try {
+      final (from, to) = MoveNotation.fromICCS(iccs);
+      final piece = pieces![from];
+      if (piece == null) return iccs;
+      final move = MoveRecord(
+        from: from,
+        to: to,
+        pieceType: piece.type,
+        color: activeColor!,
       );
+      return MoveNotation.toText(pieces!, move);
+    } catch (_) {
+      return iccs;
     }
-
-    return Text(
-      mark,
-      style: TextStyle(fontSize: 11, color: markColor ?? Colors.white54),
-    );
   }
 
-  Color _winRateColor(int winRate) {
-    if (winRate >= 60) return const Color(0xFF00CC44); // High win rate
-    if (winRate >= 45) return Colors.orange; // Moderate
-    return const Color(0xFFFF6666); // Low win rate
+  Widget _buildScoreDisplay(int score) {
+    final text = score >= 0 ? '+$score' : '$score';
+    Color color;
+    if (score > 0) {
+      color = const Color(0xFF00CC44);
+    } else if (score < 0) {
+      color = const Color(0xFFFF4444);
+    } else {
+      color = Colors.white70;
+    }
+    return Text(
+      text,
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.bold,
+        color: color,
+      ),
+    );
   }
 }

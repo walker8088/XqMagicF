@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:xqmagic/utils/app_settings.dart';
@@ -35,6 +38,7 @@ class SettingsDialog extends StatefulWidget {
 class _SettingsDialogState extends State<SettingsDialog> {
   // Engine settings
   late String _enginePath;
+  late String _engineProtocol; // 'uci', 'ucci', 'auto'
   late int _engineDepth;
   late int _engineTime; // seconds
   late int _engineThreads;
@@ -58,9 +62,66 @@ class _SettingsDialogState extends State<SettingsDialog> {
     _loadSettings();
   }
 
+  /// Show dialog to select engine file or manually input path
+  Future<void> _selectEnginePath() async {
+    // Option 1: Use native file picker
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: Platform.isWindows
+          ? ['exe', 'bat', 'cmd']
+          : Platform.isMacOS
+              ? ['app', '']
+              : [''],
+      allowMultiple: false,
+    );
+
+    if (result != null && result.files.single.path != null) {
+      if (mounted) {
+        setState(() => _enginePath = result.files.single.path!);
+      }
+      return;
+    }
+
+    // Option 2: Manual input if user cancels file picker
+    if (mounted) {
+      final controller = TextEditingController(text: _enginePath);
+      final manualPath = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('手动输入引擎路径'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              labelText: '引擎路径',
+              hintText: '请输入引擎可执行文件完整路径',
+              border: OutlineInputBorder(),
+            ),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+              child: const Text('确定'),
+            ),
+          ],
+        ),
+      );
+
+      if (manualPath != null && manualPath.isNotEmpty) {
+        setState(() => _enginePath = manualPath);
+      }
+      controller.dispose();
+    }
+  }
+
   void _loadSettings() {
     final settings = AppSettings.instance;
     _enginePath = settings.enginePath;
+    _engineProtocol = settings.engineProtocol;
     _engineDepth = settings.engineDepth;
     _engineTime = 5; // Default 5s, stored as seconds
     _engineThreads = settings.engineThreads;
@@ -80,6 +141,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
   Future<void> _saveSettings() async {
     final settings = AppSettings.instance;
     await settings.setEnginePath(_enginePath);
+    await settings.setEngineProtocol(_engineProtocol);
     await settings.setEngineDepth(_engineDepth);
     await settings.setEngineThreads(_engineThreads);
     await settings.setEngineHash(_engineHash);
@@ -174,12 +236,21 @@ class _SettingsDialogState extends State<SettingsDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildTextField(
+              _buildEnginePathField(context),
+              const SizedBox(height: 12),
+              _buildDropdown<String>(
                 context: context,
-                label: '引擎路径',
-                value: _enginePath,
-                onChanged: (v) => setState(() => _enginePath = v),
-                hintText: '请输入引擎可执行文件路径',
+                label: '通信协议',
+                value: _engineProtocol,
+                items: const [
+                  DropdownMenuItem(value: 'auto', child: Text('自动检测')),
+                  DropdownMenuItem(value: 'uci', child: Text('UCI')),
+                  DropdownMenuItem(value: 'ucci', child: Text('UCCI')),
+                ],
+                onChanged: (v) {
+                  if (v != null) setState(() => _engineProtocol = v);
+                },
+                helper: 'UCI: Pikafish 等 / UCCI: 象棋引擎等 / 自动: 先UCI后UCCI',
               ),
               const SizedBox(height: 12),
               _buildSlider(
@@ -357,6 +428,40 @@ class _SettingsDialogState extends State<SettingsDialog> {
     );
   }
 
+  /// Build read-only engine path field with file picker button
+  Widget _buildEnginePathField(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('引擎路径', style: Theme.of(context).textTheme.bodyMedium),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: TextEditingController(text: _enginePath),
+                readOnly: true,
+                decoration: const InputDecoration(
+                  hintText: '点击右侧按钮选择引擎或输入路径',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton.icon(
+              onPressed: _selectEnginePath,
+              icon: const Icon(Icons.folder_open, size: 18),
+              label: const Text('浏览'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildTextField({
     required BuildContext context,
     required String label,
@@ -416,11 +521,20 @@ class _SettingsDialogState extends State<SettingsDialog> {
     required T value,
     required List<DropdownMenuItem<T>> items,
     required ValueChanged<T?> onChanged,
+    String? helper,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: Theme.of(context).textTheme.bodyMedium),
+        if (helper != null)
+          Text(
+            helper,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Colors.white54,
+              fontSize: 11,
+            ),
+          ),
         const SizedBox(height: 4),
         DropdownButtonFormField<T>(
           value: value,

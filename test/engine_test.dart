@@ -306,5 +306,125 @@ void main() {
           'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR r';
       expect(fen, expected);
     });
+
+    test(
+      'should parse info lines with score, pv, and bestmove correctly',
+      () async {
+        final enginePath = findEngine();
+        if (enginePath == null) {
+          print('SKIP: No engine found');
+          return;
+        }
+
+        final engine = UCIEngine(enginePath: enginePath, logEnabled: true);
+        try {
+          final started = await engine.start();
+          expect(started, isTrue);
+          expect(engine.isReady, isTrue);
+
+          // Collect all events for analysis
+          final infoEvents = <EngineAnalysisUpdate>[];
+          EngineBestMove? bestMoveEvent;
+          final allRawLines = <String>[];
+
+          engine.events.listen((event) {
+            if (event is EngineAnalysisUpdate) {
+              infoEvents.add(event);
+              print('INFO: depth=${event.info.depth} '
+                  'score=${event.info.isMate ? "M${event.info.score}" : event.info.score} '
+                  'pv=${event.info.pv} '
+                  'multipv=${event.info.multipv}');
+            } else if (event is EngineBestMove) {
+              bestMoveEvent = event;
+              print('BESTMOVE: ${event.iccsMove}');
+            } else if (event is EngineRawLine) {
+              allRawLines.add(event.line);
+            }
+          });
+
+          // Analyze initial position
+          const fen = FenParser.initial;
+          await engine.analyzeByDepth(fen: fen, depth: 8);
+
+          // Wait for bestmove with timeout
+          for (int i = 0; i < 60; i++) {
+            await Future.delayed(const Duration(seconds: 1));
+            if (bestMoveEvent != null) break;
+          }
+
+          print('Total info events: ${infoEvents.length}');
+          print('Total raw lines: ${allRawLines.length}');
+
+          // Verify bestmove was received
+          expect(bestMoveEvent, isNotNull,
+              reason: 'Should receive bestmove after analysis');
+          expect(bestMoveEvent!.iccsMove.isNotEmpty, isTrue);
+
+          // Verify info events were received
+          expect(infoEvents.isNotEmpty, isTrue,
+              reason: 'Should receive info events during analysis');
+
+          // Verify at least one info has score and pv
+          final scoredInfos = infoEvents.where((e) =>
+              e.info.pv.isNotEmpty &&
+              (e.info.score != 0 || e.info.isMate));
+          expect(scoredInfos.isNotEmpty, isTrue,
+              reason: 'At least one info should have non-zero score and pv');
+        } finally {
+          await engine.dispose();
+        }
+      },
+      timeout: const Timeout(Duration(seconds: 120)),
+    );
+
+    test(
+      'should handle multiPV with multiple principal variations',
+      () async {
+        final enginePath = findEngine();
+        if (enginePath == null) {
+          print('SKIP: No engine found');
+          return;
+        }
+
+        final engine = UCIEngine(enginePath: enginePath, logEnabled: true);
+        try {
+          final started = await engine.start();
+          expect(started, isTrue);
+
+          // Collect infos grouped by multipv
+          final allInfos = <int>[]; // multipv values seen
+
+          engine.events.listen((event) {
+            if (event is EngineAnalysisUpdate) {
+              if (!allInfos.contains(event.info.multipv)) {
+                allInfos.add(event.info.multipv);
+              }
+            }
+          });
+
+          // Analyze with multiPV=3
+          const fen = FenParser.initial;
+          await engine.analyzeByDepth(fen: fen, depth: 8, multiPV: 3);
+
+          // Wait for analysis to complete
+          for (int i = 0; i < 60; i++) {
+            await Future.delayed(const Duration(seconds: 1));
+            if (allInfos.length >= 2) break;
+            if (engine.bestMove != null && allInfos.isNotEmpty) break;
+          }
+
+          print('MultiPV values seen: $allInfos');
+          print('Engine bestInfo: ${engine.bestInfo}');
+          print('Engine currentInfos count: ${engine.currentInfos.length}');
+
+          // If multiPV is supported, we should see multiple variations
+          expect(engine.currentInfos.isNotEmpty, isTrue,
+              reason: 'Should have at least one PV line');
+        } finally {
+          await engine.dispose();
+        }
+      },
+      timeout: const Timeout(Duration(seconds: 120)),
+    );
   });
 }

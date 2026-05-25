@@ -90,8 +90,6 @@ class GameTreeNode {
     return [...parentMoves, move!];
   }
 
-  /// 获取局面 FEN（不含回合信息，用于局面查询）
-  String get boardFen => fen.split(' ').first;
 }
 
 /// 棋谱树管理：维护整棵走子树
@@ -197,11 +195,30 @@ class GameTree {
   /// 当前局面 FEN
   String? get currentFen => _current?.fen;
 
-  /// 当前局面（不含回合）
-  String? get currentBoardFen => _current?.boardFen;
-
   /// 从根到当前的走法序列
   List<MoveRecord> get movesFromRoot => _current?.getMovesFromRoot() ?? [];
+
+  /// 完整主变着线（从根到最深的节点，不受 _current 影响）
+  List<MoveRecord> get mainLineMoves {
+    final moves = <MoveRecord>[];
+    var node = root;
+    while (node.mainLineChild != null) {
+      node = node.mainLineChild!;
+      if (node.move != null) moves.add(node.move!);
+    }
+    return moves;
+  }
+
+  /// 完整主变着线的节点路径（从根到最深的节点）
+  List<GameTreeNode> get mainLinePath {
+    final path = <GameTreeNode>[root];
+    var node = root;
+    while (node.mainLineChild != null) {
+      node = node.mainLineChild!;
+      path.add(node);
+    }
+    return path;
+  }
 
   /// 当前节点的深度（从根开始的步数）
   int get depth => _current?.getPathFromRoot().length ?? 0;

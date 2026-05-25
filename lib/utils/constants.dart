@@ -8,7 +8,7 @@ class AppConstants {
   static const int boardRows = 10; // 10条横线
 
   // 棋盘边距（格子数）
-  static const int paddingCells = 2;
+  static const int paddingCells = 1;
 
   // 颜色
   static const Color boardBackground = Color(0xFFE8C576); // 木质底色

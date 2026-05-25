@@ -36,9 +36,66 @@ class GameEngine {
     final pieces = _board.getPiecesOfColor(color);
     final moves = <MoveRecord>[];
     for (final piece in pieces) {
-      moves.addAll(_generateMovesFor(piece.coord, piece));
+      final pieceMoves = _generateMovesFor(piece.coord, piece);
+      for (final move in pieceMoves) {
+        if (!_leavesKingInCheck(move, color)) {
+          moves.add(move);
+        }
+      }
     }
     return moves;
+  }
+
+  /// 走子后己方将帅是否被攻击
+  bool _leavesKingInCheck(MoveRecord move, PieceColor moverColor) {
+    final sim = copy();
+    sim._board.movePiece(move.from, move.to);
+    return sim._isKingAttacked(moverColor);
+  }
+
+  /// 检查某方的将帅是否正被攻击（轻量版，不调用 getAllLegalMoves）
+  bool _isKingAttacked(PieceColor color) {
+    final kingPos = _findGeneral(color);
+    if (kingPos == null) return false;
+
+    final opponentColor = color == PieceColor.red
+        ? PieceColor.black
+        : PieceColor.red;
+    final allPieces = _board.pieces.values.toList();
+
+    for (final piece in allPieces) {
+      if (piece.color != opponentColor) continue;
+      if (piece.type == PieceType.king) {
+        // 将帅对面：同一列，中间无子
+        if (piece.coord.col == kingPos.col) {
+          final minRow = piece.coord.row < kingPos.row
+              ? piece.coord.row
+              : kingPos.row;
+          final maxRow = piece.coord.row > kingPos.row
+              ? piece.coord.row
+              : kingPos.row;
+          bool blocked = false;
+          for (final p in allPieces) {
+            if (p.coord.col == kingPos.col && p.coord.row > minRow && p.coord.row < maxRow) {
+              blocked = true;
+              break;
+            }
+          }
+          if (!blocked) return true;
+        }
+        continue;
+      }
+      if (MoveValidator.isValidMove(
+        type: piece.type,
+        color: piece.color,
+        from: piece.coord,
+        to: kingPos,
+        obstacles: allPieces.map((p) => p.coord).toList(),
+      )) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// 内部：生成指定棋子的所有合法走法（不限制回合）
@@ -100,14 +157,7 @@ class GameEngine {
 
   /// 检查某方是否被将军
   bool isInCheck(PieceColor color) {
-    final generalPos = _findGeneral(color);
-    if (generalPos == null) return false;
-
-    final opponentColor = color == PieceColor.red
-        ? PieceColor.black
-        : PieceColor.red;
-    final opponentMoves = getAllLegalMoves(opponentColor);
-    return opponentMoves.any((m) => m.to == generalPos);
+    return _isKingAttacked(color);
   }
 
   /// 检查某方是否被将杀（无合法走法且被将军）

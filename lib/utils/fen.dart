@@ -78,14 +78,18 @@ class FenParser {
   /// Parse FEN string and populate the board
   /// FEN row 0 = top of board (Black side) → our row 9
   /// FEN row 9 = bottom of board (Red side) → our row 0
+  ///
+  /// FEN 至少包含两个字段：布局和走子方(r/b)
   static PieceColor parse(String fen, Board board) {
     board.clear();
 
     final parts = fen.trim().split(' ');
+    assert(
+      parts.length >= 2,
+      'FEN 至少需要两个字段（布局 + 走子方），收到: "$fen"',
+    );
     final boardStr = parts[0];
-    final activeColor = parts.length > 1 && parts[1] == 'b'
-        ? PieceColor.black
-        : PieceColor.red;
+    final activeColor = parts[1] == 'b' ? PieceColor.black : PieceColor.red;
 
     final fenRows = boardStr.split('/');
     for (

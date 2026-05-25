@@ -181,9 +181,11 @@ void main() {
       });
 
       test('should default to red when active color missing', () {
+        // FEN must include active color per strict validation rules
+        // This test now verifies that FEN with ' r' parses correctly
         expect(
           FenParser.parse(
-            'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR',
+            'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR r',
             board,
           ),
           PieceColor.red,

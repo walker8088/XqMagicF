@@ -18,12 +18,17 @@ import 'package:flutter/foundation.dart';
 ///
 /// ## Score Convention
 /// Scores are in centipawns. Positive = red advantage, negative = black advantage.
+/// UCI/UCCI protocol handler for Xiangqi engines.
 class UCIEngine {
-  UCIEngine({String? enginePath, this.logEnabled = false})
-    : _enginePath = enginePath;
+  UCIEngine({String? enginePath, this.logEnabled = false, String protocol = 'auto'})
+    : _enginePath = enginePath,
+      _protocol = protocol;
 
   final String? _enginePath;
   final bool logEnabled;
+
+  /// 引擎协议：'uci'、'ucci'、'auto'(自动检测)
+  final String _protocol;
 
   Process? _process;
   bool _isRunning = false;
@@ -38,6 +43,7 @@ class UCIEngine {
   final List<EngineInfo> _currentInfos = [];
   EngineInfo? _bestInfo;
   String? _bestMove;
+  String? _currentFen;
 
   // Streams for external consumers
   final StreamController<EngineEvent> _eventController =
@@ -138,31 +144,14 @@ class UCIEngine {
         _log('>> $cmd');
       }, onError: (e) => _log('stdin error: $e'));
 
-      // Send UCI/UCCI command and wait for uciok/ucciok
-      await _sendCommand('uci');
-      final uciOk = await _waitForPattern(
-        'uciok',
-        timeout: const Duration(seconds: 5),
-      );
-      if (!uciOk) {
-        // UCI failed - engine may have exited (UCCI-only engines like eleeye)
-        _log('UCI failed, restarting engine to try UCCI protocol...');
-        await _cleanupProcess();
-        await _startProcess(engineFile, absolutePath);
-
-        await _sendCommand('ucci');
-        final ucciOk = await _waitForPattern(
-          'ucciok',
-          timeout: _startupTimeout,
+      // Send UCI/UCCI command based on protocol setting
+      final protocolOk = await _handshake();
+      if (!protocolOk) {
+        _emitEvent(
+          EngineError('Engine did not respond to uci/ucci command'),
         );
-        if (!ucciOk) {
-          _emitEvent(
-            EngineError('Engine did not respond to uci or ucci command'),
-          );
-          await stop();
-          return false;
-        }
-        _log('Engine using UCCI protocol');
+        await stop();
+        return false;
       }
 
       // Send isready and wait for readyok
@@ -258,6 +247,59 @@ class UCIEngine {
     }, onError: (e) => _log('stdin error: $e'));
   }
 
+  /// 协议握手：根据 _protocol 发送 uci/ucci 命令并等待响应
+  /// - 'uci': 只尝试 uci，等待 uciok
+  /// - 'ucci': 只尝试 ucci，等待 ucciok
+  /// - 'auto': 先试 uci，失败后重启试 ucci
+  Future<bool> _handshake() async {
+    switch (_protocol) {
+      case 'uci':
+        await _sendCommand('uci');
+        final ok = await _waitForPattern('uciok', timeout: _startupTimeout);
+        if (ok) _log('Engine using UCI protocol');
+        return ok;
+
+      case 'ucci':
+        await _sendCommand('ucci');
+        final ok = await _waitForPattern('ucciok', timeout: _startupTimeout);
+        if (ok) _log('Engine using UCCI protocol');
+        return ok;
+
+      case 'auto':
+      default:
+        // 先尝试 UCI
+        await _sendCommand('uci');
+        final uciOk = await _waitForPattern(
+          'uciok',
+          timeout: const Duration(seconds: 5),
+        );
+        if (uciOk) {
+          _log('Engine using UCI protocol (auto-detected)');
+          return true;
+        }
+
+        // UCI 失败，重启进程尝试 UCCI
+        _log('UCI handshake failed, trying UCCI protocol...');
+        final engineFile = File(_enginePath!);
+        final absolutePath = engineFile.absolute.path;
+        await _cleanupProcess();
+        await _startProcess(engineFile, absolutePath);
+
+        await _sendCommand('ucci');
+        final ucciOk = await _waitForPattern(
+          'ucciok',
+          timeout: _startupTimeout,
+        );
+        if (ucciOk) {
+          _log('Engine using UCCI protocol (auto-detected)');
+          return true;
+        }
+
+        _log('Both UCI and UCCI handshakes failed');
+        return false;
+    }
+  }
+
   // ---- UCI Commands ----
 
   /// Send "ucinewgame" to signal a new game.
@@ -324,6 +366,7 @@ class UCIEngine {
     _currentInfos.clear();
     _bestInfo = null;
     _bestMove = null;
+    _currentFen = fen;
 
     final positionCmd = 'position fen $fen';
     await _sendCommand(positionCmd);
@@ -354,6 +397,7 @@ class UCIEngine {
     _currentInfos.clear();
     _bestInfo = null;
     _bestMove = null;
+    _currentFen = fen;
 
     final positionCmd = 'position fen $fen';
     await _sendCommand(positionCmd);
@@ -377,6 +421,7 @@ class UCIEngine {
     _currentInfos.clear();
     _bestInfo = null;
     _bestMove = null;
+    _currentFen = fen;
 
     await _sendCommand('position fen $fen');
     await _sendCommand('go infinite');
@@ -398,6 +443,7 @@ class UCIEngine {
     _currentInfos.clear();
     _bestInfo = null;
     _bestMove = null;
+    _currentFen = fen;
 
     await _sendCommand('position fen $fen');
 
@@ -581,10 +627,10 @@ class UCIEngine {
       }
     } else if (trimmed.startsWith('bestmove')) {
       _parseBestMove(trimmed);
-    } else if (trimmed.startsWith('info')) {
-      _parseInfo(trimmed);
     } else if (trimmed.startsWith('info string')) {
       _log('Engine info string: ${trimmed.substring(11)}');
+    } else if (trimmed.startsWith('info')) {
+      _parseInfo(trimmed);
     }
   }
 
@@ -594,6 +640,7 @@ class UCIEngine {
     if (parts.length >= 2) {
       final uciMove = parts[1];
       _bestMove = uciMove;
+      final isRedToMove = _currentFen != null ? _isRedToMoveFromFen(_currentFen!) : true;
       _bestInfo = EngineInfo(
         depth: _bestInfo?.depth ?? 0,
         score: _bestInfo?.score ?? 0,
@@ -603,6 +650,7 @@ class UCIEngine {
         nodes: _bestInfo?.nodes ?? 0,
         nps: _bestInfo?.nps ?? 0,
         timeMs: _bestInfo?.timeMs ?? 0,
+        isRedToMove: isRedToMove,
       );
 
       // Engine outputs ICCS algebraic directly (e.g. "h7e7")
@@ -642,6 +690,15 @@ class UCIEngine {
     }
 
     _emitEvent(EngineAnalysisUpdate(info, allInfos: List.from(_currentInfos)));
+  }
+
+  /// Extract whether it's red's turn from a FEN string.
+  /// FEN format: `<board> <active_color> ...`
+  /// `active_color` is 'r' for red, 'b' for black.
+  bool _isRedToMoveFromFen(String fen) {
+    final parts = fen.split(' ');
+    if (parts.length < 2) return true; // Default to red
+    return parts[1].toLowerCase() == 'r';
   }
 
   EngineInfo? _parseInfoLine(String line) {
@@ -778,6 +835,11 @@ class UCIEngine {
                   score = value;
                   isMate = false;
                   break;
+                case 'score':
+                  // UCCI 格式：score 直接跟数值
+                  score = value;
+                  isMate = false;
+                  break;
                 case 'mate':
                   score = value;
                   isMate = true;
@@ -795,6 +857,8 @@ class UCIEngine {
       return null;
     }
 
+    final isRedToMove = _currentFen != null ? _isRedToMoveFromFen(_currentFen!) : true;
+
     return EngineInfo(
       depth: depth,
       selDepth: selDepth,
@@ -807,6 +871,7 @@ class UCIEngine {
       timeMs: timeMs,
       hashfull: hashfull,
       tbhits: tbhits,
+      isRedToMove: isRedToMove,
     );
   }
 
@@ -953,6 +1018,7 @@ class EngineInfo {
     this.timeMs = 0,
     this.hashfull = 0,
     this.tbhits = 0,
+    this.isRedToMove = true,
   });
 
   /// Search depth
@@ -988,9 +1054,12 @@ class EngineInfo {
   /// Tablebase hits
   final int tbhits;
 
-  /// Convert score to the convention: positive = red advantage.
-  /// The engine reports from the perspective of the side to move.
-  int get adjustedScore => isMate ? score : score;
+  /// Whether it's red's turn to move
+  final bool isRedToMove;
+
+  /// Score is already from red's perspective:
+  /// positive = red advantage, negative = black advantage.
+  int get adjustedScore => score;
 
   /// Get the best move from the PV in ICCS algebraic format.
   /// PV moves are already in ICCS format (identical to UCI output).

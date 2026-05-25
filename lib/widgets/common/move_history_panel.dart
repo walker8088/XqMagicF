@@ -9,14 +9,16 @@ class MoveHistoryPanel extends StatefulWidget {
     required this.moves,
     required this.currentIndex,
     required this.onTapMove,
+    required this.onTapRoot,
     this.notations = const [],
     this.evaluations = const {},
     this.annotations = const {},
   });
 
   final List<MoveRecord> moves;
-  final int currentIndex;
+  final int currentIndex; // -1 = root, 0+ = move index
   final void Function(int) onTapMove;
+  final VoidCallback onTapRoot;
   final List<String> notations; // 中文记法列表
   final Map<int, int> evaluations; // 索引 -> 引擎分数
   final Map<int, String> annotations; // 索引 -> 注解
@@ -45,13 +47,19 @@ class _MoveHistoryPanelState extends State<MoveHistoryPanel> {
   }
 
   void _scrollToCurrentIndex() {
-    if (widget.moves.isEmpty || _scrollController.hasClients == false) return;
+    if (_scrollController.hasClients == false) return;
 
-    final moveRow = widget.currentIndex ~/ 2;
-    final totalRows = (widget.moves.length / 2).ceil();
+    // Row 0 = root, Row 1+ = moves (one move per row)
+    final int row;
+    if (widget.currentIndex < 0) {
+      row = 0; // root
+    } else {
+      row = widget.currentIndex + 1;
+    }
+    final totalRows = 1 + widget.moves.length;
 
-    if (moveRow >= 0 && moveRow < totalRows) {
-      final position = (moveRow * 40.0).clamp(
+    if (row >= 0 && row < totalRows) {
+      final position = (row * 36.0).clamp(
         0.0,
         _scrollController.position.maxScrollExtent,
       );
@@ -102,72 +110,92 @@ class _MoveHistoryPanelState extends State<MoveHistoryPanel> {
 
   Widget _buildMoveList() {
     if (widget.moves.isEmpty) {
-      return const Center(
-        child: Text('暂无着法', style: TextStyle(color: Colors.white38)),
+      return ListView(
+        controller: _scrollController,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        children: [
+          _buildRootRow(),
+        ],
       );
     }
 
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 8),
-      itemCount: (widget.moves.length / 2).ceil(),
+      itemCount: 1 + widget.moves.length, // +1 for root, one row per move
       itemBuilder: (context, index) {
-        final moveNumber = index + 1;
-        final whiteIndex = index * 2;
-        final blackIndex = index * 2 + 1;
+        if (index == 0) {
+          return _buildRootRow();
+        }
+
+        final moveIndex = index - 1; // skip root
+        final moveNumber = (moveIndex ~/ 2) + 1;
+        final isRedMove = moveIndex % 2 == 0;
 
         return _buildMoveRow(
-          moveNumber,
-          whiteIndex < widget.moves.length ? widget.moves[whiteIndex] : null,
-          blackIndex < widget.moves.length ? widget.moves[blackIndex] : null,
-          whiteIndex,
-          blackIndex,
+          isRedMove ? '$moveNumber.' : '',
+          widget.moves[moveIndex],
+          moveIndex,
         );
       },
     );
   }
 
   Widget _buildMoveRow(
-    int number,
-    MoveRecord? whiteMove,
-    MoveRecord? blackMove,
-    int whiteIdx,
-    int blackIdx,
+    String numberLabel,
+    MoveRecord move,
+    int moveIndex,
   ) {
     return Row(
       children: [
         SizedBox(
           width: 32,
           child: Text(
-            '$number.',
+            numberLabel,
             style: const TextStyle(color: Colors.white54, fontSize: 13),
             textAlign: TextAlign.right,
           ),
         ),
         const SizedBox(width: 4),
         Expanded(
-          child: whiteMove != null
-              ? _buildMoveButton(
-                  whiteMove,
-                  whiteIdx,
-                  widget.notations.isNotEmpty && whiteIdx < widget.notations.length
-                      ? widget.notations[whiteIdx]
-                      : null,
-                )
-              : const SizedBox.shrink(),
-        ),
-        Expanded(
-          child: blackMove != null
-              ? _buildMoveButton(
-                  blackMove,
-                  blackIdx,
-                  widget.notations.isNotEmpty && blackIdx < widget.notations.length
-                      ? widget.notations[blackIdx]
-                      : null,
-                )
-              : const SizedBox.shrink(),
+          child: _buildMoveButton(
+            move,
+            moveIndex,
+            widget.notations.isNotEmpty && moveIndex < widget.notations.length
+                ? widget.notations[moveIndex]
+                : null,
+          ),
         ),
       ],
+    );
+  }
+
+  Widget _buildRootRow() {
+    final isRootSelected = widget.currentIndex < 0;
+
+    return InkWell(
+      onTap: widget.onTapRoot,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        decoration: BoxDecoration(
+          color: isRootSelected ? Colors.white.withOpacity(0.2) : null,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: 32),
+            const SizedBox(width: 4),
+            Text(
+              ' === ',
+              style: TextStyle(
+                color: const Color(0xFFCC4444),
+                fontSize: 13,
+                fontWeight: isRootSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

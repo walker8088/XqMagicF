@@ -10,7 +10,6 @@ import '../widgets/board/chess_board.dart';
 import '../widgets/common/analysis_panel.dart';
 import '../widgets/common/move_history_panel.dart';
 import '../widgets/common/opening_browser.dart';
-import '../widgets/common/review_panel.dart';
 import 'pgn_dialog.dart';
 import 'package:xqmagic/screens/settings_dialog.dart';
 
@@ -29,10 +28,10 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void initState() {
     super.initState();
-    // 初始无左侧面板：3个区域，左侧大小为0
+    // 初始显示云库查询左侧面板
     _splitController = MultiSplitViewController(
       areas: [
-        Area(size: 0, min: 0, max: 500),
+        Area(size: 260, min: 0, max: 500),
         Area(flex: 1),
         Area(size: 280, min: 200, max: 500),
       ],
@@ -41,7 +40,7 @@ class _GameScreenState extends State<GameScreen> {
     _verticalSplitController = MultiSplitViewController(
       areas: [
         Area(flex: 3, min: 200), // 主内容区（棋盘）
-        Area(size: 120, min: 80, max: 300), // 底部引擎分析面板
+        Area(size: 200, min: 120, max: 400), // 底部引擎面板
       ],
     );
   }
@@ -58,9 +57,10 @@ class _GameScreenState extends State<GameScreen> {
     return Consumer<GameViewModel>(
       builder: (context, vm, _) {
         // 左侧面板状态变化时更新分栏
-        if (vm.leftPanel != _lastLeftPanel) {
-          _lastLeftPanel = vm.leftPanel;
-          final leftSize = vm.leftPanel != 'none' ? 260.0 : 0.0;
+        final shouldShowLeft = vm.leftPanel != 'none' || vm.cloudResult != null;
+        if (shouldShowLeft != (_lastLeftPanel != 'none')) {
+          _lastLeftPanel = shouldShowLeft ? 'cloud' : 'none';
+          final leftSize = shouldShowLeft ? 260.0 : 0.0;
           _splitController.areas = [
             Area(size: leftSize, min: 0, max: 500),
             Area(flex: 1),
@@ -110,7 +110,8 @@ class _GameScreenState extends State<GameScreen> {
                                 builder: (context, area) {
                                   switch (area.index) {
                                     case 0:
-                                      return vm.leftPanel != 'none'
+                                      final showLeft = vm.leftPanel != 'none' || vm.cloudResult != null;
+                                      return showLeft
                                           ? _buildLeftPanel(context, vm)
                                           : const SizedBox.shrink();
                                     case 1:
@@ -143,23 +144,23 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildBoardArea(BuildContext context, GameViewModel vm) {
-    return Center(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final availableWidth = constraints.maxWidth * 0.95;
-          final availableHeight = constraints.maxHeight * 0.95;
-          final cellSizeFromWidth =
-              availableWidth /
-              (AppConstants.boardCols + AppConstants.paddingCells * 2);
-          final cellSizeFromHeight =
-              availableHeight /
-              (AppConstants.boardRows + AppConstants.paddingCells * 2);
-          final cellSize = cellSizeFromWidth < cellSizeFromHeight
-              ? cellSizeFromWidth
-              : cellSizeFromHeight;
-          return ChessBoard(cellSize: cellSize, viewModel: vm);
-        },
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth * 0.95;
+        final availableHeight = constraints.maxHeight * 0.95;
+        final cellSizeFromWidth =
+            availableWidth /
+            (AppConstants.boardCols + AppConstants.paddingCells * 2);
+        final cellSizeFromHeight =
+            availableHeight /
+            (AppConstants.boardRows + AppConstants.paddingCells * 2);
+        final cellSize = cellSizeFromWidth < cellSizeFromHeight
+            ? cellSizeFromWidth
+            : cellSizeFromHeight;
+        return Center(
+          child: ChessBoard(cellSize: cellSize, viewModel: vm),
+        );
+      },
     );
   }
 
@@ -171,22 +172,20 @@ class _GameScreenState extends State<GameScreen> {
       child: Column(
         children: [
           Expanded(
-            flex: 2,
             child: MoveHistoryPanel(
-              moves: vm.movesFromRoot,
-              notations: vm.moveNotations,
+              moves: vm.mainLineMoves,
+              notations: vm.mainLineNotations,
               currentIndex: vm.depth - 1,
               onTapMove: (index) {
                 vm.goToStart();
-                for (int i = 0; i < index; i++) {
+                for (int i = 0; i <= index; i++) {
                   if (vm.canGoForward) vm.goForward();
                 }
               },
+              onTapRoot: () {
+                vm.goToStart();
+              },
             ),
-          ),
-          Expanded(
-            flex: 3,
-            child: const ReviewPanel(),
           ),
         ],
       ),
@@ -405,9 +404,34 @@ class _GameScreenState extends State<GameScreen> {
           Expanded(
             child: vm.cloudResult != null
                 ? CloudMoveList(
+                    pieces: vm.engine.board.pieces,
+                    activeColor: vm.engine.currentTurn,
                     moves: vm.cloudResult!.moves,
-                    bestScore: vm.cloudResult!.bestScore,
                     onMoveTap: (iccs) => vm.playEngineMove(iccs),
+                  )
+                : vm.isCloudQuerying
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white54),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          '云库查询中...',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white54,
+                          ),
+                        ),
+                      ],
+                    ),
                   )
                 : Center(
                     child: Padding(
@@ -416,13 +440,13 @@ class _GameScreenState extends State<GameScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.cloud_outlined,
+                            Icons.cloud_off_outlined,
                             size: 48,
                             color: Colors.white24,
                           ),
                           const SizedBox(height: 12),
                           const Text(
-                            '走棋后自动查询云库',
+                            '无云库数据',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.white54,
@@ -438,86 +462,69 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  /// 底部面板：引擎控制 + 引擎分析合并
+  /// 底部面板：引擎控制（上）+ 引擎输出（下）
   Widget _buildBottomPanel(BuildContext context, GameViewModel vm) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       color: Colors.black.withOpacity(0.3),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // === 左侧：引擎控制 ===
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+          // === 顶部：引擎控制 ===
+          Row(
             children: [
-              Row(
-                children: [
-                  // 分析开关
-                  ElevatedButton.icon(
-                    onPressed: () => vm.toggleAnalysis(),
-                    icon: Icon(
-                      vm.isAnalyzing ? Icons.pause : Icons.play_arrow,
-                      size: 16,
-                    ),
-                    label: Text(vm.isAnalyzing ? '停止' : '分析'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: vm.isAnalyzing ? Colors.red : Colors.green,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      textStyle: const TextStyle(fontSize: 12),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // 分析模式
-                  _dropdown(
-                    value: vm.analysisMode,
-                    items: EngineAnalysisMode.values,
-                    label: (m) => m.label,
-                    onChanged: vm.setAnalysisMode,
-                    tooltip: '分析模式',
-                  ),
-                  const SizedBox(width: 8),
-                  // 优先级模式
-                  _dropdown(
-                    value: vm.priorityMode,
-                    items: PriorityMode.values,
-                    label: (m) => m.label,
-                    onChanged: vm.setPriorityMode,
-                    tooltip: '优先级',
-                  ),
-                  const SizedBox(width: 8),
-                  // MultiPV
-                  const Text('PV:', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                  const SizedBox(width: 4),
-                  SizedBox(
-                    width: 50,
-                    child: DropdownButton<int>(
-                      value: vm.multiPV,
-                      isDense: true,
-                      dropdownColor: const Color(0xFF3E2723),
-                      underline: const SizedBox.shrink(),
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                      items: List.generate(5, (i) => i + 1)
-                          .map((v) => DropdownMenuItem(value: v, child: Text('$v')))
-                          .toList(),
-                      onChanged: (v) => v != null ? vm.setMultiPV(v) : null,
-                    ),
-                  ),
-                ],
+              // 分析开关
+              ElevatedButton.icon(
+                onPressed: () => vm.toggleAnalysis(),
+                icon: Icon(
+                  vm.isAnalyzing ? Icons.pause : Icons.play_arrow,
+                  size: 16,
+                ),
+                label: Text(vm.isAnalyzing ? '停止' : '分析'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: vm.isAnalyzing ? Colors.red : Colors.green,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  textStyle: const TextStyle(fontSize: 12),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+              const SizedBox(width: 12),
+              // 分析模式
+              _dropdown(
+                value: vm.analysisMode,
+                items: EngineAnalysisMode.values,
+                label: (m) => m.label,
+                onChanged: vm.setAnalysisMode,
+                tooltip: '分析模式',
+              ),
+              const SizedBox(width: 8),
+              // MultiPV
+              const Text('PV:', style: TextStyle(color: Colors.white70, fontSize: 12)),
+              const SizedBox(width: 4),
+              SizedBox(
+                width: 50,
+                child: DropdownButton<int>(
+                  value: vm.multiPV,
+                  isDense: true,
+                  dropdownColor: const Color(0xFF3E2723),
+                  underline: const SizedBox.shrink(),
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                  items: List.generate(5, (i) => i + 1)
+                      .map((v) => DropdownMenuItem(value: v, child: Text('$v')))
+                      .toList(),
+                  onChanged: (v) => v != null ? vm.setMultiPV(v) : null,
+                ),
               ),
             ],
           ),
-          const SizedBox(width: 16),
-          const VerticalDivider(color: Colors.white24, width: 1),
-          const SizedBox(width: 16),
-          // === 右侧：引擎分析结果（实时 PV 线路） ===
-          Expanded(
+          const SizedBox(height: 6),
+          // === 底部：引擎分析结果（实时 PV 线路） ===
+          Flexible(
             child: LiveAnalysisPanel(
               viewModel: vm,
-              cloudResult: vm.cloudResult,
               onBestMoveTap: (iccs) => vm.playEngineMove(iccs),
             ),
           ),
@@ -658,24 +665,6 @@ class _GameScreenState extends State<GameScreen> {
             '云库缓存: ${vm.cloudDB.cache.size}',
             style: const TextStyle(color: Colors.white54, fontSize: 11),
           ),
-          if (vm.isCloudReviewing && vm.cloudReviewProgress != null) ...[
-            const SizedBox(width: 8),
-            const Icon(Icons.cloud, color: Colors.blue, size: 12),
-            const SizedBox(width: 2),
-            Text(
-              '云库复盘中... ${(vm.cloudReviewProgress! * 100).toInt()}%',
-              style: const TextStyle(color: Colors.blue, fontSize: 11),
-            ),
-          ],
-          if (vm.isEngineReviewing && vm.engineReviewProgress != null) ...[
-            const SizedBox(width: 8),
-            const Icon(Icons.smart_toy, color: Colors.blue, size: 12),
-            const SizedBox(width: 2),
-            Text(
-              '引擎复盘中... ${(vm.engineReviewProgress! * 100).toInt()}%',
-              style: const TextStyle(color: Colors.blue, fontSize: 11),
-            ),
-          ],
         ],
       ),
     );

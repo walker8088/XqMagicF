@@ -1,5 +1,4 @@
-import 'dart:convert';
-
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:xqmagic/utils/lru_cache.dart';
 
@@ -18,6 +17,97 @@ class CloudQueryResult {
   final String bestMove;
   final int bestScore;
   final bool isCache;
+
+  /// 解析 chessdb.cn queryall 返回的文本响应
+  ///
+  /// 格式: move:c3c4,score:1,rank:2,note:! (44-02),winrate:50.08|move:...
+  /// [isRedToMove] 当前是否红方走子，用于将得分转换为红方视角
+  static CloudQueryResult? parseResponse(
+    String body,
+    String position, {
+    bool isRedToMove = true,
+  }) {
+    if (body.isEmpty) return null;
+
+    final moveStrings = body.split('|');
+    if (moveStrings.isEmpty || moveStrings[0].isEmpty) return null;
+
+    final moves = <CloudMoveInfo>[];
+    int? bestScore;
+
+    // 第一次遍历：找出最高分数（红方视角，chessdb.cn 已是红方视角）
+    for (final moveStr in moveStrings) {
+      final fields = _parseFields(moveStr.trim());
+      if (fields == null) continue;
+      final score = int.tryParse(fields['score'] ?? '0') ?? 0;
+      if (bestScore == null || score > bestScore) {
+        bestScore = score;
+      }
+    }
+
+    // 第二次遍历：构建 CloudMoveInfo 列表（chessdb.cn 已是红方视角，无需转换）
+    for (final moveStr in moveStrings) {
+      final fields = _parseFields(moveStr.trim());
+      if (fields == null) continue;
+
+      final iccs = fields['move'] ?? '';
+      if (iccs.isEmpty) continue;
+
+      final score = int.tryParse(fields['score'] ?? '0') ?? 0;
+      final winRate = (double.tryParse(fields['winrate'] ?? '0') ?? 0.0).round();
+      final frequency = _parseFrequency(fields['note']);
+      final diff = score - bestScore!;
+
+      moves.add(
+        CloudMoveInfo(
+          iccs: iccs,
+          score: score,
+          winRate: winRate,
+          frequency: frequency,
+          diff: diff,
+        ),
+      );
+    }
+
+    if (moves.isEmpty) return null;
+
+    moves.sort((a, b) => b.score.compareTo(a.score));
+
+    return CloudQueryResult(
+      position: position,
+      moves: moves,
+      bestMove: moves.first.iccs,
+      bestScore: moves.first.score,
+    );
+  }
+
+  static Map<String, String>? _parseFields(String moveStr) {
+    try {
+      final result = <String, String>{};
+      final pairs = moveStr.split(',');
+      for (final pair in pairs) {
+        final colonIdx = pair.indexOf(':');
+        if (colonIdx < 0) continue;
+        final key = pair.substring(0, colonIdx).trim();
+        final value = pair.substring(colonIdx + 1).trim();
+        result[key] = value;
+      }
+      return result.isEmpty ? null : result;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static int _parseFrequency(String? note) {
+    if (note == null || note.isEmpty) return 0;
+    try {
+      final match = RegExp(r'\((\d+)-').firstMatch(note);
+      if (match != null) {
+        return int.parse(match.group(1)!);
+      }
+    } catch (_) {}
+    return 0;
+  }
 }
 
 /// 云库着法信息
@@ -74,9 +164,14 @@ class CloudDBClient {
     String positionFen, {
     bool useCache = true,
   }) async {
+    debugPrint('[CloudDB] 查询开始, FEN: $positionFen');
+
     if (useCache) {
       final cached = _cache.get(positionFen);
-      if (cached != null) return cached;
+      if (cached != null) {
+        debugPrint('[CloudDB] 命中缓存, ${cached.moves.length} 条着法');
+        return cached;
+      }
     }
 
     _isQuerying = true;
@@ -85,17 +180,24 @@ class CloudDBClient {
       final url = Uri.parse(
         baseUrl,
       ).replace(queryParameters: {'action': 'queryall', 'board': positionFen});
+      debugPrint('[CloudDB] 请求 URL: $url');
+
       final response = await http.get(url).timeout(const Duration(seconds: 10));
+      debugPrint('[CloudDB] 响应状态码: ${response.statusCode}');
+      debugPrint('[CloudDB] 响应内容: ${response.body}');
 
       if (response.statusCode != 200) {
+        debugPrint('[CloudDB] 请求失败, 状态码: ${response.statusCode}');
         _isQuerying = false;
         return null;
       }
 
       final result = _parseResponse(response.body, positionFen);
-
       if (result != null) {
         _cache.put(positionFen, result);
+        debugPrint('[CloudDB] 解析成功, ${result.moves.length} 条着法, 最佳=${result.bestMove}');
+      } else {
+        debugPrint('[CloudDB] 解析结果为空');
       }
 
       for (final listener in List.from(_listeners)) {
@@ -104,62 +206,31 @@ class CloudDBClient {
 
       _isQuerying = false;
       return result;
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('[CloudDB] 查询异常: $e');
+      debugPrint('[CloudDB] 堆栈: $st');
       _isQuerying = false;
       return null;
     }
   }
 
+  /// 从 FEN 字符串提取是否红方走子
+  static bool _isRedToMoveFromFen(String fen) {
+    final parts = fen.split(' ');
+    if (parts.length < 2) return true; // 默认红方
+    return parts[1].toLowerCase() == 'r';
+  }
+
   CloudQueryResult? _parseResponse(String body, String position) {
-    try {
-      final json = jsonDecode(body) as Map<String, dynamic>;
-      if (json['code'] != 'success') return null;
-
-      final movesJson = json['moves'] as List<dynamic>;
-      if (movesJson.isEmpty) return null;
-
-      int? bestScore;
-      for (final moveJson in movesJson) {
-        final score = (moveJson['score'] as num).toInt();
-        if (bestScore == null || score > bestScore) {
-          bestScore = score;
-        }
-      }
-
-      final moves = <CloudMoveInfo>[];
-      for (final moveJson in movesJson) {
-        final iccs = moveJson['move'] as String;
-        final score = (moveJson['score'] as num).toInt();
-        final winRate = (moveJson['winrate'] ?? 0) is String
-            ? int.tryParse(moveJson['winrate'] as String) ?? 0
-            : (moveJson['winrate'] as num?)?.toInt() ?? 0;
-        final frequency = (moveJson['number'] ?? 0) is String
-            ? int.tryParse(moveJson['number'] as String) ?? 0
-            : (moveJson['number'] as num?)?.toInt() ?? 0;
-        final diff = bestScore != null ? score - bestScore : 0;
-
-        moves.add(
-          CloudMoveInfo(
-            iccs: iccs,
-            score: score,
-            winRate: winRate,
-            frequency: frequency,
-            diff: diff,
-          ),
-        );
-      }
-
-      moves.sort((a, b) => b.score.compareTo(a.score));
-
-      return CloudQueryResult(
-        position: position,
-        moves: moves,
-        bestMove: moves.first.iccs,
-        bestScore: moves.first.score,
-      );
-    } catch (_) {
-      return null;
+    debugPrint('[CloudDB] 开始解析文本响应, 长度: ${body.length}');
+    final isRedToMove = _isRedToMoveFromFen(position);
+    final result = CloudQueryResult.parseResponse(body, position, isRedToMove: isRedToMove);
+    if (result != null) {
+      debugPrint('[CloudDB] 解析成功: ${result.moves.length} 条着法, 最佳=${result.bestMove}');
+    } else {
+      debugPrint('[CloudDB] 解析结果为空');
     }
+    return result;
   }
 
   void clearCache() {

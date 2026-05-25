@@ -168,17 +168,19 @@ void main() {
         expect(moves, isNotEmpty);
       });
 
-      test('minimal position: only generals, each has 3 moves', () {
+      test('minimal position: only generals, each has 2 moves (forward blocked by 飞将)', () {
         const fen = '4k4/9/9/9/9/9/9/9/9/4K4 r';
         final engine = GameEngine(fen);
 
-        // Red general at (4,0): can move to (3,0), (5,0), (4,1)
+        // Red general at (4,0): can move to (3,0), (5,0)
+        // (4,1) is illegal: flying generals rule — would leave king in check
         final redMoves = engine.getAllLegalMoves(PieceColor.red);
-        expect(redMoves.length, 3);
+        expect(redMoves.length, 2);
 
-        // Black general at (4,9): can move to (3,9), (5,9), (4,8)
+        // Black general at (4,9): can move to (3,9), (5,9)
+        // (4,8) is illegal: same reason
         final blackMoves = engine.getAllLegalMoves(PieceColor.black);
-        expect(blackMoves.length, 3);
+        expect(blackMoves.length, 2);
       });
     });
 

@@ -117,6 +117,11 @@ class AppSettings {
   String get recentFiles => get<String>('recent_files', '[]');
   Future<void> setRecentFiles(String json) => set('recent_files', json);
 
+  /// 引擎协议类型：uci、ucci、auto(自动检测)
+  String get engineProtocol => get<String>('engine_protocol', 'auto');
+  Future<void> setEngineProtocol(String protocol) =>
+      set('engine_protocol', protocol);
+
   Future<void> reset() async {
     _data.clear();
     await _save();

@@ -14,7 +14,6 @@ class MoveNotation {
 
   // ========== ICCS 格式（引擎通信用） ==========
 
-  /// ICCS 代数坐标记法: file(a-i) + rank(0-9) + file(a-i) + rank(0-9)
   /// 例如: h7e7 表示从 (7,7) 到 (4,7)，b0c2 表示从 (1,0) 到 (2,2)
   /// 此格式与 UCI/UCCI 引擎输出格式完全一致，无需额外转换
   static String toICCS(MoveRecord move) {

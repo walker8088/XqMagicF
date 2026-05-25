@@ -13,6 +13,7 @@ dependencies:
   path_provider: ^2.1.1
   http: ^1.1.0
   multi_split_view: ^3.6.2
+  file_picker: ^8.1.2
 
 dev_dependencies:
   flutter_test:

@@ -280,15 +280,12 @@ void main() {
       });
     });
 
-    group('boardFen', () {
-      test('should return FEN without active color', () {
+    group('fen', () {
+      test('should return full FEN with active color', () {
         const fen =
             'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR r';
         final node = GameTreeNode(fen: fen);
-        expect(
-          node.boardFen,
-          'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR',
-        );
+        expect(node.fen, fen);
       });
     });
 
@@ -576,9 +573,9 @@ void main() {
         expect(gameTree.currentFen, FenParser.initial);
       });
 
-      test('currentBoardFen should return FEN without active color', () {
+      test('currentFen should return full FEN with active color', () {
         gameTree.initStandard();
-        expect(gameTree.currentBoardFen, FenParser.initial.split(' ').first);
+        expect(gameTree.currentFen, FenParser.initial);
       });
 
       test('movesFromRoot should return moves from root', () {
