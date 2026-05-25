@@ -1,4 +1,4 @@
-name: XQMagic
+name: magicf
 description: "象棋魔术师 - 象棋对弈界面程序"
 publish_to: "none"
 version: 0.1.0
@@ -12,6 +12,7 @@ dependencies:
   provider: ^6.1.1
   path_provider: ^2.1.1
   http: ^1.1.0
+  multi_split_view: ^3.6.2
 
 dev_dependencies:
   flutter_test:

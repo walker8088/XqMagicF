@@ -25,16 +25,17 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen> {
-  late final MultiSplitViewController _splitController;
+  late MultiSplitViewController _splitController;
+  String _lastLeftPanel = '';
 
   @override
   void initState() {
     super.initState();
+    // 初始无左侧面板：3个区域，左侧大小为0
     _splitController = MultiSplitViewController(
       areas: [
-        // 棋盘区域 (flex)
+        Area(size: 0, min: 0, max: 500),
         Area(flex: 1),
-        // 右侧面板 (固定宽度)
         Area(size: 280, min: 200, max: 500),
       ],
     );
@@ -46,23 +47,20 @@ class _GameScreenState extends State<GameScreen> {
     super.dispose();
   }
 
-  /// 更新分栏布局
-  void _updateSplitAreas(GameViewModel vm) {
-    final areas = <Area>[];
-    if (vm.leftPanel != 'none') {
-      areas.add(Area(size: 260, min: 200, max: 500));
-    }
-    areas.add(Area(flex: 1));
-    areas.add(Area(size: 280, min: 200, max: 500));
-    _splitController.areas = areas;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Consumer<GameViewModel>(
       builder: (context, vm, _) {
-        // 更新分栏以匹配面板状态
-        _updateSplitAreas(vm);
+        // 左侧面板状态变化时更新分栏
+        if (vm.leftPanel != _lastLeftPanel) {
+          _lastLeftPanel = vm.leftPanel;
+          final leftSize = vm.leftPanel != 'none' ? 260.0 : 0.0;
+          _splitController.areas = [
+            Area(size: leftSize, min: 0, max: 500),
+            Area(flex: 1),
+            Area(size: 280, min: 200, max: 500),
+          ];
+        }
 
         return Scaffold(
           body: Container(
@@ -75,9 +73,7 @@ class _GameScreenState extends State<GameScreen> {
             ),
             child: Column(
               children: [
-                // 顶部栏
                 _buildTopBar(context, vm),
-                // 主内容区：可拖拽分栏
                 Expanded(
                   child: MultiSplitViewTheme(
                     data: MultiSplitViewThemeData(
@@ -90,11 +86,23 @@ class _GameScreenState extends State<GameScreen> {
                     child: MultiSplitView(
                       axis: Axis.horizontal,
                       controller: _splitController,
-                      builder: (context, area) => _buildArea(context, vm, area),
+                      builder: (context, area) {
+                        switch (area.index) {
+                          case 0:
+                            return vm.leftPanel != 'none'
+                                ? _buildLeftPanel(context, vm)
+                                : const SizedBox.shrink();
+                          case 1:
+                            return _buildBoardArea(context, vm);
+                          case 2:
+                            return _buildRightPanel(context, vm);
+                          default:
+                            return const SizedBox.shrink();
+                        }
+                      },
                     ),
                   ),
                 ),
-                // 引擎控制面板
                 EngineControlPanel(
                   analysisMode: vm.analysisMode,
                   priorityMode: vm.priorityMode,
@@ -105,7 +113,6 @@ class _GameScreenState extends State<GameScreen> {
                   onMultiPVChanged: vm.setMultiPV,
                   onToggleAnalysis: () => vm.toggleAnalysis(),
                 ),
-                // 底部状态栏
                 _buildStatusBar(vm),
               ],
             ),
@@ -115,25 +122,6 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  /// 根据 area.index 构建对应内容
-  Widget _buildArea(BuildContext context, GameViewModel vm, Area area) {
-    final hasLeftPanel = vm.leftPanel != 'none';
-    final areaIndex = hasLeftPanel ? area.index : area.index;
-
-    // 重新计算索引：如果有左侧面板，0=左侧, 1=棋盘, 2=右侧
-    // 如果没有左侧面板，0=棋盘, 1=右侧
-    if (hasLeftPanel) {
-      if (areaIndex == 0) return _buildLeftPanel(context, vm);
-      if (areaIndex == 1) return _buildBoardArea(context, vm);
-      if (areaIndex == 2) return _buildRightPanel(context, vm);
-    } else {
-      if (areaIndex == 0) return _buildBoardArea(context, vm);
-      if (areaIndex == 1) return _buildRightPanel(context, vm);
-    }
-    return const SizedBox.shrink();
-  }
-
-  /// 棋盘区域
   Widget _buildBoardArea(BuildContext context, GameViewModel vm) {
     return Center(
       child: LayoutBuilder(
@@ -155,7 +143,6 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  /// 右侧面板：着法列表 + 分析/复盘
   Widget _buildRightPanel(BuildContext context, GameViewModel vm) {
     return Container(
       decoration: const BoxDecoration(
@@ -163,7 +150,6 @@ class _GameScreenState extends State<GameScreen> {
       ),
       child: Column(
         children: [
-          // 着法列表
           Expanded(
             flex: 2,
             child: MoveHistoryPanel(
@@ -177,7 +163,6 @@ class _GameScreenState extends State<GameScreen> {
               },
             ),
           ),
-          // 分析面板 或 复盘面板
           Expanded(
             flex: 3,
             child: vm.isAnalysisPanel
@@ -194,7 +179,6 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  /// 顶部栏
   Widget _buildTopBar(BuildContext context, GameViewModel vm) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -237,7 +221,6 @@ class _GameScreenState extends State<GameScreen> {
             style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
           const Spacer(),
-          // 左侧面板切换按钮
           _sidePanelButton(
             icon: Icons.bookmark_border,
             activeIcon: Icons.bookmark,
@@ -252,7 +235,6 @@ class _GameScreenState extends State<GameScreen> {
             tooltip: '棋谱库',
             onPressed: vm.showLibraryPanel,
           ),
-          // 右侧面板切换按钮
           _sidePanelButton(
             icon: vm.isAnalysisPanel ? Icons.analytics : Icons.replay,
             isActive: false,
@@ -267,23 +249,19 @@ class _GameScreenState extends State<GameScreen> {
             icon: const Icon(Icons.folder_open, size: 18),
             color: Colors.white70,
             tooltip: '打开棋谱',
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (_) => PGNOpenDialog(viewModel: vm),
-              );
-            },
+            onPressed: () => showDialog(
+              context: context,
+              builder: (_) => PGNOpenDialog(viewModel: vm),
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.save, size: 18),
             color: Colors.white70,
             tooltip: '保存棋谱',
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (_) => PGNSaveDialog(viewModel: vm),
-              );
-            },
+            onPressed: () => showDialog(
+              context: context,
+              builder: (_) => PGNSaveDialog(viewModel: vm),
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.edit, size: 18),
@@ -345,7 +323,6 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  /// 侧边面板切换按钮
   Widget _sidePanelButton({
     required IconData icon,
     IconData? activeIcon,
@@ -388,7 +365,6 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  /// 左侧面板内容
   Widget _buildLeftPanel(BuildContext context, GameViewModel vm) {
     return Container(
       decoration: const BoxDecoration(
@@ -444,7 +420,6 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  /// 底部状态栏
   Widget _buildStatusBar(GameViewModel vm) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -554,7 +529,7 @@ class _GameScreenState extends State<GameScreen> {
             '云库缓存: ${vm.cloudDB.cache.size}',
             style: const TextStyle(color: Colors.white54, fontSize: 11),
           ),
-          if (vm.isCloudReviewing) ...[
+          if (vm.isCloudReviewing && vm.cloudReviewProgress != null) ...[
             const SizedBox(width: 8),
             const Icon(Icons.cloud, color: Colors.blue, size: 12),
             const SizedBox(width: 2),
@@ -563,7 +538,7 @@ class _GameScreenState extends State<GameScreen> {
               style: const TextStyle(color: Colors.blue, fontSize: 11),
             ),
           ],
-          if (vm.isEngineReviewing) ...[
+          if (vm.isEngineReviewing && vm.engineReviewProgress != null) ...[
             const SizedBox(width: 8),
             const Icon(Icons.smart_toy, color: Colors.blue, size: 12),
             const SizedBox(width: 2),
