@@ -78,13 +78,13 @@ class EngineReviewService {
   EngineReviewService({EngineManager? manager}) : _manager = manager;
 
   final EngineManager? _manager;
-  bool _cancelled = false;
+  bool _isRunning = false;
 
-  bool get isRunning => !_cancelled;
+  bool get isRunning => _isRunning;
 
   /// 取消复盘
   void cancel() {
-    _cancelled = true;
+    _isRunning = false;
   }
 
   /// 复盘对局
@@ -99,14 +99,14 @@ class EngineReviewService {
     if (_manager == null || !_manager!.isReady) return null;
     if (fenList.isEmpty || playedMoveICCS.isEmpty) return null;
 
-    _cancelled = false;
+    _isRunning = true;
     final moveCount = playedMoveICCS.length;
     if (fenList.length < moveCount) return null;
 
     final reviewMoves = <EngineReviewMove>[];
 
     for (int i = 0; i < moveCount; i++) {
-      if (_cancelled) return null;
+      if (!_isRunning) return null;
 
       final positionFen = fenList[i];
       final playedICCS = playedMoveICCS[i];
@@ -147,6 +147,8 @@ class EngineReviewService {
       onProgress?.call(i + 1, moveCount);
     }
 
+    _isRunning = false;
+
     return EngineReviewResult(
       startFen: fenList.first,
       moves: reviewMoves,
@@ -159,7 +161,7 @@ class EngineReviewService {
     EngineInfo? lastInfo;
 
     while (sw.elapsedMilliseconds < timeoutMs) {
-      if (_cancelled) return null;
+      if (!_isRunning) return null;
       await Future.delayed(const Duration(milliseconds: 100));
 
       final infos = _manager!.allInfos;
