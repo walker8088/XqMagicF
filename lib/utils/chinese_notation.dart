@@ -18,7 +18,18 @@ class ChineseNotation {
   ChineseNotation._();
 
   /// 中文数字映射
-  static const _chineseNumbers = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+  static const _chineseNumbers = [
+    '零',
+    '一',
+    '二',
+    '三',
+    '四',
+    '五',
+    '六',
+    '七',
+    '八',
+    '九',
+  ];
 
   // ========== 棋盘 Normalize/Denormalize ==========
 
@@ -82,7 +93,7 @@ class ChineseNotation {
   // ========== 标准中文记谱法 ==========
 
   /// 将走法记录转换为标准中文记谱法（四字/五字格式）
-  ///
+  //
   /// 需要传入当前棋盘状态以处理同线多子的情况
   /// [board] 当前棋盘（用于检查同线是否有同类型棋子）
   /// [move] 走法记录
@@ -97,7 +108,6 @@ class ChineseNotation {
     final pieceName = _getPieceName(move.pieceType, move.color, useSimpleText);
 
     // 获取纵线编号（从走棋方视角，从右到左 1-9）
-    // 公式：file = 9 - col，对红黑双方都适用
     final fromFile = _getFileNumber(move.from.col, isRed);
     final toFile = _getFileNumber(move.to.col, isRed);
 
@@ -115,10 +125,23 @@ class ChineseNotation {
       isRed,
     );
 
+    String result;
     if (prefix != null) {
-      return '$prefix$pieceName$action$target';
+      result = '$prefix$pieceName$action$target';
+    } else {
+      result = '$pieceName$fromFile$action$target';
     }
-    return '$pieceName$fromFile$action$target';
+
+    // DEBUG: 黑方走子时打印关键数据
+    if (!isRed && result.contains('退')) {
+      debugPrint(
+        '[棋谱DEBUG] 黑方退着: move.from=${move.from}, move.to=${move.to}, '
+        'rowDiff=$rowDiff, colDiff=$colDiff, isRed=$isRed, '
+        'result="$result"',
+      );
+    }
+
+    return result;
   }
 
   // ========== WXF 记谱法 ==========
@@ -138,10 +161,7 @@ class ChineseNotation {
   /// - P3.4 = 兵三平四
   /// - fC2.5 = 前炮平五（同线多子）
   /// - bN8-7 = 后马退7
-  static String toWXF(
-    Map<Coord, ChessPiece> board,
-    MoveRecord move,
-  ) {
+  static String toWXF(Map<Coord, ChessPiece> board, MoveRecord move) {
     final isRed = move.color == PieceColor.red;
 
     final pieceLetter = _getPieceLetter(move.pieceType);
@@ -250,11 +270,20 @@ class ChineseNotation {
     }
 
     // 计算目标位置
-    final toCoord = _calculateTarget(fromCoord, directionChar, targetNum, isRed, type);
+    final toCoord = _calculateTarget(
+      fromCoord,
+      directionChar,
+      targetNum,
+      isRed,
+      type,
+    );
     if (toCoord == null) return null;
 
     // 验证目标位置是否在棋盘范围内
-    if (toCoord.col < 0 || toCoord.col > 8 || toCoord.row < 0 || toCoord.row > 9) {
+    if (toCoord.col < 0 ||
+        toCoord.col > 8 ||
+        toCoord.row < 0 ||
+        toCoord.row > 9) {
       return null;
     }
 
@@ -272,7 +301,11 @@ class ChineseNotation {
   // ========== 内部方法 ==========
 
   /// 获取棋子名称（根据颜色区分）
-  static String _getPieceName(PieceType? type, PieceColor color, bool useSimpleText) {
+  static String _getPieceName(
+    PieceType? type,
+    PieceColor color,
+    bool useSimpleText,
+  ) {
     if (type == null) {
       debugPrint('[ChineseNotation] WARN: pieceType is null, color=$color');
       return '?';
@@ -280,7 +313,9 @@ class ChineseNotation {
 
     // 检查索引范围
     if (type.index < 0 || type.index > 6) {
-      debugPrint('[ChineseNotation] WARN: invalid pieceType.index=${type.index}, type=$type');
+      debugPrint(
+        '[ChineseNotation] WARN: invalid pieceType.index=${type.index}, type=$type',
+      );
       return '?';
     }
 
@@ -288,12 +323,16 @@ class ChineseNotation {
       // 简体中文：红黑双方用不同的字
       const redNames = ['帅', '仕', '相', '马', '车', '炮', '兵'];
       const blackNames = ['将', '士', '象', '马', '车', '炮', '卒'];
-      return color == PieceColor.red ? redNames[type.index] : blackNames[type.index];
+      return color == PieceColor.red
+          ? redNames[type.index]
+          : blackNames[type.index];
     } else {
       // 繁体中文
       const redNames = ['帥', '仕', '相', '傌', '俥', '砲', '兵'];
       const blackNames = ['將', '士', '象', '馬', '車', '砲', '卒'];
-      return color == PieceColor.red ? redNames[type.index] : blackNames[type.index];
+      return color == PieceColor.red
+          ? redNames[type.index]
+          : blackNames[type.index];
     }
   }
 
@@ -543,13 +582,19 @@ class ChineseNotation {
           final toCol = isRed ? 9 - target : target - 1;
           final colChange = (toCol - from.col).abs();
           final rowChange = colChange == 1 ? 2 : 1;
-          return Coord(toCol, isRed ? from.row + rowChange : from.row - rowChange);
+          return Coord(
+            toCol,
+            isRed ? from.row + rowChange : from.row - rowChange,
+          );
         } else {
           // 士/象：斜线前进，target 是目标纵线
           final toCol = isRed ? 9 - target : target - 1;
           final rowOffset = (toCol - from.col).abs();
           // 红方前进 = row 增大，黑方前进 = row 减小
-          return Coord(toCol, isRed ? from.row + rowOffset : from.row - rowOffset);
+          return Coord(
+            toCol,
+            isRed ? from.row + rowOffset : from.row - rowOffset,
+          );
         }
       case '-':
         // 退（向后）
@@ -559,11 +604,17 @@ class ChineseNotation {
           final toCol = isRed ? 9 - target : target - 1;
           final colChange = (toCol - from.col).abs();
           final rowChange = colChange == 1 ? 2 : 1;
-          return Coord(toCol, isRed ? from.row - rowChange : from.row + rowChange);
+          return Coord(
+            toCol,
+            isRed ? from.row - rowChange : from.row + rowChange,
+          );
         } else {
           final toCol = isRed ? 9 - target : target - 1;
           final rowOffset = (toCol - from.col).abs();
-          return Coord(toCol, isRed ? from.row - rowOffset : from.row + rowOffset);
+          return Coord(
+            toCol,
+            isRed ? from.row - rowOffset : from.row + rowOffset,
+          );
         }
       default:
         return null;

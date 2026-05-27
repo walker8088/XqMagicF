@@ -179,7 +179,6 @@ class GameViewModel extends ChangeNotifier {
     }
 
     // 根据评分变化判断着法质量
-    // 评分变化阈值（厘）：-50 = 小失误, -150 = 大失误, -300 = 败着
     if (scoreDiff < -300) {
       node.moveAnnotation = '✗✗';
     } else if (scoreDiff < -150) {
