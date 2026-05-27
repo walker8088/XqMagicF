@@ -1,7 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:xqmagic/models/chess_piece.dart';
 import 'package:xqmagic/services/cloud_db.dart';
-import 'package:xqmagic/utils/coord.dart';
 
 void main() {
   group('CloudQueryResult', () {

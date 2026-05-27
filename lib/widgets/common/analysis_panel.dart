@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:xqmagic/models/chess_piece.dart';
-import 'package:xqmagic/models/move.dart';
 import 'package:xqmagic/services/cloud_db.dart';
 import 'package:xqmagic/services/uci_engine.dart';
 import 'package:xqmagic/utils/constants.dart';
 import 'package:xqmagic/utils/coord.dart';
 import 'package:xqmagic/utils/move_notation.dart';
-import 'package:xqmagic/viewmodels/game_viewmodel.dart';
+import 'package:xqmagic/utils/pv_chinese_converter.dart';
 
 /// Represents a single principal variation line from engine analysis.
 class EnginePVLine {
@@ -18,6 +17,7 @@ class EnginePVLine {
     required this.nodes,
     required this.nps,
     required this.time,
+    this.isRedToMove = true,
   });
 
   /// Search depth
@@ -41,6 +41,9 @@ class EnginePVLine {
   /// Time spent in milliseconds
   final int time;
 
+  /// 引擎分析时是否为红方走棋，用于 PV 线路中文转换
+  final bool isRedToMove;
+
   /// Factory constructor to create from EngineInfo
   factory EnginePVLine.fromEngineInfo(EngineInfo info) {
     final convertedScore = info.adjustedScore;
@@ -52,6 +55,7 @@ class EnginePVLine {
       nodes: info.nodes,
       nps: info.nps,
       time: info.timeMs,
+      isRedToMove: info.isRedToMove,
     );
   }
 
@@ -59,18 +63,45 @@ class EnginePVLine {
   String get bestMove => pv.isNotEmpty ? pv.first : '';
 }
 
-/// 实时引擎分析面板：自动监听 GameViewModel 并显示实时 PV 线路
+/// 实时引擎分析面板：监听引擎分析数据并显示实时 PV 线路
 ///
-/// 这是 `AnalysisPanel` 的状态化包装器，监听引擎分析更新
-/// 并将 `EngineInfo` 自动转换为 `EnginePVLine` 格式
+/// 这是 `AnalysisPanel` 的状态化包装器，接收明确的分析数据 props
+/// 而非直接依赖 GameViewModel，实现 widget 与 ViewModel 的解耦
 class LiveAnalysisPanel extends StatefulWidget {
   const LiveAnalysisPanel({
     super.key,
-    required this.viewModel,
+    required this.engineInfos,
+    required this.isEngineReady,
+    required this.isAnalyzing,
+    required this.isThinking,
+    required this.bestMove,
+    required this.board,
+    required this.activeColor,
     this.onBestMoveTap,
   });
 
-  final GameViewModel viewModel;
+  /// 引擎 PV 线路列表
+  final List<EngineInfo> engineInfos;
+
+  /// 引擎是否已就绪
+  final bool isEngineReady;
+
+  /// UI 是否标记为正在分析
+  final bool isAnalyzing;
+
+  /// 引擎是否正在思考
+  final bool isThinking;
+
+  /// 当前最佳着法 (ICCS)
+  final String? bestMove;
+
+  /// 当前棋盘棋子映射
+  final Map<Coord, ChessPiece> board;
+
+  /// 当前走子方
+  final PieceColor activeColor;
+
+  /// 点击最佳着法时的回调
   final void Function(String iccs)? onBestMoveTap;
 
   @override
@@ -78,60 +109,27 @@ class LiveAnalysisPanel extends StatefulWidget {
 }
 
 class _LiveAnalysisPanelState extends State<LiveAnalysisPanel> {
-  late final VoidCallback _listener;
-
-  @override
-  void initState() {
-    super.initState();
-    _listener = _onViewModelChanged;
-    widget.viewModel.addListener(_listener);
-  }
-
-  @override
-  void dispose() {
-    widget.viewModel.removeListener(_listener);
-    super.dispose();
-  }
-
-  @override
-  void didUpdateWidget(covariant LiveAnalysisPanel oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.viewModel != widget.viewModel) {
-      oldWidget.viewModel.removeListener(_listener);
-      widget.viewModel.addListener(_listener);
-    }
-  }
-
-  void _onViewModelChanged() {
-    if (mounted) setState(() {});
-  }
-
   @override
   Widget build(BuildContext context) {
-    final vm = widget.viewModel;
-    final infos = vm.engineInfos;
+    final infos = widget.engineInfos;
 
     // Convert EngineInfo list to EnginePVLine list, sorted by multipv
-    final pvLines = infos
-        .map((info) => EnginePVLine.fromEngineInfo(info))
-        .toList()
-      ..sort((a, b) {
-        final idxA = infos.indexWhere((i) => i.bestMoveICCS == a.bestMove);
-        final idxB = infos.indexWhere((i) => i.bestMoveICCS == b.bestMove);
-        return idxA.compareTo(idxB);
-      });
+    final pvLines =
+        infos.map((info) => EnginePVLine.fromEngineInfo(info)).toList()
+          ..sort((a, b) {
+            final idxA = infos.indexWhere((i) => i.bestMoveICCS == a.bestMove);
+            final idxB = infos.indexWhere((i) => i.bestMoveICCS == b.bestMove);
+            return idxA.compareTo(idxB);
+          });
 
     return AnalysisPanel(
-      engineInfo: vm.engineManager.isReady
-          ? EngineInfo(
-              depth: 0,
-              score: 0,
-              isMate: false,
-              pv: [],
-            )
+      engineInfo: widget.isEngineReady
+          ? EngineInfo(depth: 0, score: 0, isMate: false, pv: [])
           : null,
-      bestMove: vm.engineBestMove,
-      isAnalyzing: vm.isAnalyzing || vm.engineManager.isThinking,
+      board: widget.board,
+      activeColor: widget.activeColor,
+      bestMove: widget.bestMove,
+      isAnalyzing: widget.isAnalyzing || widget.isThinking,
       pvLines: pvLines,
       onBestMoveTap: widget.onBestMoveTap,
     );
@@ -148,6 +146,8 @@ class AnalysisPanel extends StatelessWidget {
     this.isAnalyzing = false,
     this.pvLines = const [],
     this.onBestMoveTap,
+    this.board,
+    this.activeColor,
   });
 
   /// Engine info (name, author, etc.)
@@ -168,148 +168,73 @@ class AnalysisPanel extends StatelessWidget {
   /// Callback when user taps a recommended move
   final void Function(String iccs)? onBestMoveTap;
 
+  /// Board state for converting ICCS to Chinese notation
+  final Map<Coord, ChessPiece>? board;
+
+  /// Active color for Chinese notation conversion
+  final PieceColor? activeColor;
+
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (isAnalyzing) _buildAnalyzingIndicator(context),
-          if (bestMove != null && !isAnalyzing) _buildBestMove(context),
-          if (pvLines.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            _buildPVLines(context),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (bestMove != null) _buildBestMove(context),
+            if (pvLines.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _buildPVLines(context),
+            ],
+            if (cloudResult != null && cloudResult!.moves.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Divider(height: 20),
+              _buildCloudSection(context),
+            ],
           ],
-          if (cloudResult != null && cloudResult!.moves.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            const Divider(height: 20),
-            _buildCloudSection(context),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        const Text(
-          '引擎分析',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
         ),
-        if (engineInfo != null)
-          Text(
-            'D:${engineInfo!.depth}',
-            style: const TextStyle(fontSize: 11, color: Colors.white70),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildAnalyzingIndicator(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const SizedBox(
-            width: 14,
-            height: 14,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-            ),
-          ),
-          const SizedBox(width: 8),
-          const Text(
-            '引擎分析中...',
-            style: TextStyle(fontSize: 12, color: Colors.blue),
-          ),
-        ],
       ),
     );
   }
 
   Widget _buildBestMove(BuildContext context) {
     final pvLine = pvLines.isNotEmpty ? pvLines.first : null;
+    // 使用引擎分析时的走棋方（而非当前 activeColor），确保分析结果不因
+    // 走棋后 activeColor 变化而显示出错
+    final bestColor = pvLine?.isRedToMove == false
+        ? PieceColor.black
+        : PieceColor.red;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppConstants.redPieceColor.withOpacity(0.85),
-            const Color(0xFFAA0000),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                '最佳着法',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.white70,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              if (pvLine != null)
-                ScoreDisplay(
-                  score: pvLine.score,
-                  mateIn: pvLine.mateIn,
-                  small: true,
-                ),
-            ],
+          const Text(
+            '最佳: ',
+            style: TextStyle(fontSize: 12, color: Colors.white54),
           ),
-          const SizedBox(height: 4),
           if (bestMove != null)
             InkWell(
               onTap: onBestMoveTap != null
                   ? () => onBestMoveTap!(bestMove!)
                   : null,
-              borderRadius: BorderRadius.circular(4),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Text(
-                  _formatMoveDisplay(bestMove!),
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 2,
-                  ),
+              child: Text(
+                _formatMoveDisplay(bestMove!, bestColor),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
             ),
-          if (pvLine != null && pvLine.pv.length > 1)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                '变化: ${_formatPVPreview(pvLine.pv)}',
-                style: const TextStyle(fontSize: 10, color: Colors.white60),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+          const Spacer(),
+          if (pvLine != null)
+            ScoreDisplay(
+              score: pvLine.score,
+              mateIn: pvLine.mateIn,
+              small: true,
             ),
         ],
       ),
@@ -332,13 +257,28 @@ class AnalysisPanel extends StatelessWidget {
         ...pvLines.asMap().entries.map((entry) {
           final index = entry.key;
           final line = entry.value;
-          return _buildPVLineRow(index, line);
+          // 使用引擎分析时的 isRedToMove，确保 PV 颜色正确
+          final pvActiveColor = line.isRedToMove
+              ? PieceColor.red
+              : PieceColor.black;
+          final displayMoves = board != null
+              ? PVChineseConverter.formatPVWithChinese(
+                  board!,
+                  pvActiveColor,
+                  line.pv,
+                )
+              : line.pv.map((m) => MoveNotation.formatICCS(m)).toList();
+          return _buildPVLineRow(index, line, displayMoves);
         }),
       ],
     );
   }
 
-  Widget _buildPVLineRow(int index, EnginePVLine line) {
+  Widget _buildPVLineRow(
+    int index,
+    EnginePVLine line,
+    List<String> chineseMoves,
+  ) {
     return InkWell(
       onTap: line.pv.isNotEmpty && onBestMoveTap != null
           ? () => onBestMoveTap!(line.pv.first)
@@ -387,17 +327,15 @@ class AnalysisPanel extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 4),
-            // First move
+            // PV 线路（完整中文记谱）
             Expanded(
               child: Text(
-                line.pv.isNotEmpty ? _formatMoveDisplay(line.pv.first) : '--',
+                chineseMoves.isNotEmpty ? chineseMoves.join(' ') : '--',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: index == 0 ? FontWeight.bold : FontWeight.normal,
                   color: index == 0 ? Colors.white : Colors.white70,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -436,24 +374,15 @@ class AnalysisPanel extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 4),
-        CloudMoveList(
-          moves: cloudResult!.moves,
-          onMoveTap: onBestMoveTap,
-        ),
+        CloudMoveList(moves: cloudResult!.moves, onMoveTap: onBestMoveTap),
       ],
     );
   }
 
-  String _formatMoveDisplay(String iccs) {
-    if (iccs.length != 4) return iccs;
-    // Format ICCS as "81-82" for better readability
-    return '${iccs.substring(0, 2)}-${iccs.substring(2)}';
-  }
-
-  String _formatPVPreview(List<String> moves) {
-    if (moves.length <= 1) return '';
-    final preview = moves.sublist(1, moves.length.clamp(1, 6));
-    return preview.map(_formatMoveDisplay).join(' ');
+  /// 统一格式化单步着法显示：中文记谱(ICCS)
+  String _formatMoveDisplay(String iccs, PieceColor color) {
+    if (board == null) return MoveNotation.formatICCS(iccs);
+    return MoveNotation.formatMoveDisplay(board!, color, iccs);
   }
 }
 
@@ -622,23 +551,10 @@ class CloudMoveList extends StatelessWidget {
     );
   }
 
-  /// 将 ICCS 转为中文记谱
+  /// 将 ICCS 转为显示格式
   String _iccsToChinese(String iccs) {
     if (pieces == null || activeColor == null) return iccs;
-    try {
-      final (from, to) = MoveNotation.fromICCS(iccs);
-      final piece = pieces![from];
-      if (piece == null) return iccs;
-      final move = MoveRecord(
-        from: from,
-        to: to,
-        pieceType: piece.type,
-        color: activeColor!,
-      );
-      return MoveNotation.toText(pieces!, move);
-    } catch (_) {
-      return iccs;
-    }
+    return MoveNotation.formatMoveDisplay(pieces!, activeColor!, iccs);
   }
 
   Widget _buildScoreDisplay(int score) {
@@ -653,11 +569,7 @@ class CloudMoveList extends StatelessWidget {
     }
     return Text(
       text,
-      style: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.bold,
-        color: color,
-      ),
+      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
     );
   }
 }

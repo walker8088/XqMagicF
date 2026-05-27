@@ -109,7 +109,22 @@ class EngineManager extends ChangeNotifier {
   void setMultiPV(int n) {
     if (n < 1) return;
     _multiPV = n;
+    // Immediately apply to running engine so the change takes effect
+    // on the next analysis (or current analysis if engine supports live updates)
+    _applyMultiPVToEngine();
     notifyListeners();
+  }
+
+  /// Send the current MultiPV value to the running engine.
+  Future<void> _applyMultiPVToEngine() async {
+    if (_engine != null && _engine!.isReady && !isThinking) {
+      try {
+        await _engine!.setOption('MultiPV', _multiPV);
+        _log('MultiPV set to $_multiPV on engine');
+      } catch (e) {
+        _log('Failed to apply MultiPV to engine: $e');
+      }
+    }
   }
 
   /// Set Skill Level for the engine (0-20, UCI standard).
@@ -154,10 +169,12 @@ class EngineManager extends ChangeNotifier {
   /// If [enginePath] is null, uses the default path.
   Future<bool> loadEngine({String? enginePath}) async {
     final path = enginePath ?? _defaultEnginePath;
+    debugPrint('[EngineManager] loadEngine: path=$path');
     if (path == null || path.isEmpty) {
       _state = EngineState.error;
       _error = 'Engine path not configured';
       notifyListeners();
+      debugPrint('[EngineManager] loadEngine failed: no path configured');
       return false;
     }
 
@@ -166,6 +183,9 @@ class EngineManager extends ChangeNotifier {
     _state = EngineState.loading;
     _error = null;
     notifyListeners();
+    debugPrint(
+      '[EngineManager] loadEngine: state=loading, creating UCIEngine...',
+    );
 
     try {
       _engine = UCIEngine(
@@ -176,23 +196,31 @@ class EngineManager extends ChangeNotifier {
 
       // Subscribe to engine events
       _eventSubscription = _engine!.events.listen(_onEngineEvent);
+      debugPrint('[EngineManager] UCIEngine created, calling start()...');
 
       final started = await _engine!.start();
+      debugPrint('[EngineManager] engine start() returned: $started');
       if (!started) {
         _state = EngineState.error;
         _error = 'Failed to start engine';
         notifyListeners();
+        debugPrint('[EngineManager] loadEngine failed: start() returned false');
         return false;
       }
 
       _state = EngineState.ready;
       notifyListeners();
       _log('Engine loaded: ${_engine!.engineName}');
+      debugPrint(
+        '[EngineManager] Engine loaded successfully: ${_engine!.engineName}',
+      );
       return true;
-    } catch (e) {
+    } catch (e, st) {
       _state = EngineState.error;
       _error = 'Failed to load engine: $e';
       notifyListeners();
+      debugPrint('[EngineManager] loadEngine exception: $e');
+      debugPrint('[EngineManager] stack: $st');
       return false;
     }
   }
@@ -349,6 +377,14 @@ class EngineManager extends ChangeNotifier {
     await _engine!.stopAnalysis();
     _state = EngineState.ready;
     notifyListeners();
+  }
+
+  /// 立即清除分析结果（不走子时调用，同步清除旧数据，避免 UI 闪烁旧 PV）
+  void clearAnalysisResults() {
+    _allInfos.clear();
+    _latestInfo = null;
+    _lastBestMove = null;
+    _state = EngineState.ready;
   }
 
   /// Signal a new game (clear engine's hash/transposition table).

@@ -100,7 +100,9 @@ class _GameScreenState extends State<GameScreen> {
                               data: MultiSplitViewThemeData(
                                 dividerPainter: DividerPainters.grooved2(
                                   backgroundColor: const Color(0xFF2E1A0E),
-                                  color: const Color(0xFFF5DEB3).withOpacity(0.3),
+                                  color: const Color(
+                                    0xFFF5DEB3,
+                                  ).withOpacity(0.3),
                                   thickness: 2,
                                 ),
                               ),
@@ -110,7 +112,9 @@ class _GameScreenState extends State<GameScreen> {
                                 builder: (context, area) {
                                   switch (area.index) {
                                     case 0:
-                                      final showLeft = vm.leftPanel != 'none' || vm.cloudResult != null;
+                                      final showLeft =
+                                          vm.leftPanel != 'none' ||
+                                          vm.cloudResult != null;
                                       return showLeft
                                           ? _buildLeftPanel(context, vm)
                                           : const SizedBox.shrink();
@@ -376,11 +380,7 @@ class _GameScreenState extends State<GameScreen> {
             color: Colors.black.withOpacity(0.2),
             child: Row(
               children: [
-                const Icon(
-                  Icons.cloud,
-                  size: 16,
-                  color: Color(0xFFF5DEB3),
-                ),
+                const Icon(Icons.cloud, size: 16, color: Color(0xFFF5DEB3)),
                 const SizedBox(width: 6),
                 const Text(
                   '云库查询',
@@ -419,16 +419,15 @@ class _GameScreenState extends State<GameScreen> {
                           height: 24,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white54),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white54,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 12),
                         const Text(
                           '云库查询中...',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.white54,
-                          ),
+                          style: TextStyle(fontSize: 12, color: Colors.white54),
                         ),
                       ],
                     ),
@@ -474,24 +473,6 @@ class _GameScreenState extends State<GameScreen> {
           // === 顶部：引擎控制 ===
           Row(
             children: [
-              // 分析开关
-              ElevatedButton.icon(
-                onPressed: () => vm.toggleAnalysis(),
-                icon: Icon(
-                  vm.isAnalyzing ? Icons.pause : Icons.play_arrow,
-                  size: 16,
-                ),
-                label: Text(vm.isAnalyzing ? '停止' : '分析'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: vm.isAnalyzing ? Colors.red : Colors.green,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  textStyle: const TextStyle(fontSize: 12),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
-              const SizedBox(width: 12),
               // 分析模式
               _dropdown(
                 value: vm.analysisMode,
@@ -502,7 +483,10 @@ class _GameScreenState extends State<GameScreen> {
               ),
               const SizedBox(width: 8),
               // MultiPV
-              const Text('PV:', style: TextStyle(color: Colors.white70, fontSize: 12)),
+              const Text(
+                'PV:',
+                style: TextStyle(color: Colors.white70, fontSize: 12),
+              ),
               const SizedBox(width: 4),
               SizedBox(
                 width: 50,
@@ -524,7 +508,13 @@ class _GameScreenState extends State<GameScreen> {
           // === 底部：引擎分析结果（实时 PV 线路） ===
           Flexible(
             child: LiveAnalysisPanel(
-              viewModel: vm,
+              engineInfos: vm.engineInfos,
+              isEngineReady: vm.isEngineReady,
+              isAnalyzing: vm.isAnalyzing,
+              isThinking: vm.isEngineThinking,
+              bestMove: vm.engineBestMove,
+              board: vm.engine.board.pieces,
+              activeColor: vm.engine.currentTurn,
               onBestMoveTap: (iccs) => vm.playEngineMove(iccs),
             ),
           ),
@@ -587,23 +577,6 @@ class _GameScreenState extends State<GameScreen> {
             style: const TextStyle(color: Colors.white, fontSize: 13),
           ),
           const SizedBox(width: 24),
-          if (vm.currentOpening != null) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5DEB3).withOpacity(0.1),
-                border: Border.all(
-                  color: const Color(0xFFF5DEB3).withOpacity(0.3),
-                ),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                '${vm.currentOpening!.eccoCode} ${vm.currentOpening!.eccoName}',
-                style: const TextStyle(color: Color(0xFFF5DEB3), fontSize: 11),
-              ),
-            ),
-            const SizedBox(width: 24),
-          ],
           if (vm.state == GameState.checkmate)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -621,13 +594,13 @@ class _GameScreenState extends State<GameScreen> {
               ),
             ),
           if (vm.mode == GameMode.engineEndGame &&
-              vm.currentPuzzle != null) ...[
+              vm.stateManager.currentPuzzle != null) ...[
             const SizedBox(width: 16),
             Text(
-              '杀法挑战: ${vm.currentPuzzle!.name}',
+              '杀法挑战: ${vm.stateManager.currentPuzzle!.name}',
               style: const TextStyle(color: Color(0xFFF5DEB3), fontSize: 12),
             ),
-            if (vm.puzzleCompleted) ...[
+            if (vm.stateManager.puzzleCompleted) ...[
               const SizedBox(width: 8),
               const Icon(Icons.check_circle, color: Colors.green, size: 16),
               const Text(
@@ -637,7 +610,7 @@ class _GameScreenState extends State<GameScreen> {
             ],
           ],
           const Spacer(),
-          if (vm.engineManager.isThinking) ...[
+          if (vm.isEngineThinking) ...[
             const SizedBox(width: 8),
             const SizedBox(
               width: 12,
@@ -652,7 +625,7 @@ class _GameScreenState extends State<GameScreen> {
               '引擎思考中...',
               style: TextStyle(color: Colors.green, fontSize: 11),
             ),
-          ] else if (vm.engineManager.isReady) ...[
+          ] else if (vm.isEngineReady) ...[
             const SizedBox(width: 8),
             const Icon(Icons.smart_toy, color: Colors.green, size: 14),
             const SizedBox(width: 2),
@@ -662,7 +635,7 @@ class _GameScreenState extends State<GameScreen> {
             ),
           ],
           Text(
-            '云库缓存: ${vm.cloudDB.cache.size}',
+            '云库缓存: ${vm.cloudCacheSize}',
             style: const TextStyle(color: Colors.white54, fontSize: 11),
           ),
         ],

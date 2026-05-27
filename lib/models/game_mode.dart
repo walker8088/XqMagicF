@@ -3,9 +3,6 @@ enum GameMode {
   /// 自由练习：从任意局面自由走子，可回溯、编辑
   free('Free', '自由练习'),
 
-  /// 引擎辅助：引擎实时分析，显示箭头提示最佳着法
-  engineAssist('EngineAssist', '引擎辅助'),
-
   /// 人机对战：引擎与人类玩家对抗
   engineFight('EngineFight', '人机对战'),
 

@@ -63,10 +63,7 @@ class MoveNotation {
   ///
   /// 例如：C2.5 (炮二平五), N8+7 (马8进7), R2+3 (车二进三)
   /// 同线多子：fC2.5 (前炮平五), bN8-7 (后马退7)
-  static String toWXF(
-    Map<Coord, ChessPiece> board,
-    MoveRecord move,
-  ) {
+  static String toWXF(Map<Coord, ChessPiece> board, MoveRecord move) {
     return ChineseNotation.toWXF(board, move);
   }
 
@@ -77,6 +74,39 @@ class MoveNotation {
     PieceColor color,
   ) {
     return ChineseNotation.fromWXF(board, wxf, color);
+  }
+
+  // ========== 组合格式化（中文 + ICCS） ==========
+
+  /// 将 ICCS 着法格式化为 "中文记谱(iccs)" 的显示格式
+  ///
+  /// 例如："c2e2" → "炮二平五(c2-e2)"
+  ///
+  /// [board] 当前棋盘状态
+  /// [color] 走棋方
+  /// [iccs] ICCS 格式着法（如 "c2e2"）
+  static String formatMoveDisplay(
+    Map<Coord, ChessPiece> board,
+    PieceColor color,
+    String iccs,
+  ) {
+    if (iccs.length != 4) return iccs;
+    try {
+      final (from, to) = fromICCS(iccs);
+      final piece = board[from];
+      if (piece == null) return formatICCS(iccs);
+
+      final move = MoveRecord(
+        from: from,
+        to: to,
+        pieceType: piece.type,
+        color: color,
+      );
+      final chinese = toText(board, move);
+      return '$chinese(${formatICCS(iccs)})';
+    } catch (_) {
+      return formatICCS(iccs);
+    }
   }
 
   /// 格式化着法显示：ICCS → 人类可读格式 (e7-e5)

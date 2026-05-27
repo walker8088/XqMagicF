@@ -95,7 +95,6 @@ class ModeSelector extends StatelessWidget {
             style: const TextStyle(color: Colors.white, fontSize: 12),
             items: const [
               DropdownMenuItem(value: 'Free', child: Text('自由练习')),
-              DropdownMenuItem(value: 'EngineAssist', child: Text('引擎辅助')),
               DropdownMenuItem(value: 'EngineFight', child: Text('人机对战')),
               DropdownMenuItem(value: 'EngineEndGame', child: Text('杀法挑战')),
               DropdownMenuItem(value: 'EngineOnline', child: Text('连线分析')),

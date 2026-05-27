@@ -28,6 +28,13 @@ class SettingsDialog extends StatefulWidget {
     if (context.mounted) {
       final vm = context.read<GameViewModel>();
       await vm.syncSettingsToEngine();
+      // 如果引擎未就绪且已配置路径，自动加载引擎
+      if (!vm.isEngineReady) {
+        final enginePath = AppSettings.instance.enginePath;
+        if (enginePath.isNotEmpty) {
+          await vm.loadEngine(enginePath);
+        }
+      }
     }
   }
 
@@ -70,8 +77,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
       allowedExtensions: Platform.isWindows
           ? ['exe', 'bat', 'cmd']
           : Platform.isMacOS
-              ? ['app', '']
-              : [''],
+          ? ['app', '']
+          : [''],
       allowMultiple: false,
     );
 
@@ -104,7 +111,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
               child: const Text('取消'),
             ),
             FilledButton(
-              onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+              onPressed: () =>
+                  Navigator.of(context).pop(controller.text.trim()),
               child: const Text('确定'),
             ),
           ],
@@ -445,8 +453,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   hintText: '点击右侧按钮选择引擎或输入路径',
                   border: OutlineInputBorder(),
                   isDense: true,
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                 ),
               ),
             ),

@@ -2,10 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xqmagic/models/board.dart';
-import 'package:xqmagic/models/chess_piece.dart';
 import 'package:xqmagic/services/uci_engine.dart';
 import 'package:xqmagic/utils/constants.dart';
-import 'package:xqmagic/utils/coord.dart';
 import 'package:xqmagic/utils/fen.dart';
 
 void main() {
@@ -330,10 +328,12 @@ void main() {
           engine.events.listen((event) {
             if (event is EngineAnalysisUpdate) {
               infoEvents.add(event);
-              print('INFO: depth=${event.info.depth} '
-                  'score=${event.info.isMate ? "M${event.info.score}" : event.info.score} '
-                  'pv=${event.info.pv} '
-                  'multipv=${event.info.multipv}');
+              print(
+                'INFO: depth=${event.info.depth} '
+                'score=${event.info.isMate ? "M${event.info.score}" : event.info.score} '
+                'pv=${event.info.pv} '
+                'multipv=${event.info.multipv}',
+              );
             } else if (event is EngineBestMove) {
               bestMoveEvent = event;
               print('BESTMOVE: ${event.iccsMove}');
@@ -356,20 +356,29 @@ void main() {
           print('Total raw lines: ${allRawLines.length}');
 
           // Verify bestmove was received
-          expect(bestMoveEvent, isNotNull,
-              reason: 'Should receive bestmove after analysis');
+          expect(
+            bestMoveEvent,
+            isNotNull,
+            reason: 'Should receive bestmove after analysis',
+          );
           expect(bestMoveEvent!.iccsMove.isNotEmpty, isTrue);
 
           // Verify info events were received
-          expect(infoEvents.isNotEmpty, isTrue,
-              reason: 'Should receive info events during analysis');
+          expect(
+            infoEvents.isNotEmpty,
+            isTrue,
+            reason: 'Should receive info events during analysis',
+          );
 
           // Verify at least one info has score and pv
-          final scoredInfos = infoEvents.where((e) =>
-              e.info.pv.isNotEmpty &&
-              (e.info.score != 0 || e.info.isMate));
-          expect(scoredInfos.isNotEmpty, isTrue,
-              reason: 'At least one info should have non-zero score and pv');
+          final scoredInfos = infoEvents.where(
+            (e) => e.info.pv.isNotEmpty && (e.info.score != 0 || e.info.isMate),
+          );
+          expect(
+            scoredInfos.isNotEmpty,
+            isTrue,
+            reason: 'At least one info should have non-zero score and pv',
+          );
         } finally {
           await engine.dispose();
         }
@@ -418,8 +427,11 @@ void main() {
           print('Engine currentInfos count: ${engine.currentInfos.length}');
 
           // If multiPV is supported, we should see multiple variations
-          expect(engine.currentInfos.isNotEmpty, isTrue,
-              reason: 'Should have at least one PV line');
+          expect(
+            engine.currentInfos.isNotEmpty,
+            isTrue,
+            reason: 'Should have at least one PV line',
+          );
         } finally {
           await engine.dispose();
         }

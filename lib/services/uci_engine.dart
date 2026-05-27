@@ -20,9 +20,12 @@ import 'package:flutter/foundation.dart';
 /// Scores are in centipawns. Positive = red advantage, negative = black advantage.
 /// UCI/UCCI protocol handler for Xiangqi engines.
 class UCIEngine {
-  UCIEngine({String? enginePath, this.logEnabled = false, String protocol = 'auto'})
-    : _enginePath = enginePath,
-      _protocol = protocol;
+  UCIEngine({
+    String? enginePath,
+    this.logEnabled = false,
+    String protocol = 'auto',
+  }) : _enginePath = enginePath,
+       _protocol = protocol;
 
   final String? _enginePath;
   final bool logEnabled;
@@ -33,6 +36,7 @@ class UCIEngine {
   Process? _process;
   bool _isRunning = false;
   bool _isReady = false;
+  bool _isAnalyzing = false;
 
   // Engine info
   String _engineName = 'Unknown';
@@ -147,9 +151,7 @@ class UCIEngine {
       // Send UCI/UCCI command based on protocol setting
       final protocolOk = await _handshake();
       if (!protocolOk) {
-        _emitEvent(
-          EngineError('Engine did not respond to uci/ucci command'),
-        );
+        _emitEvent(EngineError('Engine did not respond to uci/ucci command'));
         await stop();
         return false;
       }
@@ -368,15 +370,23 @@ class UCIEngine {
     _bestMove = null;
     _currentFen = fen;
 
+    // 如果有上一次分析在进行，先发送 stop
+    if (_isAnalyzing) {
+      await stopAnalysis();
+    }
+
     final positionCmd = 'position fen $fen';
     await _sendCommand(positionCmd);
 
-    if (multiPV != null && multiPV > 1) {
+    // Always send MultiPV to ensure engine outputs the correct number of lines
+    // (including when switching back from >1 to 1)
+    if (multiPV != null) {
       await setOption('MultiPV', multiPV);
     }
 
     final goCmd = 'go depth $depth';
     await _sendCommand(goCmd);
+    _isAnalyzing = true;
     _log('Analyzing by depth: $depth');
   }
 
@@ -399,15 +409,23 @@ class UCIEngine {
     _bestMove = null;
     _currentFen = fen;
 
+    // 如果有上一次分析在进行，先发送 stop
+    if (_isAnalyzing) {
+      await stopAnalysis();
+    }
+
     final positionCmd = 'position fen $fen';
     await _sendCommand(positionCmd);
 
-    if (multiPV != null && multiPV > 1) {
+    // Always send MultiPV to ensure engine outputs the correct number of lines
+    // (including when switching back from >1 to 1)
+    if (multiPV != null) {
       await setOption('MultiPV', multiPV);
     }
 
     final goCmd = 'go movetime $timeMs';
     await _sendCommand(goCmd);
+    _isAnalyzing = true;
     _log('Analyzing by time: ${timeMs}ms');
   }
 
@@ -423,8 +441,14 @@ class UCIEngine {
     _bestMove = null;
     _currentFen = fen;
 
+    // 如果有上一次分析在进行，先发送 stop
+    if (_isAnalyzing) {
+      await stopAnalysis();
+    }
+
     await _sendCommand('position fen $fen');
     await _sendCommand('go infinite');
+    _isAnalyzing = true;
     _log('Infinite analysis started');
   }
 
@@ -440,6 +464,11 @@ class UCIEngine {
       return;
     }
 
+    // 如果有上一次分析在进行，先发送 stop
+    if (_isAnalyzing) {
+      await stopAnalysis();
+    }
+
     _currentInfos.clear();
     _bestInfo = null;
     _bestMove = null;
@@ -447,7 +476,9 @@ class UCIEngine {
 
     await _sendCommand('position fen $fen');
 
-    if (multiPV != null && multiPV > 1) {
+    // Always send MultiPV to ensure engine outputs the correct number of lines
+    // (including when switching back from >1 to 1)
+    if (multiPV != null) {
       await setOption('MultiPV', multiPV);
     }
 
@@ -463,6 +494,7 @@ class UCIEngine {
     }
 
     await _sendCommand(goCmd);
+    _isAnalyzing = true;
     _log('Analysis started: $goCmd');
   }
 
@@ -470,6 +502,7 @@ class UCIEngine {
   Future<void> stopAnalysis() async {
     if (!_isRunning) return;
     await _sendCommand('stop');
+    _isAnalyzing = false;
     _log('Analysis stop requested');
   }
 
@@ -482,6 +515,11 @@ class UCIEngine {
     int? timeMs,
   }) async {
     if (!_isReady) return null;
+
+    // 如果有上一次分析在进行，先发送 stop
+    if (_isAnalyzing) {
+      await stopAnalysis();
+    }
 
     _bestMoveCompleter = Completer<String>();
 
@@ -635,12 +673,15 @@ class UCIEngine {
   }
 
   void _parseBestMove(String line) {
+    _isAnalyzing = false;
     // "bestmove <move> [ponder <move>]"
     final parts = line.split(' ');
     if (parts.length >= 2) {
       final uciMove = parts[1];
       _bestMove = uciMove;
-      final isRedToMove = _currentFen != null ? _isRedToMoveFromFen(_currentFen!) : true;
+      final isRedToMove = _currentFen != null
+          ? _isRedToMoveFromFen(_currentFen!)
+          : true;
       _bestInfo = EngineInfo(
         depth: _bestInfo?.depth ?? 0,
         score: _bestInfo?.score ?? 0,
@@ -857,7 +898,9 @@ class UCIEngine {
       return null;
     }
 
-    final isRedToMove = _currentFen != null ? _isRedToMoveFromFen(_currentFen!) : true;
+    final isRedToMove = _currentFen != null
+        ? _isRedToMoveFromFen(_currentFen!)
+        : true;
 
     return EngineInfo(
       depth: depth,
@@ -1057,9 +1100,10 @@ class EngineInfo {
   /// Whether it's red's turn to move
   final bool isRedToMove;
 
-  /// Score is already from red's perspective:
-  /// positive = red advantage, negative = black advantage.
-  int get adjustedScore => score;
+  /// 将引擎原始分数转换为红方视角：
+  /// 正数 = 红方优势，负数 = 黑方优势
+  /// 引擎原始分数是 side-to-move 视角，黑方走时需要取反
+  int get adjustedScore => isRedToMove ? score : -score;
 
   /// Get the best move from the PV in ICCS algebraic format.
   /// PV moves are already in ICCS format (identical to UCI output).
