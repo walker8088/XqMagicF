@@ -41,6 +41,9 @@ class GameTreeNode {
   /// 引擎评估分数（单位：厘，正数对红方有利）
   int? evaluation;
 
+  /// 引擎推荐的最佳着法（ICCS 格式）
+  String? engineBestMove;
+
   /// 着法质量标记：★ 好棋, ✓ 一般, ✗ 劣着, ! 佳着, ? 疑问着
   String? moveAnnotation;
 
@@ -89,7 +92,6 @@ class GameTreeNode {
     final parentMoves = parent?.getMovesFromRoot() ?? [];
     return [...parentMoves, move!];
   }
-
 }
 
 /// 棋谱树管理：维护整棵走子树

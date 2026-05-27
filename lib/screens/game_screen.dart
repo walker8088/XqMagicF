@@ -179,6 +179,8 @@ class _GameScreenState extends State<GameScreen> {
             child: MoveHistoryPanel(
               moves: vm.mainLineMoves,
               notations: vm.mainLineNotations,
+              evaluations: vm.mainLineEvaluations,
+              annotations: vm.mainLineAnnotations,
               currentIndex: vm.depth - 1,
               onTapMove: (index) {
                 vm.goToStart();
