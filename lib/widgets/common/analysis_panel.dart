@@ -201,11 +201,10 @@ class AnalysisPanel extends StatelessWidget {
 
   Widget _buildBestMove(BuildContext context) {
     final pvLine = pvLines.isNotEmpty ? pvLines.first : null;
-    // 使用引擎分析时的走棋方（而非当前 activeColor），确保分析结果不因
-    // 走棋后 activeColor 变化而显示出错
-    final bestColor = pvLine?.isRedToMove == false
-        ? PieceColor.black
-        : PieceColor.red;
+    // 优先使用引擎分析时的 isRedToMove；pvLines 为空时 fallback 到 activeColor
+    final bestColor = pvLine != null
+        ? (pvLine.isRedToMove ? PieceColor.red : PieceColor.black)
+        : activeColor ?? PieceColor.red;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),

@@ -16,29 +16,39 @@ class MoveNotation {
 
   /// 将走法记录转换为 ICCS 格式（引擎通信用）
   ///
-  /// 引擎 UCCI 的 rank 约定：0=黑方底线(顶), 9=红方底线(底)
-  /// 内部 row 约定：row=0=红方底线(底), row=9=黑方底线(顶)
-  /// 需要转换：engineRank = 9 - ourRow
+  /// **ICCS 坐标约定**（ICCS = Internet Chinese Chess Server）：
+  /// - file（纵线）: a-i，从左到右（红方视角）
+  /// - rank（横线）: 0-9，从下到上（红方视角）
+  /// - **rank 0 = 红方底线（底部）**，**rank 9 = 黑方底线（顶部）**
+  ///
+  /// **内部 Board 约定**：
+  /// - row 0 = 红方底线（底部），row 9 = 黑方底线（顶部）
+  ///
+  /// **结论**：ICCS rank 与内部 row 完全一致，无需转换
+  ///
+  /// 示例：马二进三 → h0g2，炮８平５ → h7e7
   static String toICCS(MoveRecord move) {
     final fromFile = _colToFile(move.from.col);
-    final fromRank = 9 - move.from.row;
+    final fromRank = move.from.row;
     final toFile = _colToFile(move.to.col);
-    final toRank = 9 - move.to.row;
+    final toRank = move.to.row;
     return '${fromFile}${fromRank}${toFile}${toRank}';
   }
 
   /// 从 ICCS 代数坐标解析为 Coord
   ///
-  /// 引擎 UCCI 的 rank 约定：0=黑方底线(顶), 9=红方底线(底)
-  /// 内部 row 约定：row=0=红方底线(底), row=9=黑方底线(顶)
-  /// 需要转换：ourRow = 9 - engineRank
+  /// **ICCS 坐标约定**：rank 0 = 红方底线（底部），rank 9 = 黑方底线（顶部）
+  /// **内部 Board 约定**：row 0 = 红方底线（底部），row 9 = 黑方底线（顶部）
+  /// **结论**：ICCS rank 与内部 row 完全一致，无需转换
+  ///
+  /// 示例：h0g2 → 马二进三，h7e7 → 炮８平５
   static (Coord, Coord) fromICCS(String iccs) {
     if (iccs.length != 4) throw ArgumentError('ICCS 格式应为4位: $iccs');
     final fromCol = _fileToCol(iccs[0]);
-    final engineFromRank = int.parse(iccs[1]);
+    final fromRow = int.parse(iccs[1]);
     final toCol = _fileToCol(iccs[2]);
-    final engineToRank = int.parse(iccs[3]);
-    return (Coord(fromCol, 9 - engineFromRank), Coord(toCol, 9 - engineToRank));
+    final toRow = int.parse(iccs[3]);
+    return (Coord(fromCol, fromRow), Coord(toCol, toRow));
   }
 
   static String _colToFile(int col) {
@@ -87,11 +97,12 @@ class MoveNotation {
 
   /// 将 ICCS 着法格式化为 "中文记谱(iccs)" 的显示格式
   ///
-  /// 例如："c2e2" → "炮二平五(c2-e2)"
+  /// 例如："h2e2" → "炮二平五(h2-e2)"
   ///
-  /// [board] 当前棋盘状态
-  /// [color] 走棋方
-  /// [iccs] ICCS 格式着法（如 "c2e2"）
+  /// [board] 当前棋盘状态（用于找到棋子并确定走子方颜色）
+  /// [iccs] ICCS 格式着法（如 "h2e2"）
+  ///
+  /// 走子方颜色由棋盘上棋子的实际颜色决定，不受外部传入 color 参数影响。
   static String formatMoveDisplay(
     Map<Coord, ChessPiece> board,
     PieceColor color,
@@ -107,7 +118,7 @@ class MoveNotation {
         from: from,
         to: to,
         pieceType: piece.type,
-        color: color,
+        color: piece.color, // 使用棋盘上棋子的实际颜色
       );
       final chinese = toText(board, move);
       return '$chinese(${formatICCS(iccs)})';

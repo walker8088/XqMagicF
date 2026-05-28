@@ -13,6 +13,7 @@ class PVChineseConverter {
 
   /// 将单步 ICCS 着法转换为中文记谱
   ///
+  /// 走子方颜色由棋盘上棋子的实际颜色决定。
   /// 如需 "中文记谱(ICCS)" 组合格式，请使用 [MoveNotation.formatMoveDisplay]
   static String singleMove(
     Map<Coord, ChessPiece> board,
@@ -29,7 +30,7 @@ class PVChineseConverter {
         from: from,
         to: to,
         pieceType: piece.type,
-        color: activeColor,
+        color: piece.color, // 使用棋盘上棋子的实际颜色
       );
       return MoveNotation.toText(board, move);
     } catch (_) {
@@ -67,7 +68,7 @@ class PVChineseConverter {
           from: from,
           to: to,
           pieceType: piece.type,
-          color: currentColor,
+          color: piece.color, // 使用棋盘上棋子的实际颜色
         );
         chineseMoves.add(MoveNotation.toText(boardCopy, move));
 

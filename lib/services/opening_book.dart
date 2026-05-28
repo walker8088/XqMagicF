@@ -21,7 +21,11 @@ class OpeningMove {
     this.eccoCode,
   });
 
-  /// ICCS 坐标记法 (4位数字)
+  /// ICCS 数字记法 (4位数字, 非标准 ICCS)
+  ///
+  /// 注意：此字段使用 4 位数字编码（如 '2153'），与标准 ICCS 格式（如 'h2e2'）不同。
+  /// 标准 ICCS 使用字母 a-i 表示纵线（col），数字 0-9 表示横线（row）。
+  /// 如需标准 ICCS 转换，请使用 MoveNotation.toICCS/fromICCS。
   final String iccs;
 
   /// 中文着法描述 (如 "炮二平五")
@@ -154,212 +158,217 @@ class OpeningBookService {
   /// FEN 格式: 布局 + 走子方(r=红方, b=黑方)
   /// 任何局面都依赖走子方，同一布局红走和黑走是完全不同的局面
   ///
-  /// FEN 格式: 10行棋盘, 从上(黑方, row 0)到下(红方, row 9), 每行9列 (col 0-8)
+  /// FEN 格式: 10行棋盘, 从上(黑方, row 9)到下(红方, row 0), 每行9列 (col 0-8)
   /// 棋子: 大写=红方, 小写=黑方
   /// r/R=车, n/N=马, b/B=象/相, a/A=士, k/K=将/帅, c/C=炮, p/P=卒/兵
   ///
   /// 红方棋子初始位置:
-  ///   车: (0,9) (8,9)  马: (1,9) (7,9)  相: (2,9) (6,9)
-  ///   仕: (3,9) (5,9)  帅: (4,9)        炮: (1,7) (7,7)
-  ///   兵: (0,6) (2,6) (4,6) (6,6) (8,6)
+  ///   车: (0,0) (8,0)  马: (1,0) (7,0)  相: (2,0) (6,0)
+  ///   仕: (3,0) (5,0)  帅: (4,0)        炮: (1,2) (7,2)
+  ///   兵: (0,3) (2,3) (4,3) (6,3) (8,3)
   ///
   /// 黑方棋子初始位置:
-  ///   车: (0,0) (8,0)  马: (1,0) (7,0)  象: (2,0) (6,0)
-  ///   士: (3,0) (5,0)  将: (4,0)        炮: (1,2) (7,2)
-  ///   卒: (0,3) (2,3) (4,3) (6,3) (8,3)
+  ///   车: (0,9) (8,9)  马: (1,9) (7,9)  象: (2,9) (6,9)
+  ///   士: (3,9) (5,9)  将: (4,9)        炮: (1,7) (7,7)
+  ///   卒: (0,6) (2,6) (4,6) (6,6) (8,6)
   ///
-  /// ICCS ↔ 棋盘坐标: ICCS col = 9 - boardCol, ICCS row = boardRow + 1
+  /// 注意：本开局库使用 4 位数字记法，与标准 ICCS（字母+数字）不同。
+  /// 如需标准 ICCS 格式，请使用 MoveNotation.toICCS/fromICCS。
   static const Map<String, OpeningInfo> _openingBook = {
     // ============================================================
     // 初始局面
     // ============================================================
-    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR r': OpeningInfo(
-      positionFen:
-          'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR r',
-      eccoCode: null,
-      eccoName: null,
-      moves: [
-        OpeningMove(
-          iccs: '2153',
-          chineseName: '炮二平五',
-          frequency: 4500,
-          winRate: 0.52,
-          source: OpeningSource.master,
-          eccoCode: 'B00',
+    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR r':
+        OpeningInfo(
+          positionFen:
+              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR r',
+          eccoCode: null,
+          eccoName: null,
+          moves: [
+            OpeningMove(
+              iccs: '2153',
+              chineseName: '炮二平五',
+              frequency: 4500,
+              winRate: 0.52,
+              source: OpeningSource.master,
+              eccoCode: 'B00',
+            ),
+            OpeningMove(
+              iccs: '3637',
+              chineseName: '兵七进一',
+              frequency: 2200,
+              winRate: 0.50,
+              source: OpeningSource.master,
+              eccoCode: 'A01',
+            ),
+            OpeningMove(
+              iccs: '8143',
+              chineseName: '相三进五',
+              frequency: 1800,
+              winRate: 0.49,
+              source: OpeningSource.master,
+              eccoCode: 'C00',
+            ),
+            OpeningMove(
+              iccs: '2163',
+              chineseName: '炮二平六',
+              frequency: 800,
+              winRate: 0.48,
+              source: OpeningSource.master,
+              eccoCode: 'E00',
+            ),
+            OpeningMove(
+              iccs: '8183',
+              chineseName: '炮八平六',
+              frequency: 700,
+              winRate: 0.48,
+              source: OpeningSource.master,
+              eccoCode: 'D00',
+            ),
+            OpeningMove(
+              iccs: '8163',
+              chineseName: '马八进七',
+              frequency: 600,
+              winRate: 0.48,
+              source: OpeningSource.master,
+              eccoCode: 'F00',
+            ),
+            OpeningMove(
+              iccs: '2133',
+              chineseName: '炮二平七',
+              frequency: 300,
+              winRate: 0.47,
+              source: OpeningSource.classic,
+              eccoCode: 'G00',
+            ),
+            OpeningMove(
+              iccs: '1617',
+              chineseName: '兵一进一',
+              frequency: 150,
+              winRate: 0.46,
+              source: OpeningSource.classic,
+              eccoCode: 'H00',
+            ),
+          ],
         ),
-        OpeningMove(
-          iccs: '3637',
-          chineseName: '兵七进一',
-          frequency: 2200,
-          winRate: 0.50,
-          source: OpeningSource.master,
-          eccoCode: 'A01',
-        ),
-        OpeningMove(
-          iccs: '8143',
-          chineseName: '相三进五',
-          frequency: 1800,
-          winRate: 0.49,
-          source: OpeningSource.master,
-          eccoCode: 'C00',
-        ),
-        OpeningMove(
-          iccs: '2163',
-          chineseName: '炮二平六',
-          frequency: 800,
-          winRate: 0.48,
-          source: OpeningSource.master,
-          eccoCode: 'E00',
-        ),
-        OpeningMove(
-          iccs: '8183',
-          chineseName: '炮八平六',
-          frequency: 700,
-          winRate: 0.48,
-          source: OpeningSource.master,
-          eccoCode: 'D00',
-        ),
-        OpeningMove(
-          iccs: '8163',
-          chineseName: '马八进七',
-          frequency: 600,
-          winRate: 0.48,
-          source: OpeningSource.master,
-          eccoCode: 'F00',
-        ),
-        OpeningMove(
-          iccs: '2133',
-          chineseName: '炮二平七',
-          frequency: 300,
-          winRate: 0.47,
-          source: OpeningSource.classic,
-          eccoCode: 'G00',
-        ),
-        OpeningMove(
-          iccs: '1617',
-          chineseName: '兵一进一',
-          frequency: 150,
-          winRate: 0.46,
-          source: OpeningSource.classic,
-          eccoCode: 'H00',
-        ),
-      ],
-    ),
 
     // ============================================================
     // 中炮局 (Central Cannon) - 红炮二平五后
     // 炮从 (7,7)→(4,7), row7: 1C5C1→1C2C4
     // ECCO: B00
     // ============================================================
-    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r': OpeningInfo(
-      positionFen:
-          'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r',
-      eccoCode: 'B00',
-      eccoName: '中炮局',
-      moves: [
-        OpeningMove(
-          iccs: '2747',
-          chineseName: '炮8平5',
-          frequency: 3200,
-          winRate: 0.48,
-          source: OpeningSource.master,
-          eccoCode: 'B01',
+    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r':
+        OpeningInfo(
+          positionFen:
+              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r',
+          eccoCode: 'B00',
+          eccoName: '中炮局',
+          moves: [
+            OpeningMove(
+              iccs: '2747',
+              chineseName: '炮8平5',
+              frequency: 3200,
+              winRate: 0.48,
+              source: OpeningSource.master,
+              eccoCode: 'B01',
+            ),
+            OpeningMove(
+              iccs: '8977',
+              chineseName: '马8进7',
+              frequency: 2800,
+              winRate: 0.47,
+              source: OpeningSource.master,
+              eccoCode: 'B03',
+            ),
+            OpeningMove(
+              iccs: '7959',
+              chineseName: '炮2平5',
+              frequency: 1500,
+              winRate: 0.47,
+              source: OpeningSource.master,
+              eccoCode: 'B02',
+            ),
+            OpeningMove(
+              iccs: '8967',
+              chineseName: '马8进6',
+              frequency: 400,
+              winRate: 0.46,
+              source: OpeningSource.classic,
+              eccoCode: 'B06',
+            ),
+          ],
         ),
-        OpeningMove(
-          iccs: '8977',
-          chineseName: '马8进7',
-          frequency: 2800,
-          winRate: 0.47,
-          source: OpeningSource.master,
-          eccoCode: 'B03',
-        ),
-        OpeningMove(
-          iccs: '7959',
-          chineseName: '炮2平5',
-          frequency: 1500,
-          winRate: 0.47,
-          source: OpeningSource.master,
-          eccoCode: 'B02',
-        ),
-        OpeningMove(
-          iccs: '8967',
-          chineseName: '马8进6',
-          frequency: 400,
-          winRate: 0.46,
-          source: OpeningSource.classic,
-          eccoCode: 'B06',
-        ),
-      ],
-    ),
 
     // ============================================================
     // 中炮对顺手炮 - 黑炮8平5后
     // 黑炮从 (1,2)→(4,2), row2: 1c5c1→4c2c1
     // ECCO: B01
     // ============================================================
-    'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r': OpeningInfo(
-      positionFen:
-          'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r',
-      eccoCode: 'B01',
-      eccoName: '中炮对顺手炮',
-      moves: [
-        OpeningMove(
-          iccs: '8163',
-          chineseName: '马八进七',
-          frequency: 2500,
-          winRate: 0.51,
-          source: OpeningSource.master,
+    'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r':
+        OpeningInfo(
+          positionFen:
+              'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r',
+          eccoCode: 'B01',
+          eccoName: '中炮对顺手炮',
+          moves: [
+            OpeningMove(
+              iccs: '8163',
+              chineseName: '马八进七',
+              frequency: 2500,
+              winRate: 0.51,
+              source: OpeningSource.master,
+            ),
+            OpeningMove(
+              iccs: '8183',
+              chineseName: '炮八平六',
+              frequency: 800,
+              winRate: 0.49,
+              source: OpeningSource.master,
+            ),
+            OpeningMove(
+              iccs: '2123',
+              chineseName: '马二进三',
+              frequency: 600,
+              winRate: 0.48,
+              source: OpeningSource.classic,
+            ),
+          ],
         ),
-        OpeningMove(
-          iccs: '8183',
-          chineseName: '炮八平六',
-          frequency: 800,
-          winRate: 0.49,
-          source: OpeningSource.master,
-        ),
-        OpeningMove(
-          iccs: '2123',
-          chineseName: '马二进三',
-          frequency: 600,
-          winRate: 0.48,
-          source: OpeningSource.classic,
-        ),
-      ],
-    ),
 
     // ============================================================
     // 中炮对顺手炮 - 红马八进七后
     // 红马从 (1,9)→(2,7), row9: RNBAKABNR→R1BAKABNR, row7: 1C2C4→1CN1C4
     // ============================================================
-    'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR r': OpeningInfo(
-      positionFen:
-          'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR r',
-      eccoCode: 'B01',
-      eccoName: '中炮对顺手炮',
-      moves: [
-        OpeningMove(
-          iccs: '8977',
-          chineseName: '马8进7',
-          frequency: 2000,
-          winRate: 0.48,
-          source: OpeningSource.master,
+    'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR r':
+        OpeningInfo(
+          positionFen:
+              'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR r',
+          eccoCode: 'B01',
+          eccoName: '中炮对顺手炮',
+          moves: [
+            OpeningMove(
+              iccs: '8977',
+              chineseName: '马8进7',
+              frequency: 2000,
+              winRate: 0.48,
+              source: OpeningSource.master,
+            ),
+            OpeningMove(
+              iccs: '2939',
+              chineseName: '车1进1',
+              frequency: 600,
+              winRate: 0.47,
+              source: OpeningSource.master,
+            ),
+            OpeningMove(
+              iccs: '7978',
+              chineseName: '炮2进1',
+              frequency: 400,
+              winRate: 0.46,
+              source: OpeningSource.classic,
+            ),
+          ],
         ),
-        OpeningMove(
-          iccs: '2939',
-          chineseName: '车1进1',
-          frequency: 600,
-          winRate: 0.47,
-          source: OpeningSource.master,
-        ),
-        OpeningMove(
-          iccs: '7978',
-          chineseName: '炮2进1',
-          frequency: 400,
-          winRate: 0.46,
-          source: OpeningSource.classic,
-        ),
-      ],
-    ),
 
     // ============================================================
     // 中炮对顺手炮 - 黑马8进7后
@@ -394,35 +403,36 @@ class OpeningBookService {
     // 黑马从 (1,0)→(2,2), row0: rnbakabnr→r1bakabnr, row2: 1c5c1→1cn4c1
     // ECCO: B03
     // ============================================================
-    'r1bakabnr/9/1cn4c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r': OpeningInfo(
-      positionFen:
-          'r1bakabnr/9/1cn4c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r',
-      eccoCode: 'B03',
-      eccoName: '中炮对屏风马',
-      moves: [
-        OpeningMove(
-          iccs: '8163',
-          chineseName: '马八进七',
-          frequency: 2200,
-          winRate: 0.51,
-          source: OpeningSource.master,
+    'r1bakabnr/9/1cn4c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r':
+        OpeningInfo(
+          positionFen:
+              'r1bakabnr/9/1cn4c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r',
+          eccoCode: 'B03',
+          eccoName: '中炮对屏风马',
+          moves: [
+            OpeningMove(
+              iccs: '8163',
+              chineseName: '马八进七',
+              frequency: 2200,
+              winRate: 0.51,
+              source: OpeningSource.master,
+            ),
+            OpeningMove(
+              iccs: '3637',
+              chineseName: '兵七进一',
+              frequency: 800,
+              winRate: 0.49,
+              source: OpeningSource.master,
+            ),
+            OpeningMove(
+              iccs: '2123',
+              chineseName: '马二进三',
+              frequency: 500,
+              winRate: 0.48,
+              source: OpeningSource.classic,
+            ),
+          ],
         ),
-        OpeningMove(
-          iccs: '3637',
-          chineseName: '兵七进一',
-          frequency: 800,
-          winRate: 0.49,
-          source: OpeningSource.master,
-        ),
-        OpeningMove(
-          iccs: '2123',
-          chineseName: '马二进三',
-          frequency: 500,
-          winRate: 0.48,
-          source: OpeningSource.classic,
-        ),
-      ],
-    ),
 
     // ============================================================
     // 中炮对屏风马 - 红马八进七后
@@ -527,90 +537,93 @@ class OpeningBookService {
     // 黑炮从 (7,2)→(4,2), row2: 1c5c1→1c2c4
     // ECCO: B02
     // ============================================================
-    'rnbakabnr/9/1c2c4/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r': OpeningInfo(
-      positionFen:
-          'rnbakabnr/9/1c2c4/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r',
-      eccoCode: 'B02',
-      eccoName: '中炮对列手炮',
-      moves: [
-        OpeningMove(
-          iccs: '8163',
-          chineseName: '马八进七',
-          frequency: 1200,
-          winRate: 0.51,
-          source: OpeningSource.master,
+    'rnbakabnr/9/1c2c4/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r':
+        OpeningInfo(
+          positionFen:
+              'rnbakabnr/9/1c2c4/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r',
+          eccoCode: 'B02',
+          eccoName: '中炮对列手炮',
+          moves: [
+            OpeningMove(
+              iccs: '8163',
+              chineseName: '马八进七',
+              frequency: 1200,
+              winRate: 0.51,
+              source: OpeningSource.master,
+            ),
+            OpeningMove(
+              iccs: '2123',
+              chineseName: '马二进三',
+              frequency: 600,
+              winRate: 0.49,
+              source: OpeningSource.master,
+            ),
+            OpeningMove(
+              iccs: '3637',
+              chineseName: '兵七进一',
+              frequency: 300,
+              winRate: 0.48,
+              source: OpeningSource.classic,
+            ),
+          ],
         ),
-        OpeningMove(
-          iccs: '2123',
-          chineseName: '马二进三',
-          frequency: 600,
-          winRate: 0.49,
-          source: OpeningSource.master,
-        ),
-        OpeningMove(
-          iccs: '3637',
-          chineseName: '兵七进一',
-          frequency: 300,
-          winRate: 0.48,
-          source: OpeningSource.classic,
-        ),
-      ],
-    ),
 
     // ============================================================
     // 中炮对列手炮 - 红马八进七后
     // 红马从 (1,9)→(2,7), row9: RNBAKABNR→R1BAKABNR, row7: 1C2C4→1CN1C4
     // ============================================================
-    'rnbakabnr/9/1c2c4/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR r': OpeningInfo(
-      positionFen:
-          'rnbakabnr/9/1c2c4/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR r',
-      eccoCode: 'B02',
-      eccoName: '中炮对列手炮',
-      moves: [
-        OpeningMove(
-          iccs: '8977',
-          chineseName: '马8进7',
-          frequency: 800,
-          winRate: 0.47,
-          source: OpeningSource.master,
+    'rnbakabnr/9/1c2c4/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR r':
+        OpeningInfo(
+          positionFen:
+              'rnbakabnr/9/1c2c4/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR r',
+          eccoCode: 'B02',
+          eccoName: '中炮对列手炮',
+          moves: [
+            OpeningMove(
+              iccs: '8977',
+              chineseName: '马8进7',
+              frequency: 800,
+              winRate: 0.47,
+              source: OpeningSource.master,
+            ),
+            OpeningMove(
+              iccs: '2939',
+              chineseName: '车1进1',
+              frequency: 400,
+              winRate: 0.46,
+              source: OpeningSource.classic,
+            ),
+          ],
         ),
-        OpeningMove(
-          iccs: '2939',
-          chineseName: '车1进1',
-          frequency: 400,
-          winRate: 0.46,
-          source: OpeningSource.classic,
-        ),
-      ],
-    ),
 
     // ============================================================
     // 中炮对反宫马 - 黑炮2平6后 (反宫马阵型)
     // 黑炮从 (7,2)→(5,2), row2: 1c5c1→1c3c1c1
     // ECCO: B04
     // ============================================================
-    'rnbakabnr/9/1c3c3/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r': OpeningInfo(
-      positionFen:
-          'rnbakabnr/9/1c3c3/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r',
-      eccoCode: 'B04',
-      eccoName: '中炮对反宫马',
-      moves: [
-        OpeningMove(
-          iccs: '8163',
-          chineseName: '马八进七',
-          frequency: 800,
-          winRate: 0.51,
-          source: OpeningSource.master,
+    'rnbakabnr/9/1c3c3/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r':
+        OpeningInfo(
+          positionFen:
+              'rnbakabnr/9/1c3c3/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r',
+          eccoCode: 'B04',
+          eccoName: '中炮对反宫马',
+          moves: [
+            OpeningMove(
+              iccs: '8163',
+              chineseName: '马八进七',
+              frequency: 800,
+              winRate: 0.51,
+              source: OpeningSource.master,
+            ),
+            OpeningMove(
+              iccs: '3637',
+              chineseName: '兵七进一',
+              frequency: 400,
+              winRate: 0.49,
+              source: OpeningSource.master,
+            ),
+          ],
         ),
-        OpeningMove(
-          iccs: '3637',
-          chineseName: '兵七进一',
-          frequency: 400,
-          winRate: 0.49,
-          source: OpeningSource.master,
-        ),
-      ],
-    ),
 
     // ============================================================
     // 中炮对单提马 - 黑马8进9后
@@ -618,7 +631,8 @@ class OpeningBookService {
     // ECCO: B05
     // ============================================================
     '1nbakabnr/9/n6c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r': OpeningInfo(
-      positionFen: '1nbakabnr/9/n6c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r',
+      positionFen:
+          '1nbakabnr/9/n6c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r',
       eccoCode: 'B05',
       eccoName: '中炮对单提马',
       moves: [
@@ -644,111 +658,114 @@ class OpeningBookService {
     // 红兵从 (2,6)→(2,5), row5: 9→2P6, row6: P1P1P1P1P→P3P1P1P
     // ECCO: A01
     // ============================================================
-    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/2P6/P3P1P1P/1C5C1/9/RNBAKABNR r': OpeningInfo(
-      positionFen:
-          'rnbakabnr/9/1c5c1/p1p1p1p1p/9/2P6/P3P1P1P/1C5C1/9/RNBAKABNR r',
-      eccoCode: 'A01',
-      eccoName: '仙人指路',
-      moves: [
-        OpeningMove(
-          iccs: '3635',
-          chineseName: '卒7进1',
-          frequency: 1200,
-          winRate: 0.48,
-          source: OpeningSource.master,
+    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/2P6/P3P1P1P/1C5C1/9/RNBAKABNR r':
+        OpeningInfo(
+          positionFen:
+              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/2P6/P3P1P1P/1C5C1/9/RNBAKABNR r',
+          eccoCode: 'A01',
+          eccoName: '仙人指路',
+          moves: [
+            OpeningMove(
+              iccs: '3635',
+              chineseName: '卒7进1',
+              frequency: 1200,
+              winRate: 0.48,
+              source: OpeningSource.master,
+            ),
+            OpeningMove(
+              iccs: '2747',
+              chineseName: '炮8平5',
+              frequency: 800,
+              winRate: 0.47,
+              source: OpeningSource.master,
+            ),
+            OpeningMove(
+              iccs: '8977',
+              chineseName: '马8进7',
+              frequency: 600,
+              winRate: 0.47,
+              source: OpeningSource.classic,
+            ),
+            OpeningMove(
+              iccs: '8143',
+              chineseName: '象3进5',
+              frequency: 300,
+              winRate: 0.46,
+              source: OpeningSource.classic,
+            ),
+          ],
         ),
-        OpeningMove(
-          iccs: '2747',
-          chineseName: '炮8平5',
-          frequency: 800,
-          winRate: 0.47,
-          source: OpeningSource.master,
-        ),
-        OpeningMove(
-          iccs: '8977',
-          chineseName: '马8进7',
-          frequency: 600,
-          winRate: 0.47,
-          source: OpeningSource.classic,
-        ),
-        OpeningMove(
-          iccs: '8143',
-          chineseName: '象3进5',
-          frequency: 300,
-          winRate: 0.46,
-          source: OpeningSource.classic,
-        ),
-      ],
-    ),
 
     // ============================================================
     // 仙人指路对卒底炮 - 黑卒7进1后
     // 黑卒从 (2,3)→(2,4), row3: p1p1p1p1p→p3p1p1p, row4: 9→2p6
     // ECCO: A02
     // ============================================================
-    'rnbakabnr/9/1c5c1/p3p1p1p/2p6/2P6/P3P1P1P/1C5C1/9/RNBAKABNR r': OpeningInfo(
-      positionFen:
-          'rnbakabnr/9/1c5c1/p3p1p1p/2p6/2P6/P3P1P1P/1C5C1/9/RNBAKABNR r',
-      eccoCode: 'A02',
-      eccoName: '仙人指路对卒底炮',
-      moves: [
-        OpeningMove(
-          iccs: '2153',
-          chineseName: '炮二平五',
-          frequency: 800,
-          winRate: 0.51,
-          source: OpeningSource.master,
+    'rnbakabnr/9/1c5c1/p3p1p1p/2p6/2P6/P3P1P1P/1C5C1/9/RNBAKABNR r':
+        OpeningInfo(
+          positionFen:
+              'rnbakabnr/9/1c5c1/p3p1p1p/2p6/2P6/P3P1P1P/1C5C1/9/RNBAKABNR r',
+          eccoCode: 'A02',
+          eccoName: '仙人指路对卒底炮',
+          moves: [
+            OpeningMove(
+              iccs: '2153',
+              chineseName: '炮二平五',
+              frequency: 800,
+              winRate: 0.51,
+              source: OpeningSource.master,
+            ),
+            OpeningMove(
+              iccs: '8163',
+              chineseName: '马八进七',
+              frequency: 500,
+              winRate: 0.49,
+              source: OpeningSource.master,
+            ),
+            OpeningMove(
+              iccs: '8143',
+              chineseName: '相三进五',
+              frequency: 300,
+              winRate: 0.48,
+              source: OpeningSource.classic,
+            ),
+          ],
         ),
-        OpeningMove(
-          iccs: '8163',
-          chineseName: '马八进七',
-          frequency: 500,
-          winRate: 0.49,
-          source: OpeningSource.master,
-        ),
-        OpeningMove(
-          iccs: '8143',
-          chineseName: '相三进五',
-          frequency: 300,
-          winRate: 0.48,
-          source: OpeningSource.classic,
-        ),
-      ],
-    ),
 
     // ============================================================
     // 仙人指路转中炮 - 红炮二平五后
     // 红炮从 (7,7)→(4,7), row7: 1C5C1→1C2C4
     // ============================================================
-    'rnbakabnr/9/1c5c1/p3p1p1p/2p6/2P6/P3P1P1P/1C2C4/9/RNBAKABNR r': OpeningInfo(
-      positionFen:
-          'rnbakabnr/9/1c5c1/p3p1p1p/2p6/2P6/P3P1P1P/1C2C4/9/RNBAKABNR r',
-      eccoCode: 'A01',
-      eccoName: '仙人指路转中炮',
-      moves: [
-        OpeningMove(
-          iccs: '2747',
-          chineseName: '炮8平5',
-          frequency: 600,
-          winRate: 0.48,
-          source: OpeningSource.master,
+    'rnbakabnr/9/1c5c1/p3p1p1p/2p6/2P6/P3P1P1P/1C2C4/9/RNBAKABNR r':
+        OpeningInfo(
+          positionFen:
+              'rnbakabnr/9/1c5c1/p3p1p1p/2p6/2P6/P3P1P1P/1C2C4/9/RNBAKABNR r',
+          eccoCode: 'A01',
+          eccoName: '仙人指路转中炮',
+          moves: [
+            OpeningMove(
+              iccs: '2747',
+              chineseName: '炮8平5',
+              frequency: 600,
+              winRate: 0.48,
+              source: OpeningSource.master,
+            ),
+            OpeningMove(
+              iccs: '8977',
+              chineseName: '马8进7',
+              frequency: 400,
+              winRate: 0.47,
+              source: OpeningSource.master,
+            ),
+            OpeningMove(
+              iccs: '3938',
+              chineseName: '车9进1',
+              frequency: 200,
+              winRate: 0.46,
+              source: OpeningSource.classic,
+            ),
+          ],
         ),
-        OpeningMove(
-          iccs: '8977',
-          chineseName: '马8进7',
-          frequency: 400,
-          winRate: 0.47,
-          source: OpeningSource.master,
-        ),
-        OpeningMove(
-          iccs: '3938',
-          chineseName: '车9进1',
-          frequency: 200,
-          winRate: 0.46,
-          source: OpeningSource.classic,
-        ),
-      ],
-    ),
 
     // ============================================================
     // 飞相局 (Elephant Opening) - 红相三进五后
@@ -836,165 +853,169 @@ class OpeningBookService {
     // 炮从 (1,7)→(3,7), row7: 1C5C1→3C3C1
     // ECCO: D00
     // ============================================================
-    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/3C3C1/9/RNBAKABNR r': OpeningInfo(
-      positionFen:
-          'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/3C3C1/9/RNBAKABNR r',
-      eccoCode: 'D00',
-      eccoName: '士角炮',
-      moves: [
-        OpeningMove(
-          iccs: '8143',
-          chineseName: '象3进5',
-          frequency: 600,
-          winRate: 0.48,
-          source: OpeningSource.master,
+    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/3C3C1/9/RNBAKABNR r':
+        OpeningInfo(
+          positionFen:
+              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/3C3C1/9/RNBAKABNR r',
+          eccoCode: 'D00',
+          eccoName: '士角炮',
+          moves: [
+            OpeningMove(
+              iccs: '8143',
+              chineseName: '象3进5',
+              frequency: 600,
+              winRate: 0.48,
+              source: OpeningSource.master,
+            ),
+            OpeningMove(
+              iccs: '8977',
+              chineseName: '马8进7',
+              frequency: 400,
+              winRate: 0.47,
+              source: OpeningSource.master,
+            ),
+            OpeningMove(
+              iccs: '2747',
+              chineseName: '炮8平5',
+              frequency: 300,
+              winRate: 0.47,
+              source: OpeningSource.classic,
+              eccoCode: 'D01',
+            ),
+            OpeningMove(
+              iccs: '3637',
+              chineseName: '卒7进1',
+              frequency: 200,
+              winRate: 0.46,
+              source: OpeningSource.classic,
+            ),
+          ],
         ),
-        OpeningMove(
-          iccs: '8977',
-          chineseName: '马8进7',
-          frequency: 400,
-          winRate: 0.47,
-          source: OpeningSource.master,
-        ),
-        OpeningMove(
-          iccs: '2747',
-          chineseName: '炮8平5',
-          frequency: 300,
-          winRate: 0.47,
-          source: OpeningSource.classic,
-          eccoCode: 'D01',
-        ),
-        OpeningMove(
-          iccs: '3637',
-          chineseName: '卒7进1',
-          frequency: 200,
-          winRate: 0.46,
-          source: OpeningSource.classic,
-        ),
-      ],
-    ),
 
     // ============================================================
     // 过宫炮 (Cross-Palace Cannon) - 红炮二平六后
     // 炮从 (7,7)→(3,7), row7: 1C5C1→1C1C5
     // ECCO: E00
     // ============================================================
-    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C1C5/9/RNBAKABNR r': OpeningInfo(
-      positionFen:
-          'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C1C5/9/RNBAKABNR r',
-      eccoCode: 'E00',
-      eccoName: '过宫炮',
-      moves: [
-        OpeningMove(
-          iccs: '8977',
-          chineseName: '马8进7',
-          frequency: 600,
-          winRate: 0.47,
-          source: OpeningSource.master,
+    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C1C5/9/RNBAKABNR r':
+        OpeningInfo(
+          positionFen:
+              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C1C5/9/RNBAKABNR r',
+          eccoCode: 'E00',
+          eccoName: '过宫炮',
+          moves: [
+            OpeningMove(
+              iccs: '8977',
+              chineseName: '马8进7',
+              frequency: 600,
+              winRate: 0.47,
+              source: OpeningSource.master,
+            ),
+            OpeningMove(
+              iccs: '2747',
+              chineseName: '炮8平5',
+              frequency: 400,
+              winRate: 0.47,
+              source: OpeningSource.master,
+              eccoCode: 'E01',
+            ),
+            OpeningMove(
+              iccs: '8143',
+              chineseName: '象3进5',
+              frequency: 300,
+              winRate: 0.46,
+              source: OpeningSource.classic,
+            ),
+            OpeningMove(
+              iccs: '3637',
+              chineseName: '卒7进1',
+              frequency: 200,
+              winRate: 0.46,
+              source: OpeningSource.classic,
+            ),
+          ],
         ),
-        OpeningMove(
-          iccs: '2747',
-          chineseName: '炮8平5',
-          frequency: 400,
-          winRate: 0.47,
-          source: OpeningSource.master,
-          eccoCode: 'E01',
-        ),
-        OpeningMove(
-          iccs: '8143',
-          chineseName: '象3进5',
-          frequency: 300,
-          winRate: 0.46,
-          source: OpeningSource.classic,
-        ),
-        OpeningMove(
-          iccs: '3637',
-          chineseName: '卒7进1',
-          frequency: 200,
-          winRate: 0.46,
-          source: OpeningSource.classic,
-        ),
-      ],
-    ),
 
     // ============================================================
     // 起马局 (Horse Opening) - 红马八进七后
     // 马从 (1,9)→(2,7), row9: RNBAKABNR→R1BAKABNR, row7: 1C5C1→1CN4C1
     // ECCO: F00
     // ============================================================
-    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN4C1/9/R1BAKABNR r': OpeningInfo(
-      positionFen:
-          'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN4C1/9/R1BAKABNR r',
-      eccoCode: 'F00',
-      eccoName: '起马局',
-      moves: [
-        OpeningMove(
-          iccs: '2747',
-          chineseName: '炮8平5',
-          frequency: 500,
-          winRate: 0.48,
-          source: OpeningSource.master,
-          eccoCode: 'F01',
+    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN4C1/9/R1BAKABNR r':
+        OpeningInfo(
+          positionFen:
+              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN4C1/9/R1BAKABNR r',
+          eccoCode: 'F00',
+          eccoName: '起马局',
+          moves: [
+            OpeningMove(
+              iccs: '2747',
+              chineseName: '炮8平5',
+              frequency: 500,
+              winRate: 0.48,
+              source: OpeningSource.master,
+              eccoCode: 'F01',
+            ),
+            OpeningMove(
+              iccs: '3637',
+              chineseName: '卒7进1',
+              frequency: 400,
+              winRate: 0.47,
+              source: OpeningSource.master,
+              eccoCode: 'F02',
+            ),
+            OpeningMove(
+              iccs: '8977',
+              chineseName: '马8进7',
+              frequency: 300,
+              winRate: 0.47,
+              source: OpeningSource.classic,
+            ),
+            OpeningMove(
+              iccs: '8143',
+              chineseName: '象3进5',
+              frequency: 200,
+              winRate: 0.46,
+              source: OpeningSource.classic,
+            ),
+          ],
         ),
-        OpeningMove(
-          iccs: '3637',
-          chineseName: '卒7进1',
-          frequency: 400,
-          winRate: 0.47,
-          source: OpeningSource.master,
-          eccoCode: 'F02',
-        ),
-        OpeningMove(
-          iccs: '8977',
-          chineseName: '马8进7',
-          frequency: 300,
-          winRate: 0.47,
-          source: OpeningSource.classic,
-        ),
-        OpeningMove(
-          iccs: '8143',
-          chineseName: '象3进5',
-          frequency: 200,
-          winRate: 0.46,
-          source: OpeningSource.classic,
-        ),
-      ],
-    ),
 
     // ============================================================
     // 起马对中炮 - 黑炮8平5后
     // 黑炮从 (1,2)→(4,2), row2: 1c5c1→4c2c1
     // ECCO: F01
     // ============================================================
-    'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN4C1/9/R1BAKABNR r': OpeningInfo(
-      positionFen:
-          'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN4C1/9/R1BAKABNR r',
-      eccoCode: 'F01',
-      eccoName: '起马对中炮',
-      moves: [
-        OpeningMove(
-          iccs: '2153',
-          chineseName: '炮二平五',
-          frequency: 400,
-          winRate: 0.50,
-          source: OpeningSource.master,
+    'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN4C1/9/R1BAKABNR r':
+        OpeningInfo(
+          positionFen:
+              'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN4C1/9/R1BAKABNR r',
+          eccoCode: 'F01',
+          eccoName: '起马对中炮',
+          moves: [
+            OpeningMove(
+              iccs: '2153',
+              chineseName: '炮二平五',
+              frequency: 400,
+              winRate: 0.50,
+              source: OpeningSource.master,
+            ),
+            OpeningMove(
+              iccs: '3637',
+              chineseName: '兵七进一',
+              frequency: 200,
+              winRate: 0.48,
+              source: OpeningSource.master,
+            ),
+            OpeningMove(
+              iccs: '8143',
+              chineseName: '相三进五',
+              frequency: 150,
+              winRate: 0.47,
+              source: OpeningSource.classic,
+            ),
+          ],
         ),
-        OpeningMove(
-          iccs: '3637',
-          chineseName: '兵七进一',
-          frequency: 200,
-          winRate: 0.48,
-          source: OpeningSource.master,
-        ),
-        OpeningMove(
-          iccs: '8143',
-          chineseName: '相三进五',
-          frequency: 150,
-          winRate: 0.47,
-          source: OpeningSource.classic,
-        ),
-      ],
-    ),
 
     // ============================================================
     // 金钩炮 (Golden Hook Cannon) - 红炮二平七后
@@ -1002,7 +1023,8 @@ class OpeningBookService {
     // ECCO: G00
     // ============================================================
     'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1CC6/9/RNBAKABNR r': OpeningInfo(
-      positionFen: 'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1CC6/9/RNBAKABNR r',
+      positionFen:
+          'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1CC6/9/RNBAKABNR r',
       eccoCode: 'G00',
       eccoName: '金钩炮',
       moves: [
@@ -1036,35 +1058,36 @@ class OpeningBookService {
     // 兵从 (8,6)→(8,5), row5: 9→8P, row6: P1P1P1P1P→P1P1P1P2
     // ECCO: H00
     // ============================================================
-    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/8P/P1P1P1P2/1C5C1/9/RNBAKABNR r': OpeningInfo(
-      positionFen:
-          'rnbakabnr/9/1c5c1/p1p1p1p1p/9/8P/P1P1P1P2/1C5C1/9/RNBAKABNR r',
-      eccoCode: 'H00',
-      eccoName: '边兵局',
-      moves: [
-        OpeningMove(
-          iccs: '2747',
-          chineseName: '炮8平5',
-          frequency: 200,
-          winRate: 0.48,
-          source: OpeningSource.classic,
+    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/8P/P1P1P1P2/1C5C1/9/RNBAKABNR r':
+        OpeningInfo(
+          positionFen:
+              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/8P/P1P1P1P2/1C5C1/9/RNBAKABNR r',
+          eccoCode: 'H00',
+          eccoName: '边兵局',
+          moves: [
+            OpeningMove(
+              iccs: '2747',
+              chineseName: '炮8平5',
+              frequency: 200,
+              winRate: 0.48,
+              source: OpeningSource.classic,
+            ),
+            OpeningMove(
+              iccs: '8977',
+              chineseName: '马8进7',
+              frequency: 150,
+              winRate: 0.47,
+              source: OpeningSource.classic,
+            ),
+            OpeningMove(
+              iccs: '3637',
+              chineseName: '卒7进1',
+              frequency: 100,
+              winRate: 0.46,
+              source: OpeningSource.personal,
+            ),
+          ],
         ),
-        OpeningMove(
-          iccs: '8977',
-          chineseName: '马8进7',
-          frequency: 150,
-          winRate: 0.47,
-          source: OpeningSource.classic,
-        ),
-        OpeningMove(
-          iccs: '3637',
-          chineseName: '卒7进1',
-          frequency: 100,
-          winRate: 0.46,
-          source: OpeningSource.personal,
-        ),
-      ],
-    ),
   };
 
   /// 清除缓存

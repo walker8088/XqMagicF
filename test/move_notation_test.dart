@@ -14,9 +14,9 @@ void main() {
         capturedPiece: null,
         color: PieceColor.red,
       );
-      // col=4 → file 'e', row=0 → rank=9, row=1 → rank=8
+      // col=4 → file 'e', row=0 → rank=0, row=1 → rank=1
       final iccs = MoveNotation.toICCS(move);
-      expect(iccs, 'e9e8');
+      expect(iccs, 'e0e1');
     });
 
     test('should convert move from (4, 9) to (4, 8) correctly', () {
@@ -26,9 +26,9 @@ void main() {
         capturedPiece: null,
         color: PieceColor.black,
       );
-      // col=4 → file 'e', row=9 → rank=0, row=8 → rank=1
+      // col=4 → file 'e', row=9 → rank=9, row=8 → rank=8
       final iccs = MoveNotation.toICCS(move);
-      expect(iccs, 'e0e1');
+      expect(iccs, 'e9e8');
     });
 
     test('should convert horizontal move correctly', () {
@@ -38,9 +38,9 @@ void main() {
         capturedPiece: null,
         color: PieceColor.red,
       );
-      // from: col=0 → 'a', row=0 → rank=9; to: col=8 → 'i', row=0 → rank=9
+      // from: col=0 → 'a', row=0 → rank=0; to: col=8 → 'i', row=0 → rank=0
       final iccs = MoveNotation.toICCS(move);
-      expect(iccs, 'a9i9');
+      expect(iccs, 'a0i0');
     });
 
     test('should convert cannon move from (1, 2) to (1, 5)', () {
@@ -50,9 +50,9 @@ void main() {
         capturedPiece: null,
         color: PieceColor.red,
       );
-      // col=1 → 'b', row=2 → rank=7; col=1 → 'b', row=5 → rank=4
+      // col=1 → 'b', row=2 → rank=2; col=1 → 'b', row=5 → rank=5
       final iccs = MoveNotation.toICCS(move);
-      expect(iccs, 'b7b4');
+      expect(iccs, 'b2b5');
     });
   });
 
@@ -60,25 +60,25 @@ void main() {
     test('should parse ICCS "e0e1" to coordinates', () {
       final (from, to) = MoveNotation.fromICCS('e0e1');
       expect(from.col, 4);
-      expect(from.row, 9);
+      expect(from.row, 0);
       expect(to.col, 4);
-      expect(to.row, 8);
+      expect(to.row, 1);
     });
 
     test('should parse ICCS "b2b5" to coordinates', () {
       final (from, to) = MoveNotation.fromICCS('b2b5');
       expect(from.col, 1);
-      expect(from.row, 7);
+      expect(from.row, 2);
       expect(to.col, 1);
-      expect(to.row, 4);
+      expect(to.row, 5);
     });
 
     test('should parse ICCS with rank 9', () {
       final (from, to) = MoveNotation.fromICCS('e9e8');
       expect(from.col, 4);
-      expect(from.row, 0);
+      expect(from.row, 9);
       expect(to.col, 4);
-      expect(to.row, 1);
+      expect(to.row, 8);
     });
 
     test('should round-trip moves involving row 0', () {

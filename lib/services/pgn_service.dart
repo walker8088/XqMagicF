@@ -128,9 +128,13 @@ class _ParsedMove {
 /// PGN (Portable Game Notation) service for Chinese Chess (Xiangqi)
 ///
 /// Supports reading and writing PGN files with ICCS coordinate notation.
-/// ICCS format: 4-digit string (col1row1col2row2) where:
-///   - col: 1-9 from right to left (red's perspective), maps to 9-ourCol
-///   - row: 1-10 top to bottom, maps to ourRow+1
+///
+/// **标准 ICCS 格式**（由 MoveNotation.toICCS/fromICCS 处理）：
+/// - file（纵线）: a-i，从左到右（红方视角），对应内部 col 0-8
+/// - rank（横线）: 0-9，从下到上（红方视角），对应内部 row 0-9
+/// - **rank 0 = 红方底线（底部）**，**rank 9 = 黑方底线（顶部）**
+/// - ICCS rank 与内部 board row 完全一致，无需转换
+/// - 示例：马二进三 → h0g2，炮８平５ → h7e7
 class PGNService {
   PGNService();
 
