@@ -14,24 +14,31 @@ class MoveNotation {
 
   // ========== ICCS 格式（引擎通信用） ==========
 
-  /// 例如: h7e7 表示从 (7,7) 到 (4,7)，b0c2 表示从 (1,0) 到 (2,2)
-  /// 此格式与 UCI/UCCI 引擎输出格式完全一致，无需额外转换
+  /// 将走法记录转换为 ICCS 格式（引擎通信用）
+  ///
+  /// 引擎 UCCI 的 rank 约定：0=黑方底线(顶), 9=红方底线(底)
+  /// 内部 row 约定：row=0=红方底线(底), row=9=黑方底线(顶)
+  /// 需要转换：engineRank = 9 - ourRow
   static String toICCS(MoveRecord move) {
     final fromFile = _colToFile(move.from.col);
-    final fromRank = move.from.row;
+    final fromRank = 9 - move.from.row;
     final toFile = _colToFile(move.to.col);
-    final toRank = move.to.row;
+    final toRank = 9 - move.to.row;
     return '${fromFile}${fromRank}${toFile}${toRank}';
   }
 
   /// 从 ICCS 代数坐标解析为 Coord
+  ///
+  /// 引擎 UCCI 的 rank 约定：0=黑方底线(顶), 9=红方底线(底)
+  /// 内部 row 约定：row=0=红方底线(底), row=9=黑方底线(顶)
+  /// 需要转换：ourRow = 9 - engineRank
   static (Coord, Coord) fromICCS(String iccs) {
     if (iccs.length != 4) throw ArgumentError('ICCS 格式应为4位: $iccs');
     final fromCol = _fileToCol(iccs[0]);
-    final fromRow = int.parse(iccs[1]);
+    final engineFromRank = int.parse(iccs[1]);
     final toCol = _fileToCol(iccs[2]);
-    final toRow = int.parse(iccs[3]);
-    return (Coord(fromCol, fromRow), Coord(toCol, toRow));
+    final engineToRank = int.parse(iccs[3]);
+    return (Coord(fromCol, 9 - engineFromRank), Coord(toCol, 9 - engineToRank));
   }
 
   static String _colToFile(int col) {

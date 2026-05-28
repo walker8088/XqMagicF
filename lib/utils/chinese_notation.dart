@@ -93,8 +93,12 @@ class ChineseNotation {
   // ========== 标准中文记谱法 ==========
 
   /// 将走法记录转换为标准中文记谱法（四字/五字格式）
-  //
-  /// 需要传入当前棋盘状态以处理同线多子的情况
+  ///
+  /// **视角转换策略：唯一转换点**
+  /// 1. 黑方走子时，先 normalize 棋盘和走法到红方视角
+  /// 2. 所有计算（行差、纵线、同线多子）统一按红方视角
+  /// 3. isRed 仅用于输出格式化（中文数字 vs 阿拉伯数字）
+  ///
   /// [board] 当前棋盘（用于检查同线是否有同类型棋子）
   /// [move] 走法记录
   /// [useSimpleText] 是否使用简体中文（默认true），false 则使用繁体
@@ -105,23 +109,33 @@ class ChineseNotation {
   }) {
     final isRed = move.color == PieceColor.red;
 
-    final pieceName = _getPieceName(move.pieceType, move.color, useSimpleText);
+    // 视角归一化：黑方走棋时，将棋盘和走法旋转到红方视角
+    final normBoard = isRed ? board : normalizeBoard(board, PieceColor.black);
+    final normMove = isRed ? move : normalizeMove(move);
 
-    // 获取纵线编号（从走棋方视角，从右到左 1-9）
-    final fromFile = _getFileNumber(move.from.col, isRed);
-    final toFile = _getFileNumber(move.to.col, isRed);
+    // === 以下所有计算均基于红方视角 ===
 
-    // 检查同线是否有同类型棋子（需要前/后区分）
-    final prefix = _getMultiPiecePrefix(board, move, isRed);
+    final pieceName = _getPieceName(
+      normMove.pieceType,
+      normMove.color,
+      useSimpleText,
+    );
 
-    final colDiff = move.to.col - move.from.col;
-    final rowDiff = _getRowDiff(move, isRed);
+    // 纵线编号（红方视角：col 8=一路, col 0=九路）
+    final fromFile = _getFileNumberFromRed(normMove.from.col, isRed);
+    final toFile = _getFileNumberFromRed(normMove.to.col, isRed);
+
+    // 同线多子检测（红方视角）
+    final prefix = _getMultiPiecePrefixFromRed(normBoard, normMove);
+
+    final colDiff = normMove.to.col - normMove.from.col;
+    final rowDiff = normMove.to.row - normMove.from.row;
 
     final (action, target) = _getActionAndTarget(
       colDiff,
       rowDiff,
       toFile,
-      move.pieceType,
+      normMove.pieceType,
       isRed,
     );
 
@@ -132,15 +146,6 @@ class ChineseNotation {
       result = '$pieceName$fromFile$action$target';
     }
 
-    // DEBUG: 黑方走子时打印关键数据
-    if (!isRed && result.contains('退')) {
-      debugPrint(
-        '[棋谱DEBUG] 黑方退着: move.from=${move.from}, move.to=${move.to}, '
-        'rowDiff=$rowDiff, colDiff=$colDiff, isRed=$isRed, '
-        'result="$result"',
-      );
-    }
-
     return result;
   }
 
@@ -148,41 +153,32 @@ class ChineseNotation {
 
   /// 将走法转换为 WXF 格式（World Xiangqi Federation Notation）
   ///
-  /// WXF 格式：棋子字母 + 纵线 + 方向符号 + 目标
-  /// - 棋子字母：K(将/帅) A(士/仕) B(象/相) N(马/傌) R(车/俥) C(炮/砲) P(卒/兵)
-  /// - 纵线：统一用阿拉伯数字 1-9（从走棋方视角从右到左）
-  /// - 方向符号：+ (进)  - (退)  . (平)
-  /// - 目标：平=目标纵线；进/退直线=步数；进/退斜线=落点纵线
-  ///
-  /// 例如：
-  /// - C2.5 = 炮二平五
-  /// - N8+7 = 马8进7
-  /// - R2+3 = 车二进三
-  /// - P3.4 = 兵三平四
-  /// - fC2.5 = 前炮平五（同线多子）
-  /// - bN8-7 = 后马退7
+  /// 视角归一化：黑方走棋时，先 normalize 到红方视角
   static String toWXF(Map<Coord, ChessPiece> board, MoveRecord move) {
     final isRed = move.color == PieceColor.red;
 
-    final pieceLetter = _getPieceLetter(move.pieceType);
+    // 视角归一化
+    final normBoard = isRed ? board : normalizeBoard(board, PieceColor.black);
+    final normMove = isRed ? move : normalizeMove(move);
 
-    // WXF 纵线编号（从走棋方视角，从右到左 1-9）
-    // 红方：file = 9 - col
-    // 黑方：file = col + 1
-    final fromFile = isRed ? 9 - move.from.col : move.from.col + 1;
+    // === 以下所有计算均基于红方视角 ===
+    final pieceLetter = _getPieceLetter(normMove.pieceType);
 
-    // 检查同线多子
-    final prefix = _getWXFMultiPiecePrefix(board, move);
+    // 纵线编号（红方视角：col 8=1, col 0=9）
+    final fromFile = 9 - normMove.from.col;
+    final toFile = 9 - normMove.to.col;
 
-    final colDiff = move.to.col - move.from.col;
-    final rowDiff = _getRowDiff(move, isRed);
-    final toFile = isRed ? 9 - move.to.col : move.to.col + 1;
+    // 同线多子检测（红方视角）
+    final prefix = _getWXFMultiPiecePrefixFromRed(normBoard, normMove);
+
+    final colDiff = normMove.to.col - normMove.from.col;
+    final rowDiff = normMove.to.row - normMove.from.row;
 
     final (direction, target) = _getWXFActionAndTarget(
       colDiff,
       rowDiff,
       toFile,
-      move.pieceType,
+      normMove.pieceType,
     );
 
     if (prefix != null) {
@@ -343,28 +339,11 @@ class ChineseNotation {
     return letters[type.index];
   }
 
-  /// 获取纵线编号（从走棋方视角，从右到左 1-9）
-  /// 红方用中文数字，黑方用阿拉伯数字
-  static String _getFileNumber(int col, bool isRed) {
-    // 红方：从右到左为一~九路（col 8=一路, col 0=九路）
-    // 黑方：从右到左为1~9路（col 0=1路, col 8=9路）
-    final fileNumber = isRed ? 9 - col : col + 1;
-    if (isRed) {
-      return _chineseNumbers[fileNumber];
-    }
-    return fileNumber.toString();
-  }
-
-  /// 计算行差（从走棋方视角）
-  /// 红方：row 增大 = 前进（进），row 减小 = 后退（退）
-  /// 黑方：row 减小 = 前进（进），row 增大 = 后退（退）
-  /// 返回值：正数=进，负数=退，0=平
-  static int _getRowDiff(MoveRecord move, bool isRed) {
-    if (isRed) {
-      return move.to.row - move.from.row;
-    } else {
-      return move.from.row - move.to.row;
-    }
+  /// 获取纵线编号（红方视角：col 8=1路, col 0=9路）
+  /// isRed 仅用于选择数字格式（中文数字 vs 阿拉伯数字）
+  static String _getFileNumberFromRed(int col, bool isRed) {
+    final fileNumber = 9 - col;
+    return isRed ? _chineseNumbers[fileNumber] : fileNumber.toString();
   }
 
   /// 是否为直线行走棋子（车、炮、帅、兵）
@@ -375,7 +354,7 @@ class ChineseNotation {
         type == PieceType.pawn;
   }
 
-  /// 获取中文记谱法的动作和目标
+  /// 获取中文记谱法的动作和目标（红方视角）
   static (String action, String target) _getActionAndTarget(
     int colDiff,
     int rowDiff,
@@ -388,16 +367,14 @@ class ChineseNotation {
     }
 
     final isStraight = type != null && _isStraightPiece(type);
+    // 红方视角：rowDiff > 0 = 进，rowDiff < 0 = 退
     final direction = rowDiff > 0 ? '进' : '退';
 
     if (isStraight && colDiff == 0) {
-      // 直线前进/后退，显示步数
       final steps = rowDiff.abs();
-      // 红方用中文数字，黑方用阿拉伯数字
       final target = isRed ? _chineseNumbers[steps] : steps.toString();
       return (direction, target);
     } else {
-      // 斜线前进/后退（马、士、象），显示目标纵线
       return (direction, toFile);
     }
   }
@@ -423,20 +400,19 @@ class ChineseNotation {
     }
   }
 
-  /// 检查同线是否有同类型棋子，返回前/后/中缀
-  static String? _getMultiPiecePrefix(
+  /// 检查同线是否有同类型棋子，返回前/后/中缀（红方视角）
+  static String? _getMultiPiecePrefixFromRed(
     Map<Coord, ChessPiece> board,
     MoveRecord move,
-    bool isRed,
   ) {
     if (move.pieceType == null) return null;
 
     int countOnFile = 0;
     List<ChessPiece> piecesOnFile = [];
+    final moveFile = 9 - move.from.col;
     for (final piece in board.values) {
       if (piece.type == move.pieceType! && piece.color == move.color) {
-        final pieceFile = isRed ? 9 - piece.coord.col : piece.coord.col + 1;
-        final moveFile = isRed ? 9 - move.from.col : move.from.col + 1;
+        final pieceFile = 9 - piece.coord.col;
         if (pieceFile == moveFile) {
           countOnFile++;
           piecesOnFile.add(piece);
@@ -446,16 +422,8 @@ class ChineseNotation {
 
     if (countOnFile <= 1) return null;
 
-    // 按"前/后"排序（从走棋方视角的前方 = 靠近对方底线）
-    // 红方：row 越大越靠前（靠近黑方）
-    // 黑方：row 越小越靠前（靠近红方）
-    piecesOnFile.sort((a, b) {
-      if (isRed) {
-        return b.coord.row.compareTo(a.coord.row); // row 大的在前
-      } else {
-        return a.coord.row.compareTo(b.coord.row); // row 小的在前
-      }
-    });
+    // 按"前/后"排序（红方视角：row 越大越靠前）
+    piecesOnFile.sort((a, b) => b.coord.row.compareTo(a.coord.row));
 
     final myIdx = piecesOnFile.indexWhere((p) => p.coord == move.from);
 
@@ -470,20 +438,19 @@ class ChineseNotation {
     }
   }
 
-  /// 获取 WXF 格式的多子前缀
-  static String? _getWXFMultiPiecePrefix(
+  /// 获取 WXF 格式的多子前缀（红方视角）
+  static String? _getWXFMultiPiecePrefixFromRed(
     Map<Coord, ChessPiece> board,
     MoveRecord move,
   ) {
     if (move.pieceType == null) return null;
-    final isRed = move.color == PieceColor.red;
 
     int countOnFile = 0;
     List<ChessPiece> piecesOnFile = [];
+    final moveFile = 9 - move.from.col;
     for (final piece in board.values) {
       if (piece.type == move.pieceType! && piece.color == move.color) {
-        final pieceFile = isRed ? 9 - piece.coord.col : piece.coord.col + 1;
-        final moveFile = isRed ? 9 - move.from.col : move.from.col + 1;
+        final pieceFile = 9 - piece.coord.col;
         if (pieceFile == moveFile) {
           countOnFile++;
           piecesOnFile.add(piece);
@@ -493,13 +460,8 @@ class ChineseNotation {
 
     if (countOnFile <= 1) return null;
 
-    piecesOnFile.sort((a, b) {
-      if (isRed) {
-        return b.coord.row.compareTo(a.coord.row);
-      } else {
-        return a.coord.row.compareTo(b.coord.row);
-      }
-    });
+    // 红方视角：row 越大越靠前
+    piecesOnFile.sort((a, b) => b.coord.row.compareTo(a.coord.row));
 
     final myIdx = piecesOnFile.indexWhere((p) => p.coord == move.from);
 
