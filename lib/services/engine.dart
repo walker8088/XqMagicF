@@ -488,36 +488,57 @@ class Engine {
 
   // ---- Coordinate Conversion ----
 
-  /// Convert numeric ICCS (e.g. "h2e2") to file-rank ICCS (e.g. "82 72").
-  /// Used to convert engine output to internal format.
-  static String numericToICCS(String numeric) {
-    if (numeric.length != 4) return numeric;
+  /// Convert between numeric ICCS (digits for cols) and alphanumeric ICCS (file letters).
+  /// - Input all-digits (e.g. "8182") → output alphanumeric (e.g. "i1i2")
+  /// - Input has letters (e.g. "h2e2") → output numeric (e.g. "7242")
+  static String numericToICCS(String input) {
+    if (input.length != 4) return input;
 
-    final fromFile = numeric[0];
-    final fromRank = numeric[1];
-    final toFile = numeric[2];
-    final toRank = numeric[3];
+    // Detect format: all digits → convert to file letters
+    if (RegExp(r'^\d{4}$').hasMatch(input)) {
+      final fromCol = int.parse(input[0]);
+      final fromRank = input[1];
+      final toCol = int.parse(input[2]);
+      final toRank = input[3];
+      final fromFile = String.fromCharCode('a'.codeUnitAt(0) + fromCol);
+      final toFile = String.fromCharCode('a'.codeUnitAt(0) + toCol);
+      return '$fromFile$fromRank$toFile$toRank';
+    }
 
-    // file letter (a-i) -> col index (0-8)
+    // Has letters → convert to column digits
+    final fromFile = input[0];
+    final fromRank = input[1];
+    final toFile = input[2];
+    final toRank = input[3];
     final fromCol = fromFile.codeUnitAt(0) - 'a'.codeUnitAt(0);
     final toCol = toFile.codeUnitAt(0) - 'a'.codeUnitAt(0);
-
     return '$fromCol$fromRank$toCol$toRank';
   }
 
-  /// Convert file-rank ICCS (e.g. "82 72") to numeric ICCS (e.g. "h2e2").
-  /// Used to convert internal format to engine input.
-  static String iccsToNumeric(String iccs) {
-    if (iccs.length != 4) return iccs;
+  /// Convert between alphanumeric ICCS (file letters) and numeric ICCS (digits for cols).
+  /// - Input has letters (e.g. "i1i2") → output numeric (e.g. "8182")
+  /// - Input all-digits (e.g. "7242") → output alphanumeric (e.g. "h2e2")
+  static String iccsToNumeric(String input) {
+    if (input.length != 4) return input;
 
-    final fromCol = int.parse(iccs[0]);
-    final fromRank = iccs[1];
-    final toCol = int.parse(iccs[2]);
-    final toRank = iccs[3];
+    // Has letters → convert to column digits
+    if (RegExp(r'[a-i]').hasMatch(input)) {
+      final fromFile = input[0];
+      final fromRank = input[1];
+      final toFile = input[2];
+      final toRank = input[3];
+      final fromCol = fromFile.codeUnitAt(0) - 'a'.codeUnitAt(0);
+      final toCol = toFile.codeUnitAt(0) - 'a'.codeUnitAt(0);
+      return '$fromCol$fromRank$toCol$toRank';
+    }
 
+    // All digits → convert to file letters
+    final fromCol = int.parse(input[0]);
+    final fromRank = input[1];
+    final toCol = int.parse(input[2]);
+    final toRank = input[3];
     final fromFile = String.fromCharCode('a'.codeUnitAt(0) + fromCol);
     final toFile = String.fromCharCode('a'.codeUnitAt(0) + toCol);
-
     return '$fromFile$fromRank$toFile$toRank';
   }
 

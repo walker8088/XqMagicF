@@ -149,17 +149,17 @@ void main() {
           );
           expect(bestMove!.isNotEmpty, isTrue);
 
-          // Verify best move format: ICCS algebraic (e.g., "h7e7")
+          // Verify best move format: ICCS column-row format (e.g., "7242")
           expect(
             bestMove!.length,
             4,
-            reason: 'ICCS move should be 4 chars (e.g., "h7e7")',
+            reason: 'ICCS move should be 4 chars (e.g., "7242")',
           );
-          final fromFile = bestMove![0];
+          final fromCol = bestMove![0];
           expect(
-            fromFile.compareTo('a') >= 0 && fromFile.compareTo('i') <= 0,
+            fromCol.compareTo('0') >= 0 && fromCol.compareTo('8') <= 0,
             isTrue,
-            reason: 'First char should be file letter a-i',
+            reason: 'First char should be column digit 0-8',
           );
         } finally {
           await engine.dispose();
