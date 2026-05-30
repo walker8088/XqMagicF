@@ -1,8 +1,11 @@
+import 'package:xqmagic/models/board.dart';
 import 'package:xqmagic/models/chess_piece.dart';
+import 'package:xqmagic/models/game_tree.dart';
 import 'package:xqmagic/models/move.dart';
 import 'package:xqmagic/utils/chinese_notation.dart';
 import 'package:xqmagic/utils/constants.dart';
 import 'package:xqmagic/utils/coord.dart';
+import 'package:xqmagic/utils/fen.dart';
 
 /// 中国象棋着法表示法工具
 ///
@@ -32,7 +35,7 @@ class MoveNotation {
     final fromRank = move.from.row;
     final toFile = Coord.colToFile(move.to.col);
     final toRank = move.to.row;
-    return '${fromFile}${fromRank}${toFile}${toRank}';
+    return '$fromFile$fromRank$toFile$toRank';
   }
 
   /// 从 ICCS 代数坐标解析为 Coord
@@ -87,42 +90,49 @@ class MoveNotation {
 
   // ========== 组合格式化（中文 + ICCS） ==========
 
-  /// 将 ICCS 着法格式化为 "中文记谱(iccs)" 的显示格式
+  /// 将 ICCS 着法格式化为 "中文记谱(ICCS)" 的显示格式
   ///
   /// 例如："h2e2" → "炮二平五(h2-e2)"
   ///
-  /// [board] 当前棋盘状态（用于找到棋子并确定走子方颜色）
+  /// [board] 当前棋盘状态（从 board[from] 获取棋子颜色和类型）
   /// [iccs] ICCS 格式着法（如 "h2e2"）
-  ///
-  /// 走子方颜色由棋盘上棋子的实际颜色决定，不受外部传入 color 参数影响。
-  static String formatMoveDisplay(
-    Map<Coord, ChessPiece> board,
-    PieceColor color,
-    String iccs,
-  ) {
+  static String formatMoveDisplay(Map<Coord, ChessPiece> board, String iccs) {
     if (iccs.length != 4) return iccs;
     try {
       final (from, to) = fromICCS(iccs);
       final piece = board[from];
-      if (piece == null) return formatICCS(iccs);
+      if (piece == null) return iccs;
 
       final move = MoveRecord(
         from: from,
         to: to,
         pieceType: piece.type,
-        color: piece.color, // 使用棋盘上棋子的实际颜色
+        color: piece.color,
       );
       final chinese = toText(board, move);
-      return '$chinese(${formatICCS(iccs)})';
+      return '$chinese($iccs)';
     } catch (_) {
-      return formatICCS(iccs);
+      return iccs;
     }
   }
 
-  /// 格式化着法显示：ICCS → 人类可读格式 (e7-e5)
-  static String formatICCS(String iccs) {
-    if (iccs.length != 4) return iccs;
-    return '${iccs.substring(0, 2)}-${iccs.substring(2)}';
+  /// 从 GameTreeNode 路径构建记谱列表
+  ///
+  /// 用于 GameController / ViewModel 中统一生成着法显示文本。
+  /// path[i] = 第 i 步走子前的局面，path[i+1].move = 第 i 步走子。
+  static List<String> buildNotationsFromPath(List<GameTreeNode> path) {
+    final notations = <String>[];
+    for (int i = 0; i < path.length - 1; i++) {
+      final move = path[i + 1].move!;
+      if (move.notation != null && move.notation!.isNotEmpty) {
+        notations.add(move.notation!);
+      } else {
+        final boardBefore = Board();
+        FenParser.parse(path[i].fen, boardBefore);
+        notations.add(MoveNotation.toText(boardBefore.pieces, move));
+      }
+    }
+    return notations;
   }
 }
 

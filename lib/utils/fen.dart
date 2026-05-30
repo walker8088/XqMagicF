@@ -4,15 +4,15 @@ import 'package:xqmagic/utils/constants.dart';
 import 'package:xqmagic/utils/coord.dart';
 
 /// FEN (Forsyth-Edwards Notation) for Chinese Chess (Xiangqi)
-/// Format: rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR r
+/// Format: rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w
 /// - Board: 10 rows separated by '/' (row 0 = top = black side)
 /// - Pieces: uppercase = red, lowercase = black
-/// - Active color: 'r' (red) or 'b' (black)
+/// - Active color: 'w' (white/red) or 'b' (black)
 class FenParser {
   FenParser._();
 
   static const String initial =
-      'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR r';
+      'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w';
 
   /// Convert piece type and color to FEN character
   static String pieceToFenChar(PieceType type, PieceColor color) {
@@ -72,7 +72,7 @@ class FenParser {
       rows.add(rowStr);
     }
     final boardStr = rows.join('/');
-    return '$boardStr ${activeColor == PieceColor.red ? "r" : "b"}';
+    return '$boardStr ${activeColor == PieceColor.red ? "w" : "b"}';
   }
 
   /// Parse FEN string and populate the board
@@ -84,10 +84,7 @@ class FenParser {
     board.clear();
 
     final parts = fen.trim().split(' ');
-    assert(
-      parts.length >= 2,
-      'FEN 至少需要两个字段（布局 + 走子方），收到: "$fen"',
-    );
+    assert(parts.length >= 2, 'FEN 至少需要两个字段（布局 + 走子方），收到: "$fen"');
     final boardStr = parts[0];
     final activeColor = parts[1] == 'b' ? PieceColor.black : PieceColor.red;
 

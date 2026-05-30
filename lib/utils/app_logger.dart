@@ -63,8 +63,7 @@ class AppLogger {
     final now = DateTime.now();
     return '${now.hour.toString().padLeft(2, '0')}:'
         '${now.minute.toString().padLeft(2, '0')}:'
-        '${now.second.toString().padLeft(2, '0')}.'
-        '${now.millisecond.toString().padLeft(3, '0')}';
+        '${now.second.toString().padLeft(2, '0')}';
   }
 
   static void _write(String tag, String module, String message) {
@@ -73,7 +72,7 @@ class AppLogger {
     // Always print to console in debug mode
     if (kDebugMode) {
       // ignore: avoid_print
-      print(line);
+      print('[$tag] [${_timestamp()}] [$module] $message');
     }
 
     // Write to file if enabled

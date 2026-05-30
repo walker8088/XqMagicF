@@ -149,17 +149,19 @@ void main() {
           );
           expect(bestMove!.isNotEmpty, isTrue);
 
-          // Verify best move format: ICCS column-row format (e.g., "7242")
           expect(
             bestMove!.length,
             4,
-            reason: 'ICCS move should be 4 chars (e.g., "7242")',
+            reason: 'ICCS move should be 4 chars (e.g., "h2e2")',
           );
-          final fromCol = bestMove![0];
+          // 验证格式：只能是字母格式(a-i)
+          final firstChar = bestMove![0];
+          final isLetterFormat =
+              firstChar.compareTo('a') >= 0 && firstChar.compareTo('i') <= 0;
           expect(
-            fromCol.compareTo('0') >= 0 && fromCol.compareTo('8') <= 0,
+            isLetterFormat,
             isTrue,
-            reason: 'First char should be column digit 0-8',
+            reason: 'First char should be letter a-i, got: $firstChar',
           );
         } finally {
           await engine.dispose();
@@ -249,26 +251,6 @@ void main() {
       },
       timeout: const Timeout(Duration(seconds: 90)),
     );
-
-    test('should handle ICCS move conversion correctly', () {
-      // Test numericToICCS conversion
-      // Numeric "8182" → col=8, row=1 to col=8, row=2
-      // ICCS: col 8 → file 'i', row 1 → rank 1, so "i1i2"
-      final iccs = Engine.numericToICCS('8182');
-      expect(iccs, 'i1i2');
-
-      // Test iccsToNumeric conversion
-      final numeric = Engine.iccsToNumeric('i1i2');
-      expect(numeric, '8182');
-
-      // Test coordsToICCS
-      final iccs2 = Engine.coordsToICCS(0, 0, 0, 1);
-      expect(iccs2, 'a0a1');
-
-      // Round-trip: coords → ICCS → numeric → ICCS
-      final roundTrip = Engine.numericToICCS(Engine.iccsToNumeric('h7e7'));
-      expect(roundTrip, 'h7e7');
-    });
 
     test('should round-trip FEN generation and parsing', () {
       final board = Board();
@@ -387,22 +369,31 @@ void main() {
     test(
       'should handle multiPV with multiple principal variations',
       () async {
+        // 只使用 UCI 引擎测试 multiPV（UCCI 协议不支持 MultiPV）
         final enginePath = findEngine();
         if (enginePath == null) {
           print('SKIP: No engine found');
           return;
         }
 
+        // 跳过 UCCI 引擎（UCCI 不支持 MultiPV）
+        if (enginePath.toLowerCase().contains('eleeye')) {
+          print('SKIP: UCCI engine does not support MultiPV');
+          return;
+        }
+
         final engine = Engine(enginePath: enginePath, logEnabled: true);
         try {
           final started = await engine.start();
-          expect(started, isTrue);
+          expect(started, isTrue, reason: 'Engine should start successfully');
 
-          // Collect infos grouped by multipv
-          final allInfos = <int>[]; // multipv values seen
+          // Collect multipv values and currentInfos from events
+          final allInfos = <int>[];
+          final collectedPVs = <EngineInfo>[];
 
           engine.events.listen((event) {
             if (event is EngineAnalysisUpdate) {
+              collectedPVs.add(event.info);
               if (!allInfos.contains(event.info.multipv)) {
                 allInfos.add(event.info.multipv);
               }
@@ -420,15 +411,41 @@ void main() {
             if (engine.bestMove != null && allInfos.isNotEmpty) break;
           }
 
+          // --- 详细断言，便于定位失败原因 ---
+          final pvCount = engine.currentInfos.length;
           print('MultiPV values seen: $allInfos');
+          print('Engine bestMove: ${engine.bestMove}');
           print('Engine bestInfo: ${engine.bestInfo}');
-          print('Engine currentInfos count: ${engine.currentInfos.length}');
+          print('Collected PVs from events: ${collectedPVs.length}');
+          print('currentInfos count: $pvCount');
 
-          // If multiPV is supported, we should see multiple variations
+          // 断言1：currentInfos 不应为空
           expect(
-            engine.currentInfos.isNotEmpty,
-            isTrue,
-            reason: 'Should have at least one PV line',
+            pvCount,
+            greaterThan(0),
+            reason: 'currentInfos should not be empty after analysis',
+          );
+
+          // 断言2：如果引擎支持 multiPV，应该看到多个不同的 multipv 值
+          expect(
+            allInfos.length,
+            greaterThan(1),
+            reason: 'Should see multiple multipv values, got: $allInfos',
+          );
+
+          // 断言3：currentInfos 数量应与 multipv 值数量一致
+          expect(
+            pvCount,
+            allInfos.length,
+            reason:
+                'currentInfos count ($pvCount) should match multipv values ($allInfos)',
+          );
+
+          // 断言4：bestInfo 不应为空
+          expect(
+            engine.bestInfo,
+            isNotNull,
+            reason: 'bestInfo should not be null',
           );
         } finally {
           await engine.dispose();

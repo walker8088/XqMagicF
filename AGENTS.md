@@ -73,10 +73,10 @@ final bestColor = pvLine != null
 
 - 行序：从上到下（FEN row 0 = 黑方底线 = 内部 row 9）
 - 棋子：大写=红方，小写=黑方
-- 走子方：`r` = 红，`b` = 黑
-
+- 走子方：`w` = 红（white/red），`b` = 黑
 ---
 
+## 禁止事项
 ## Board 内部约定
 
 - `row 0` = 红方底线（棋盘底部）、`row 9` = 黑方底线（棋盘顶部）
@@ -103,7 +103,7 @@ final bestColor = pvLine != null
 | `game_state_manager.dart` | `GameStateManager` | UI 状态：棋子选中、可行走位置、最佳着法提示、残局状态、面板可见性 |
 | `move_validator.dart` | `MoveValidator` | 走棋规则验证：将军、将帅对面、蹩腿、各棋子走法 |
 | `analysis_service.dart` | `AnalysisService` | 触发引擎分析 + 云库查询。依赖 `EngineManager`、`CloudDBClient` |
-| `engine_config_manager.dart` | `EngineConfigManager` | 引擎配置：加载/卸载、分析模式（quick/deep/fight）、MultiPV 配置。依赖 `EngineManager` |
+| `engine_configuration.dart` | `EngineConfiguration` | 引擎配置：depth、timeMs、threads、hash、MultiPV、自定义选项
 
 ### lib/models
 
@@ -197,17 +197,19 @@ final bestColor = pvLine != null
 ## 关键关系
 
 ```
-GameViewModel（协调器）
+GameViewModel（协调器，ChangeNotifier）
 ├── GameController
-│   ├── GameEngine (board + 走法验证)
+│   ├── GameEngine (棋盘状态 + 局面查询)
+│   │   └── MoveValidator (走法规则验证，静态)
 │   └── GameTree (棋谱树，root/current 指针)
-├── GameStateManager (UI 状态)
-├── EngineConfigManager
-│   └── EngineManager
-│       └── UCIEngine
-└── AnalysisService
-    ├── EngineManager
-    └── CloudDBClient
+├── GameStateManager (UI 交互状态)
+├── AnalysisService
+│   ├── EngineManager
+│   │   └── Engine (UCI/UCCI 底层通信)
+│   └── CloudDBClient
+└── EngineManager (引擎生命周期，ChangeNotifier)
+    ├── EngineConfiguration (纯配置参数)
+    └── Engine (进程 + UCI/UCCI)
 
 MoveNotation ← ICCS 坐标转换唯一入口
 ChineseNotation ← 中文记谱核心算法（含黑方视角旋转）

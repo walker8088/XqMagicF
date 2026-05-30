@@ -117,8 +117,8 @@ class _LiveAnalysisPanelState extends State<LiveAnalysisPanel> {
   Widget build(BuildContext context) {
     final infos = widget.engineInfos;
 
-    // 按 (firstMove, multipv) 去重：相同首步且相同 multipv 只保留最新的
-    // 新的 depth 更新直接覆盖旧的（无需 depth > existing 判断）
+    // 按 (firstMove, multipv) 去重：后来的覆盖前面的（同 multipv 内的更新）
+    // 正序遍历 infos，新的覆盖旧的
     final Map<(String, int), EngineInfo> infoByKey = {};
     for (final info in infos) {
       final first = info.bestMoveICCS;
@@ -131,10 +131,13 @@ class _LiveAnalysisPanelState extends State<LiveAnalysisPanel> {
         .map((info) => EnginePVLine.fromEngineInfo(info))
         .toList();
     pvLines.sort((a, b) {
-      // 同一 multipv 内按原始顺序
       if (a.multipv != b.multipv) return a.multipv.compareTo(b.multipv);
-      final idxA = infos.indexWhere((i) => i.bestMoveICCS == a.bestMove);
-      final idxB = infos.indexWhere((i) => i.bestMoveICCS == b.bestMove);
+      final idxA = infos.indexWhere(
+        (i) => i.bestMoveICCS == a.bestMove && i.multipv == a.multipv,
+      );
+      final idxB = infos.indexWhere(
+        (i) => i.bestMoveICCS == b.bestMove && i.multipv == b.multipv,
+      );
       return idxA.compareTo(idxB);
     });
 
@@ -223,12 +226,6 @@ class AnalysisPanel extends StatelessWidget {
   }
 
   Widget _buildBestMove(BuildContext context) {
-    final pvLine = pvLines.isNotEmpty ? pvLines.first : null;
-    // 优先使用引擎分析时的 moveColor；pvLines 为空时 fallback 到 activeColor
-    final bestColor = pvLine != null
-        ? pvLine.moveColor
-        : activeColor ?? PieceColor.red;
-
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -243,7 +240,7 @@ class AnalysisPanel extends StatelessWidget {
                   ? () => onBestMoveTap!(bestMove!)
                   : null,
               child: Text(
-                _formatMoveDisplay(bestMove!, bestColor),
+                _formatMoveDisplay(bestMove!),
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -376,15 +373,19 @@ class AnalysisPanel extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 4),
-        CloudMoveList(moves: cloudResult!.moves, onMoveTap: onBestMoveTap),
+        CloudMoveList(
+          pieces: board,
+          moves: cloudResult!.moves,
+          onMoveTap: onBestMoveTap,
+        ),
       ],
     );
   }
 
   /// 格式化为 "中文记谱(raw ICCS)"
-  String _formatMoveDisplay(String iccs, PieceColor color) {
+  String _formatMoveDisplay(String iccs) {
     if (board == null) return iccs;
-    return MoveNotation.formatMoveDisplay(board!, color, iccs);
+    return MoveNotation.formatMoveDisplay(board!, iccs);
   }
 }
 
@@ -439,18 +440,14 @@ class ScoreDisplay extends StatelessWidget {
 class CloudMoveList extends StatelessWidget {
   const CloudMoveList({
     super.key,
-    this.pieces,
-    this.activeColor,
+    required this.pieces,
     required this.moves,
     this.maxMoves = 10,
     this.onMoveTap,
   });
 
   /// 当前棋盘棋子映射（用于生成中文记谱）
-  final Map<Coord, ChessPiece>? pieces;
-
-  /// 当前走子方
-  final PieceColor? activeColor;
+  final Map<Coord, ChessPiece> pieces;
 
   /// List of cloud moves
   final List<CloudMoveInfo> moves;
@@ -540,8 +537,7 @@ class CloudMoveList extends StatelessWidget {
 
   /// 显示云库着法的中文记谱格式
   String _iccsToChinese(String iccs) {
-    if (pieces == null || activeColor == null) return iccs;
-    return MoveNotation.formatMoveDisplay(pieces!, activeColor!, iccs);
+    return MoveNotation.formatMoveDisplay(pieces, iccs);
   }
 
   Widget _buildScoreDisplay(int score) {

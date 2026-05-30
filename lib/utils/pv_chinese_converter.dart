@@ -97,7 +97,7 @@ class PVChineseConverter {
     final chineseMoves = pvLine(board, activeColor, pv);
     final result = <String>[];
     for (int i = 0; i < pv.length; i++) {
-      final iccs = MoveNotation.formatICCS(pv[i]);
+      final iccs = pv[i];
       result.add(i < chineseMoves.length ? '${chineseMoves[i]}($iccs)' : iccs);
     }
     return result;

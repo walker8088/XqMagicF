@@ -1,14 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:xqmagic/game/game_engine.dart';
+import 'package:xqmagic/game/move_validator.dart';
 import 'package:xqmagic/utils/constants.dart';
 import 'package:xqmagic/utils/coord.dart';
 
 void main() {
-  group('GameEngine.isValidMove', () {
+  group('MoveValidator.isValidMove', () {
     group('General (将/帅)', () {
       test('should allow one step up within palace', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.king,
             color: PieceColor.red,
             from: const Coord(4, 0),
@@ -21,7 +21,7 @@ void main() {
 
       test('should allow one step down within palace', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.king,
             color: PieceColor.red,
             from: const Coord(4, 1),
@@ -34,7 +34,7 @@ void main() {
 
       test('should allow one step left within palace', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.king,
             color: PieceColor.red,
             from: const Coord(4, 0),
@@ -47,7 +47,7 @@ void main() {
 
       test('should allow one step right within palace', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.king,
             color: PieceColor.red,
             from: const Coord(4, 0),
@@ -60,7 +60,7 @@ void main() {
 
       test('should reject moving two steps', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.king,
             color: PieceColor.red,
             from: const Coord(4, 0),
@@ -73,7 +73,7 @@ void main() {
 
       test('should reject diagonal move', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.king,
             color: PieceColor.red,
             from: const Coord(4, 0),
@@ -86,7 +86,7 @@ void main() {
 
       test('should reject moving out of palace', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.king,
             color: PieceColor.red,
             from: const Coord(4, 2),
@@ -99,7 +99,7 @@ void main() {
 
       test('should reject staying in place', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.king,
             color: PieceColor.red,
             from: const Coord(4, 0),
@@ -112,7 +112,7 @@ void main() {
 
       test('should reject moving to palace edge (col 2 or 6)', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.king,
             color: PieceColor.red,
             from: const Coord(3, 0),
@@ -126,7 +126,7 @@ void main() {
       group('black general', () {
         test('should allow move within black palace (rows 7-9)', () {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.king,
               color: PieceColor.black,
               from: const Coord(4, 9),
@@ -139,7 +139,7 @@ void main() {
 
         test('should reject moving out of black palace', () {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.king,
               color: PieceColor.black,
               from: const Coord(4, 7),
@@ -155,7 +155,7 @@ void main() {
     group('Advisor (士/仕)', () {
       test('should allow diagonal one step within palace', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.advisor,
             color: PieceColor.red,
             from: const Coord(4, 0),
@@ -168,7 +168,7 @@ void main() {
 
       test('should allow other diagonal within palace', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.advisor,
             color: PieceColor.red,
             from: const Coord(3, 1),
@@ -181,7 +181,7 @@ void main() {
 
       test('should reject non-diagonal move', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.advisor,
             color: PieceColor.red,
             from: const Coord(4, 0),
@@ -194,7 +194,7 @@ void main() {
 
       test('should reject moving out of palace', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.advisor,
             color: PieceColor.red,
             from: const Coord(5, 1),
@@ -207,7 +207,7 @@ void main() {
 
       test('should reject two step diagonal', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.advisor,
             color: PieceColor.red,
             from: const Coord(4, 0),
@@ -222,7 +222,7 @@ void main() {
     group('Elephant (象/相)', () {
       test('should allow valid elephant move (田字)', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.bishop,
             color: PieceColor.red,
             from: const Coord(2, 0),
@@ -236,7 +236,7 @@ void main() {
       test('should reject moving across river', () {
         // Red elephant cannot go to row > 4
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.bishop,
             color: PieceColor.red,
             from: const Coord(2, 2),
@@ -251,7 +251,7 @@ void main() {
         // From (6, 2) to (4, 4) is still on red side (row 4)
         // This is actually a valid move - row 4 is the last red row
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.bishop,
             color: PieceColor.red,
             from: const Coord(6, 2),
@@ -264,7 +264,7 @@ void main() {
 
       test('should block elephant with obstacle at eye center', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.bishop,
             color: PieceColor.red,
             from: const Coord(2, 0),
@@ -277,7 +277,7 @@ void main() {
 
       test('should reject non-田字 move', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.bishop,
             color: PieceColor.red,
             from: const Coord(2, 0),
@@ -291,7 +291,7 @@ void main() {
       group('black elephant', () {
         test('should not cross river (cannot go to row < 5)', () {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.bishop,
               color: PieceColor.black,
               from: const Coord(2, 9),
@@ -309,7 +309,7 @@ void main() {
           // Going to (4, 4) is not possible (not 田字)
           // Black crossing would be: from (2, 9) to (4, 7) - valid
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.bishop,
               color: PieceColor.black,
               from: const Coord(2, 9),
@@ -322,7 +322,7 @@ void main() {
 
         test('should block at eye center', () {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.bishop,
               color: PieceColor.black,
               from: const Coord(2, 9),
@@ -338,7 +338,7 @@ void main() {
     group('Horse (马/傌)', () {
       test('should allow vertical 日字 move (2 vertical, 1 horizontal)', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.knight,
             color: PieceColor.red,
             from: const Coord(1, 0),
@@ -351,7 +351,7 @@ void main() {
 
       test('should allow horizontal 日字 move (1 vertical, 2 horizontal)', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.knight,
             color: PieceColor.red,
             from: const Coord(1, 0),
@@ -365,7 +365,7 @@ void main() {
       test('should block horse leg for vertical move', () {
         // Moving from (1, 0) to (2, 2), leg is at (1, 1)
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.knight,
             color: PieceColor.red,
             from: const Coord(1, 0),
@@ -379,7 +379,7 @@ void main() {
       test('should block horse leg for horizontal move', () {
         // Moving from (1, 0) to (3, 1), leg is at (2, 0)
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.knight,
             color: PieceColor.red,
             from: const Coord(1, 0),
@@ -392,7 +392,7 @@ void main() {
 
       test('should reject non-日字 move', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.knight,
             color: PieceColor.red,
             from: const Coord(1, 0),
@@ -405,7 +405,7 @@ void main() {
 
       test('should reject straight move', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.knight,
             color: PieceColor.red,
             from: const Coord(1, 0),
@@ -419,7 +419,7 @@ void main() {
       test('should not be blocked by obstacle at destination', () {
         // Horse can capture at destination
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.knight,
             color: PieceColor.red,
             from: const Coord(1, 0),
@@ -444,7 +444,7 @@ void main() {
         ];
         for (final to in validTargets) {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.knight,
               color: PieceColor.red,
               from: from,
@@ -461,7 +461,7 @@ void main() {
     group('Chariot (车/俥)', () {
       test('should allow straight vertical move', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.rook,
             color: PieceColor.red,
             from: const Coord(0, 0),
@@ -474,7 +474,7 @@ void main() {
 
       test('should allow straight horizontal move', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.rook,
             color: PieceColor.red,
             from: const Coord(0, 0),
@@ -487,7 +487,7 @@ void main() {
 
       test('should reject diagonal move', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.rook,
             color: PieceColor.red,
             from: const Coord(0, 0),
@@ -500,7 +500,7 @@ void main() {
 
       test('should be blocked by obstacle on path', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.rook,
             color: PieceColor.red,
             from: const Coord(0, 0),
@@ -513,7 +513,7 @@ void main() {
 
       test('should not be blocked by obstacle at destination (capture)', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.rook,
             color: PieceColor.red,
             from: const Coord(0, 0),
@@ -526,7 +526,7 @@ void main() {
 
       test('should not be blocked by obstacle behind destination', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.rook,
             color: PieceColor.red,
             from: const Coord(0, 0),
@@ -541,7 +541,7 @@ void main() {
     group('Cannon (炮/砲)', () {
       test('should allow move with no obstacles (non-capture)', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.cannon,
             color: PieceColor.red,
             from: const Coord(1, 2),
@@ -554,7 +554,7 @@ void main() {
 
       test('should allow capture with exactly one obstacle (cannon mount)', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.cannon,
             color: PieceColor.red,
             from: const Coord(1, 2),
@@ -570,7 +570,7 @@ void main() {
 
       test('should reject move with two obstacles', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.cannon,
             color: PieceColor.red,
             from: const Coord(1, 2),
@@ -584,7 +584,7 @@ void main() {
       test('should reject capture with no cannon mount', () {
         // Complete cannon logic: capturing requires exactly one mount between from and to
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.cannon,
             color: PieceColor.red,
             from: const Coord(1, 2),
@@ -597,7 +597,7 @@ void main() {
 
       test('should reject diagonal move', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.cannon,
             color: PieceColor.red,
             from: const Coord(1, 2),
@@ -610,7 +610,7 @@ void main() {
 
       test('should allow horizontal move with no obstacles', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.cannon,
             color: PieceColor.red,
             from: const Coord(1, 2),
@@ -623,7 +623,7 @@ void main() {
 
       test('should reject horizontal move with obstacle (non-capture)', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.cannon,
             color: PieceColor.red,
             from: const Coord(1, 2),
@@ -636,7 +636,7 @@ void main() {
 
       test('should allow horizontal capture with exactly one mount', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.cannon,
             color: PieceColor.red,
             from: const Coord(1, 2),
@@ -649,7 +649,7 @@ void main() {
 
       test('should reject horizontal capture with no mount', () {
         expect(
-          GameEngine.isValidMove(
+          MoveValidator.isValidMove(
             type: PieceType.cannon,
             color: PieceColor.red,
             from: const Coord(1, 2),
@@ -665,7 +665,7 @@ void main() {
       group('red soldier (before crossing river)', () {
         test('should allow forward move', () {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.pawn,
               color: PieceColor.red,
               from: const Coord(0, 3),
@@ -678,7 +678,7 @@ void main() {
 
         test('should reject backward move', () {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.pawn,
               color: PieceColor.red,
               from: const Coord(0, 3),
@@ -691,7 +691,7 @@ void main() {
 
         test('should reject horizontal move before crossing', () {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.pawn,
               color: PieceColor.red,
               from: const Coord(0, 3),
@@ -704,7 +704,7 @@ void main() {
 
         test('should reject diagonal move', () {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.pawn,
               color: PieceColor.red,
               from: const Coord(0, 3),
@@ -719,7 +719,7 @@ void main() {
       group('red soldier (after crossing river)', () {
         test('should allow forward move after crossing', () {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.pawn,
               color: PieceColor.red,
               from: const Coord(0, 5),
@@ -732,7 +732,7 @@ void main() {
 
         test('should allow horizontal move after crossing', () {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.pawn,
               color: PieceColor.red,
               from: const Coord(0, 5),
@@ -746,7 +746,7 @@ void main() {
         test('should allow backward move after crossing', () {
           // After crossing, soldier can move forward, backward, left, right
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.pawn,
               color: PieceColor.red,
               from: const Coord(0, 5),
@@ -759,7 +759,7 @@ void main() {
 
         test('should reject diagonal move after crossing', () {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.pawn,
               color: PieceColor.red,
               from: const Coord(0, 5),
@@ -774,7 +774,7 @@ void main() {
       group('black soldier (before crossing river)', () {
         test('should allow forward move (downward for black)', () {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.pawn,
               color: PieceColor.black,
               from: const Coord(0, 6),
@@ -787,7 +787,7 @@ void main() {
 
         test('should reject backward move', () {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.pawn,
               color: PieceColor.black,
               from: const Coord(0, 6),
@@ -800,7 +800,7 @@ void main() {
 
         test('should reject horizontal move before crossing', () {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.pawn,
               color: PieceColor.black,
               from: const Coord(0, 6),
@@ -815,7 +815,7 @@ void main() {
       group('black soldier (after crossing river)', () {
         test('should allow horizontal move after crossing', () {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.pawn,
               color: PieceColor.black,
               from: const Coord(0, 4),
@@ -830,7 +830,7 @@ void main() {
       group('red soldier river boundary (row 4-5)', () {
         test('red at row 4 (not crossed) can only move forward', () {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.pawn,
               color: PieceColor.red,
               from: const Coord(4, 4),
@@ -842,7 +842,7 @@ void main() {
         });
         test('red at row 4 (not crossed) cannot move sideways', () {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.pawn,
               color: PieceColor.red,
               from: const Coord(4, 4),
@@ -854,7 +854,7 @@ void main() {
         });
         test('red at row 5 (crossed) can move sideways', () {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.pawn,
               color: PieceColor.red,
               from: const Coord(4, 5),
@@ -869,7 +869,7 @@ void main() {
       group('black soldier river boundary (row 4-5)', () {
         test('black at row 5 (not crossed) can only move forward', () {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.pawn,
               color: PieceColor.black,
               from: const Coord(4, 5),
@@ -881,7 +881,7 @@ void main() {
         });
         test('black at row 5 (not crossed) cannot move sideways', () {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.pawn,
               color: PieceColor.black,
               from: const Coord(4, 5),
@@ -893,7 +893,7 @@ void main() {
         });
         test('black at row 4 (crossed) can move sideways', () {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: PieceType.pawn,
               color: PieceColor.black,
               from: const Coord(4, 4),
@@ -910,7 +910,7 @@ void main() {
       test('should reject staying in place for all piece types', () {
         for (final type in PieceType.values) {
           expect(
-            GameEngine.isValidMove(
+            MoveValidator.isValidMove(
               type: type,
               color: PieceColor.red,
               from: const Coord(4, 4),

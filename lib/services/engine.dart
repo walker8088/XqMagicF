@@ -397,6 +397,7 @@ class Engine {
 
     // Send position
     await _sendCommand('position fen $fen');
+    _log('position fen $fen');
 
     // Set MultiPV if specified
     if (multiPV != null) {
@@ -488,55 +489,6 @@ class Engine {
 
   // ---- Coordinate Conversion ----
 
-  /// Convert UCCI numeric format (digits for cols) to ICCS alphanumeric format (file letters).
-  ///
-  /// UCCI numeric: columns are 0-8 digits (e.g. "7242" = h2e2)
-  /// ICCS:          columns are a-i letters (e.g. "h2e2")
-  ///
-  /// If input is already in ICCS letter format, returns unchanged.
-  static String numericToICCS(String input) {
-    if (input.length != 4) return input;
-    // Only convert digits → letters; if already letters, keep as-is
-    if (!RegExp(r'^\d{4}$').hasMatch(input)) return input;
-
-    final fromCol = int.parse(input[0]);
-    final fromRank = input[1];
-    final toCol = int.parse(input[2]);
-    final toRank = input[3];
-    final fromFile = String.fromCharCode('a'.codeUnitAt(0) + fromCol);
-    final toFile = String.fromCharCode('a'.codeUnitAt(0) + toCol);
-    return '$fromFile$fromRank$toFile$toRank';
-  }
-
-  /// Convert ICCS alphanumeric format (file letters) to UCCI numeric format (digits for cols).
-  ///
-  /// ICCS:          columns are a-i letters (e.g. "h2e2")
-  /// UCCI numeric: columns are 0-8 digits (e.g. "7242" = h2e2)
-  ///
-  /// If input is already in numeric format, returns unchanged.
-  static String iccsToNumeric(String input) {
-    if (input.length != 4) return input;
-    // Only convert letters → digits; if already digits, keep as-is
-    if (!RegExp(r'^[a-i]\d[a-i]\d$').hasMatch(input)) return input;
-
-    final fromFile = input[0];
-    final fromRank = input[1];
-    final toFile = input[2];
-    final toRank = input[3];
-    final fromCol = fromFile.codeUnitAt(0) - 'a'.codeUnitAt(0);
-    final toCol = toFile.codeUnitAt(0) - 'a'.codeUnitAt(0);
-    return '$fromCol$fromRank$toCol$toRank';
-  }
-
-  /// Convert board coordinates to ICCS string.
-  static String coordsToICCS(int fromCol, int fromRow, int toCol, int toRow) {
-    final fromFile = Coord.colToFile(fromCol);
-    final toFile = Coord.colToFile(toCol);
-    return '$fromFile$fromRow$toFile$toRow';
-  }
-
-  // ---- Internal Methods ----
-
   Future<void> _sendCommand(String cmd) async {
     _stdinController.add(cmd);
   }
@@ -567,7 +519,7 @@ class Engine {
   }
 
   void _handleEngineOutput(String line) {
-    _log('<< $line');
+    //_log('<< $line');
     _emitEvent(EngineRawLine(line));
 
     final trimmed = line.trim();
@@ -712,7 +664,8 @@ class Engine {
   static PieceColor _fenToMoveColor(String fen) {
     final parts = fen.split(' ');
     if (parts.length < 2) return PieceColor.red;
-    return parts[1].toLowerCase() == 'r' ? PieceColor.red : PieceColor.black;
+    // FEN 走子方：'w' = 红（white/red），'b' = 黑，'r' = 红（旧格式兼容）
+    return parts[1].toLowerCase() == 'b' ? PieceColor.black : PieceColor.red;
   }
 
   UCIOption? _parseOption(String line) {
