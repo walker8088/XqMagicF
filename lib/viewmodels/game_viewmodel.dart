@@ -13,7 +13,7 @@ import 'package:xqmagic/services/cloud_db.dart';
 import 'package:xqmagic/services/engine_manager.dart';
 import 'package:xqmagic/services/uci_engine.dart';
 import 'package:xqmagic/services/opening_book.dart';
-import 'package:xqmagic/utils/app_settings.dart';
+import 'package:xqmagic/utils/app_logger.dart';
 import 'package:xqmagic/utils/constants.dart';
 import 'package:xqmagic/utils/coord.dart';
 import 'package:xqmagic/utils/fen.dart';
