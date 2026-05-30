@@ -113,9 +113,7 @@ class _MoveHistoryPanelState extends State<MoveHistoryPanel> {
       return ListView(
         controller: _scrollController,
         padding: const EdgeInsets.symmetric(horizontal: 8),
-        children: [
-          _buildRootRow(),
-        ],
+        children: [_buildRootRow()],
       );
     }
 
@@ -141,11 +139,7 @@ class _MoveHistoryPanelState extends State<MoveHistoryPanel> {
     );
   }
 
-  Widget _buildMoveRow(
-    String numberLabel,
-    MoveRecord move,
-    int moveIndex,
-  ) {
+  Widget _buildMoveRow(String numberLabel, MoveRecord move, int moveIndex) {
     return Row(
       children: [
         SizedBox(
@@ -190,7 +184,9 @@ class _MoveHistoryPanelState extends State<MoveHistoryPanel> {
               style: TextStyle(
                 color: const Color(0xFFCC4444),
                 fontSize: 13,
-                fontWeight: isRootSelected ? FontWeight.bold : FontWeight.normal,
+                fontWeight: isRootSelected
+                    ? FontWeight.bold
+                    : FontWeight.normal,
               ),
             ),
           ],
@@ -262,8 +258,8 @@ class _MoveHistoryPanelState extends State<MoveHistoryPanel> {
   }
 
   String _formatScore(int score) {
-    if (score > 0) return '+${(score / 100).toStringAsFixed(2)}';
-    return '-${((-score) / 100).toStringAsFixed(2)}';
+    if (score > 0) return '+$score';
+    return '$score';
   }
 
   Color? _getAnnotationColor(String mark) {

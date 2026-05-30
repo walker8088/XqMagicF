@@ -396,45 +396,30 @@ class ScoreDisplay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (text, color) = _formatScore();
-
     return Text(
-      text,
+      _formatScore(),
       style: TextStyle(
         fontSize: small ? 12 : 16,
         fontWeight: FontWeight.bold,
-        color: color,
+        color: _scoreToColor(score),
       ),
     );
   }
 
-  (String, Color) _formatScore() {
+  /// 直接显示分数，不做单位转换
+  String _formatScore() {
     // Mate situation
-    if (mateIn != null) {
-      final mateText = '杀$mateIn';
-      final color = score > 0
-          ? const Color(0xFFFF4444) // Red side mating (red is favorable)
-          : Colors.blue; // Black side mating
-      return (mateText, color);
-    }
-
-    // Regular centipawn score
-    final pawns = score / 100.0;
-    final text = pawns >= 0
-        ? '+${pawns.toStringAsFixed(2)}'
-        : pawns.toStringAsFixed(2);
-
-    // Color coding: green = good for red (positive), red = bad for red (negative)
-    final color = _scoreToColor(pawns);
-    return (text, color);
+    if (mateIn != null) return '杀$mateIn';
+    // 分数直接显示，不做单位转换
+    return score >= 0 ? '+$score' : '$score';
   }
 
-  Color _scoreToColor(double pawns) {
-    if (pawns >= 2.0) return const Color(0xFF00CC44); // Strong red advantage
-    if (pawns >= 0.5) return Colors.green; // Moderate red advantage
-    if (pawns >= -0.5) return Colors.white70; // Equal position
-    if (pawns >= -2.0) return Colors.orange; // Moderate black advantage
-    return const Color(0xFFFF4444); // Strong black advantage
+  Color _scoreToColor(int score) {
+    if (score >= 200) return const Color(0xFF00CC44);
+    if (score >= 50) return Colors.green;
+    if (score >= -50) return Colors.white70;
+    if (score >= -200) return Colors.orange;
+    return const Color(0xFFFF4444);
   }
 }
 
