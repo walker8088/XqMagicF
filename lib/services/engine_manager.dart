@@ -503,15 +503,10 @@ class EngineManager extends ChangeNotifier {
     return getBestMove(fen: fen, depth: _config.depth, timeMs: _config.timeMs);
   }
 
-  /// Get the best move from current analysis results (non-blocking).
-  /// Returns null if no analysis is running or no results yet.
+  /// Get the best move from the last engine bestmove output.
+  /// Returns null if no bestmove has been received yet.
   String? getCurrentBestMove() {
-    if (_allInfos.isEmpty) return null;
-    final best = _allInfos.firstWhere(
-      (info) => info.multipv == 1,
-      orElse: () => _allInfos.first,
-    );
-    return best.bestMoveICCS;
+    return _lastBestMove;
   }
 
   /// Get the current evaluation score in centipawns.
