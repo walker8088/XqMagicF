@@ -235,12 +235,6 @@ class AnalysisPanel extends StatelessWidget {
               ),
             ),
           const Spacer(),
-          if (pvLine != null)
-            ScoreDisplay(
-              score: pvLine.score,
-              mateIn: pvLine.mateIn,
-              small: true,
-            ),
         ],
       ),
     );
