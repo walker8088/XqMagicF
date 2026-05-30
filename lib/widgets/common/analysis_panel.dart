@@ -52,9 +52,9 @@ class EnginePVLine {
       score: convertedScore,
       mateIn: info.isMate ? convertedScore : null,
       pv: info.pv,
-      nodes: info.nodes,
-      nps: info.nps,
-      time: info.timeMs,
+      nodes: info.nodes ?? 0,
+      nps: info.nps ?? 0,
+      time: info.timeMs ?? 0,
       moveColor: info.moveColor,
     );
   }
@@ -124,7 +124,14 @@ class _LiveAnalysisPanelState extends State<LiveAnalysisPanel> {
 
     return AnalysisPanel(
       engineInfo: widget.isEngineReady
-          ? EngineInfo(depth: 0, score: 0, isMate: false, pv: [])
+          ? EngineInfo(
+              depth: 0,
+              score: 0,
+              isMate: false,
+              pv: [],
+              moveColor: widget.activeColor,
+              multipv: 0,
+            )
           : null,
       board: widget.board,
       activeColor: widget.activeColor,
@@ -258,14 +265,18 @@ class AnalysisPanel extends StatelessWidget {
           final line = entry.value;
           // 使用引擎分析时的 moveColor，确保 PV 颜色正确
           final pvActiveColor = line.moveColor;
+          // 调试：原始 ICCS 格式便于差错（直接用 line.pv）
+          final rawICCS = line.pv
+              .map((m) => MoveNotation.formatICCS(m))
+              .toList();
           final displayMoves = board != null
               ? PVChineseConverter.formatPVWithChinese(
                   board!,
                   pvActiveColor,
                   line.pv,
                 )
-              : line.pv.map((m) => MoveNotation.formatICCS(m)).toList();
-          return _buildPVLineRow(index, line, displayMoves);
+              : rawICCS;
+          return _buildPVLineRow(index, line, rawICCS, displayMoves);
         }),
       ],
     );
@@ -274,6 +285,7 @@ class AnalysisPanel extends StatelessWidget {
   Widget _buildPVLineRow(
     int index,
     EnginePVLine line,
+    List<String> rawICCS,
     List<String> chineseMoves,
   ) {
     return InkWell(
@@ -324,10 +336,10 @@ class AnalysisPanel extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 4),
-            // PV 线路（完整中文记谱）
+            // PV 线路（原始 ICCS 格式便于差错）
             Expanded(
               child: Text(
-                chineseMoves.isNotEmpty ? chineseMoves.join(' ') : '--',
+                rawICCS.isNotEmpty ? rawICCS.join(' ') : '--',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: index == 0 ? FontWeight.bold : FontWeight.normal,

@@ -85,7 +85,7 @@ class EngineConfiguration extends ChangeNotifier {
   }
 
   /// Apply all configuration options to the running engine.
-  Future<void> applyToEngine(UCIEngine engine) async {
+  Future<void> applyToEngine(Engine engine) async {
     if (!engine.isReady) return;
 
     await engine.configure(

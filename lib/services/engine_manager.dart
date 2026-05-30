@@ -145,7 +145,7 @@ class EngineManager extends ChangeNotifier {
   /// 同步 AppSettings 中的引擎配置到运行中的引擎
   Future<void> syncSettingsToEngine() async {
     final settings = AppSettings.instance;
-    setProtocol(settings.engineProtocol);
+    setProtocolFromString(settings.engineProtocol);
     setDepth(settings.engineDepth);
     setThreads(settings.engineThreads);
     setHash(settings.engineHash);

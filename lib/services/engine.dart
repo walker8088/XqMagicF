@@ -488,51 +488,17 @@ class Engine {
 
   // ---- Coordinate Conversion ----
 
-  /// Convert between numeric ICCS (digits for cols) and alphanumeric ICCS (file letters).
-  /// - Input all-digits (e.g. "8182") → output alphanumeric (e.g. "i1i2")
-  /// - Input has letters (e.g. "h2e2") → output numeric (e.g. "7242")
+  /// Convert UCCI numeric format (digits for cols) to ICCS alphanumeric format (file letters).
+  ///
+  /// UCCI numeric: columns are 0-8 digits (e.g. "7242" = h2e2)
+  /// ICCS:          columns are a-i letters (e.g. "h2e2")
+  ///
+  /// If input is already in ICCS letter format, returns unchanged.
   static String numericToICCS(String input) {
     if (input.length != 4) return input;
+    // Only convert digits → letters; if already letters, keep as-is
+    if (!RegExp(r'^\d{4}$').hasMatch(input)) return input;
 
-    // Detect format: all digits → convert to file letters
-    if (RegExp(r'^\d{4}$').hasMatch(input)) {
-      final fromCol = int.parse(input[0]);
-      final fromRank = input[1];
-      final toCol = int.parse(input[2]);
-      final toRank = input[3];
-      final fromFile = String.fromCharCode('a'.codeUnitAt(0) + fromCol);
-      final toFile = String.fromCharCode('a'.codeUnitAt(0) + toCol);
-      return '$fromFile$fromRank$toFile$toRank';
-    }
-
-    // Has letters → convert to column digits
-    final fromFile = input[0];
-    final fromRank = input[1];
-    final toFile = input[2];
-    final toRank = input[3];
-    final fromCol = fromFile.codeUnitAt(0) - 'a'.codeUnitAt(0);
-    final toCol = toFile.codeUnitAt(0) - 'a'.codeUnitAt(0);
-    return '$fromCol$fromRank$toCol$toRank';
-  }
-
-  /// Convert between alphanumeric ICCS (file letters) and numeric ICCS (digits for cols).
-  /// - Input has letters (e.g. "i1i2") → output numeric (e.g. "8182")
-  /// - Input all-digits (e.g. "7242") → output alphanumeric (e.g. "h2e2")
-  static String iccsToNumeric(String input) {
-    if (input.length != 4) return input;
-
-    // Has letters → convert to column digits
-    if (RegExp(r'[a-i]').hasMatch(input)) {
-      final fromFile = input[0];
-      final fromRank = input[1];
-      final toFile = input[2];
-      final toRank = input[3];
-      final fromCol = fromFile.codeUnitAt(0) - 'a'.codeUnitAt(0);
-      final toCol = toFile.codeUnitAt(0) - 'a'.codeUnitAt(0);
-      return '$fromCol$fromRank$toCol$toRank';
-    }
-
-    // All digits → convert to file letters
     final fromCol = int.parse(input[0]);
     final fromRank = input[1];
     final toCol = int.parse(input[2]);
@@ -540,6 +506,26 @@ class Engine {
     final fromFile = String.fromCharCode('a'.codeUnitAt(0) + fromCol);
     final toFile = String.fromCharCode('a'.codeUnitAt(0) + toCol);
     return '$fromFile$fromRank$toFile$toRank';
+  }
+
+  /// Convert ICCS alphanumeric format (file letters) to UCCI numeric format (digits for cols).
+  ///
+  /// ICCS:          columns are a-i letters (e.g. "h2e2")
+  /// UCCI numeric: columns are 0-8 digits (e.g. "7242" = h2e2)
+  ///
+  /// If input is already in numeric format, returns unchanged.
+  static String iccsToNumeric(String input) {
+    if (input.length != 4) return input;
+    // Only convert letters → digits; if already digits, keep as-is
+    if (!RegExp(r'^[a-i]\d[a-i]\d$').hasMatch(input)) return input;
+
+    final fromFile = input[0];
+    final fromRank = input[1];
+    final toFile = input[2];
+    final toRank = input[3];
+    final fromCol = fromFile.codeUnitAt(0) - 'a'.codeUnitAt(0);
+    final toCol = toFile.codeUnitAt(0) - 'a'.codeUnitAt(0);
+    return '$fromCol$fromRank$toCol$toRank';
   }
 
   /// Convert board coordinates to ICCS string.

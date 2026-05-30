@@ -250,7 +250,7 @@ class ChineseNotation {
     final fromCol = isRed ? 9 - fileNum : fileNum - 1;
 
     // 找到起始位置的棋子
-    final fromCoord = _findPieceByFile(board, type, fromCol, color, prefix);
+    final fromCoord = _findPieceByCol(board, type, fromCol, color, prefix);
     if (fromCoord == null) {
       // 棋盘上不存在对应的棋子（例如 R2+3 但 2 路没有车）
       return null;
@@ -477,7 +477,7 @@ class ChineseNotation {
   }
 
   /// 通过 WXF 棋子字母找到棋盘上的对应棋子坐标
-  static Coord? _findPieceByFile(
+  static Coord? _findPieceByCol(
     Map<Coord, ChessPiece> board,
     PieceType type,
     int fromCol,

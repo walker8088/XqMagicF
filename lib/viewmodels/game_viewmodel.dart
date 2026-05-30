@@ -20,6 +20,7 @@ import 'package:xqmagic/utils/fen.dart';
 import 'package:xqmagic/utils/move_notation.dart';
 import 'package:xqmagic/utils/move_quality_assessor.dart';
 import 'package:xqmagic/utils/sound_manager.dart';
+import 'package:xqmagic/utils/app_settings.dart';
 
 /// 游戏视图模型：协调所有游戏逻辑，管理 UI 状态
 ///
