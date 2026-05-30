@@ -610,8 +610,8 @@ class Engine {
     final parts = line.split(' ');
     if (parts.length < 2) return;
 
-    final move = parts[1];
-    _bestMove = numericToICCS(move);
+    // 直接使用引擎原始输出，不做任何格式转换
+    _bestMove = parts[1];
   }
 
   EngineInfo? _parseInfo(String line) {
@@ -675,8 +675,8 @@ class Engine {
           multiPv = int.tryParse(parts[++i]);
           break;
         case 'pv':
-          // Everything after 'pv' is the principal variation
-          pv = parts.sublist(i + 1).map((m) => numericToICCS(m)).toList();
+          // 直接使用引擎原始输出的 PV 着法，不做任何格式转换
+          pv = parts.sublist(i + 1);
           i = parts.length; // exit loop
           break;
         case 'string':

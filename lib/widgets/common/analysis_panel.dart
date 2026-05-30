@@ -5,7 +5,6 @@ import 'package:xqmagic/services/engine.dart';
 import 'package:xqmagic/utils/constants.dart';
 import 'package:xqmagic/utils/coord.dart';
 import 'package:xqmagic/utils/move_notation.dart';
-import 'package:xqmagic/utils/pv_chinese_converter.dart';
 
 /// Represents a single principal variation line from engine analysis.
 class EnginePVLine {
@@ -263,31 +262,14 @@ class AnalysisPanel extends StatelessWidget {
         ...pvLines.asMap().entries.map((entry) {
           final index = entry.key;
           final line = entry.value;
-          // 使用引擎分析时的 moveColor，确保 PV 颜色正确
-          final pvActiveColor = line.moveColor;
-          // 调试：原始 ICCS 格式便于差错（直接用 line.pv）
-          final rawICCS = line.pv
-              .map((m) => MoveNotation.formatICCS(m))
-              .toList();
-          final displayMoves = board != null
-              ? PVChineseConverter.formatPVWithChinese(
-                  board!,
-                  pvActiveColor,
-                  line.pv,
-                )
-              : rawICCS;
-          return _buildPVLineRow(index, line, rawICCS, displayMoves);
+          // 直接显示引擎原始 PV 输出，不做任何格式转换
+          return _buildPVLineRow(index, line, line.pv);
         }),
       ],
     );
   }
 
-  Widget _buildPVLineRow(
-    int index,
-    EnginePVLine line,
-    List<String> rawICCS,
-    List<String> chineseMoves,
-  ) {
+  Widget _buildPVLineRow(int index, EnginePVLine line, List<String> pv) {
     return InkWell(
       onTap: line.pv.isNotEmpty && onBestMoveTap != null
           ? () => onBestMoveTap!(line.pv.first)
@@ -336,10 +318,10 @@ class AnalysisPanel extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 4),
-            // PV 线路（原始 ICCS 格式便于差错）
+            // 引擎原始 PV 输出
             Expanded(
               child: Text(
-                rawICCS.isNotEmpty ? rawICCS.join(' ') : '--',
+                pv.isNotEmpty ? pv.join(' ') : '--',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: index == 0 ? FontWeight.bold : FontWeight.normal,
@@ -388,10 +370,9 @@ class AnalysisPanel extends StatelessWidget {
     );
   }
 
-  /// 统一格式化单步着法显示：中文记谱(ICCS)
+  /// 直接显示引擎原始着法，不做任何格式转换
   String _formatMoveDisplay(String iccs, PieceColor color) {
-    if (board == null) return MoveNotation.formatICCS(iccs);
-    return MoveNotation.formatMoveDisplay(board!, color, iccs);
+    return iccs;
   }
 }
 
