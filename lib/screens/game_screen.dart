@@ -4,6 +4,7 @@ import 'package:multi_split_view/multi_split_view.dart';
 import 'package:provider/provider.dart';
 import '../models/game_state.dart';
 import '../models/game_mode.dart';
+import '../models/panel_type.dart';
 import '../utils/constants.dart';
 import '../viewmodels/game_viewmodel.dart';
 import '../widgets/board/chess_board.dart';
@@ -23,7 +24,7 @@ class GameScreen extends StatefulWidget {
 class _GameScreenState extends State<GameScreen> {
   late MultiSplitViewController _splitController;
   late MultiSplitViewController _verticalSplitController;
-  String _lastLeftPanel = '';
+  bool _lastShowLeft = false;
 
   @override
   void initState() {
@@ -57,9 +58,10 @@ class _GameScreenState extends State<GameScreen> {
     return Consumer<GameViewModel>(
       builder: (context, vm, _) {
         // 左侧面板状态变化时更新分栏
-        final shouldShowLeft = vm.leftPanel != 'none' || vm.cloudResult != null;
-        if (shouldShowLeft != (_lastLeftPanel != 'none')) {
-          _lastLeftPanel = shouldShowLeft ? 'cloud' : 'none';
+        final shouldShowLeft =
+            vm.leftPanel != PanelType.none || vm.cloudResult != null;
+        if (shouldShowLeft != _lastShowLeft) {
+          _lastShowLeft = shouldShowLeft;
           final leftSize = shouldShowLeft ? 260.0 : 0.0;
           _splitController.areas = [
             Area(size: leftSize, min: 0, max: 500),
@@ -113,7 +115,7 @@ class _GameScreenState extends State<GameScreen> {
                                   switch (area.index) {
                                     case 0:
                                       final showLeft =
-                                          vm.leftPanel != 'none' ||
+                                          vm.leftPanel != PanelType.none ||
                                           vm.cloudResult != null;
                                       return showLeft
                                           ? _buildLeftPanel(context, vm)
@@ -508,6 +510,7 @@ class _GameScreenState extends State<GameScreen> {
           ),
           const SizedBox(height: 6),
           // === 底部：引擎分析结果（实时 PV 线路） ===
+          // 用 lastMove 的 boardAfter 和 nextColor，确保显示与分析用的是同一个局面
           Flexible(
             child: LiveAnalysisPanel(
               engineInfos: vm.engineInfos,
@@ -515,8 +518,8 @@ class _GameScreenState extends State<GameScreen> {
               isAnalyzing: vm.isAnalyzing,
               isThinking: vm.isEngineThinking,
               bestMove: vm.engineBestMove,
-              board: vm.engine.board.pieces,
-              activeColor: vm.engine.currentTurn,
+              board: vm.lastMove?.boardAfter ?? vm.engine.board.pieces,
+              activeColor: vm.lastMove?.nextColor ?? vm.engine.currentTurn,
               onBestMoveTap: (iccs) => vm.playEngineMove(iccs),
             ),
           ),
@@ -579,7 +582,7 @@ class _GameScreenState extends State<GameScreen> {
             style: const TextStyle(color: Colors.white, fontSize: 13),
           ),
           const SizedBox(width: 24),
-          if (vm.state == GameState.checkmate)
+          if (vm.gameState == GameState.checkmate)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(

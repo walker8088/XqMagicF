@@ -18,4 +18,12 @@ class Coord {
 
   @override
   String toString() => '($col,$row)';
+
+  /// col 0-8 → file 'a'-'i'
+  static String colToFile(int col) =>
+      String.fromCharCode('a'.codeUnitAt(0) + col);
+
+  /// file 'a'-'i' → col 0-8
+  static int fileToCol(String file) =>
+      file.toLowerCase().codeUnitAt(0) - 'a'.codeUnitAt(0);
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:xqmagic/utils/constants.dart';
 import 'package:xqmagic/utils/lru_cache.dart';
 
 /// 云端棋库查询结果
@@ -21,11 +22,11 @@ class CloudQueryResult {
   /// 解析 chessdb.cn queryall 返回的文本响应
   ///
   /// 格式: move:c3c4,score:1,rank:2,note:! (44-02),winrate:50.08|move:...
-  /// [isRedToMove] 当前是否红方走子，用于将得分转换为红方视角
+  /// [moveColor] 当前走子方，用于将得分转换为红方视角
   static CloudQueryResult? parseResponse(
     String body,
     String position, {
-    bool isRedToMove = true,
+    PieceColor moveColor = PieceColor.red,
   }) {
     if (body.isEmpty) return null;
 
@@ -54,7 +55,8 @@ class CloudQueryResult {
       if (iccs.isEmpty) continue;
 
       final score = int.tryParse(fields['score'] ?? '0') ?? 0;
-      final winRate = (double.tryParse(fields['winrate'] ?? '0') ?? 0.0).round();
+      final winRate = (double.tryParse(fields['winrate'] ?? '0') ?? 0.0)
+          .round();
       final frequency = _parseFrequency(fields['note']);
       final diff = score - bestScore!;
 
@@ -195,7 +197,9 @@ class CloudDBClient {
       final result = _parseResponse(response.body, positionFen);
       if (result != null) {
         _cache.put(positionFen, result);
-        debugPrint('[CloudDB] 解析成功, ${result.moves.length} 条着法, 最佳=${result.bestMove}');
+        debugPrint(
+          '[CloudDB] 解析成功, ${result.moves.length} 条着法, 最佳=${result.bestMove}',
+        );
       } else {
         debugPrint('[CloudDB] 解析结果为空');
       }
@@ -214,19 +218,25 @@ class CloudDBClient {
     }
   }
 
-  /// 从 FEN 字符串提取是否红方走子
-  static bool _isRedToMoveFromFen(String fen) {
+  /// 从 FEN 字符串提取走子方
+  static PieceColor _fenToMoveColor(String fen) {
     final parts = fen.split(' ');
-    if (parts.length < 2) return true; // 默认红方
-    return parts[1].toLowerCase() == 'r';
+    if (parts.length < 2) return PieceColor.red;
+    return parts[1].toLowerCase() == 'r' ? PieceColor.red : PieceColor.black;
   }
 
   CloudQueryResult? _parseResponse(String body, String position) {
     debugPrint('[CloudDB] 开始解析文本响应, 长度: ${body.length}');
-    final isRedToMove = _isRedToMoveFromFen(position);
-    final result = CloudQueryResult.parseResponse(body, position, isRedToMove: isRedToMove);
+    final moveColor = _fenToMoveColor(position);
+    final result = CloudQueryResult.parseResponse(
+      body,
+      position,
+      moveColor: moveColor,
+    );
     if (result != null) {
-      debugPrint('[CloudDB] 解析成功: ${result.moves.length} 条着法, 最佳=${result.bestMove}');
+      debugPrint(
+        '[CloudDB] 解析成功: ${result.moves.length} 条着法, 最佳=${result.bestMove}',
+      );
     } else {
       debugPrint('[CloudDB] 解析结果为空');
     }

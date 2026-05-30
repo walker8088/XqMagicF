@@ -17,7 +17,7 @@ class EnginePVLine {
     required this.nodes,
     required this.nps,
     required this.time,
-    this.isRedToMove = true,
+    this.moveColor = PieceColor.red,
   });
 
   /// Search depth
@@ -41,8 +41,8 @@ class EnginePVLine {
   /// Time spent in milliseconds
   final int time;
 
-  /// 引擎分析时是否为红方走棋，用于 PV 线路中文转换
-  final bool isRedToMove;
+  /// 引擎分析时的走子方，用于 PV 线路中文转换
+  final PieceColor moveColor;
 
   /// Factory constructor to create from EngineInfo
   factory EnginePVLine.fromEngineInfo(EngineInfo info) {
@@ -55,7 +55,7 @@ class EnginePVLine {
       nodes: info.nodes,
       nps: info.nps,
       time: info.timeMs,
-      isRedToMove: info.isRedToMove,
+      moveColor: info.moveColor,
     );
   }
 
@@ -201,9 +201,9 @@ class AnalysisPanel extends StatelessWidget {
 
   Widget _buildBestMove(BuildContext context) {
     final pvLine = pvLines.isNotEmpty ? pvLines.first : null;
-    // 优先使用引擎分析时的 isRedToMove；pvLines 为空时 fallback 到 activeColor
+    // 优先使用引擎分析时的 moveColor；pvLines 为空时 fallback 到 activeColor
     final bestColor = pvLine != null
-        ? (pvLine.isRedToMove ? PieceColor.red : PieceColor.black)
+        ? pvLine.moveColor
         : activeColor ?? PieceColor.red;
 
     return Padding(
@@ -256,10 +256,8 @@ class AnalysisPanel extends StatelessWidget {
         ...pvLines.asMap().entries.map((entry) {
           final index = entry.key;
           final line = entry.value;
-          // 使用引擎分析时的 isRedToMove，确保 PV 颜色正确
-          final pvActiveColor = line.isRedToMove
-              ? PieceColor.red
-              : PieceColor.black;
+          // 使用引擎分析时的 moveColor，确保 PV 颜色正确
+          final pvActiveColor = line.moveColor;
           final displayMoves = board != null
               ? PVChineseConverter.formatPVWithChinese(
                   board!,

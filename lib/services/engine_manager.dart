@@ -1,7 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:xqmagic/models/game_mode.dart';
+import 'package:xqmagic/services/engine_configuration.dart';
 import 'package:xqmagic/services/uci_engine.dart';
+import 'package:xqmagic/utils/app_settings.dart';
+import 'package:xqmagic/utils/constants.dart';
 
 /// Manages the lifecycle and analysis requests for a UCI Xiangqi engine.
 ///
@@ -14,10 +18,12 @@ import 'package:xqmagic/services/uci_engine.dart';
 /// Manages the lifecycle and analysis requests for a UCI/UCCI Xiangqi engine.
 class EngineManager extends ChangeNotifier {
   EngineManager({String? defaultEnginePath, this.logEnabled = false})
-    : _defaultEnginePath = defaultEnginePath;
+    : _defaultEnginePath = defaultEnginePath,
+      _config = EngineConfiguration();
 
   final String? _defaultEnginePath;
   final bool logEnabled;
+  final EngineConfiguration _config;
 
   /// 引擎协议类型：'uci'、'ucci'、'auto'
   String _protocol = 'auto';
@@ -29,18 +35,30 @@ class EngineManager extends ChangeNotifier {
     }
   }
 
+  /// 引擎分析模式
+  EngineAnalysisMode _analysisMode = EngineAnalysisMode.deep;
+  EngineAnalysisMode get analysisMode => _analysisMode;
+
+  /// 优先级模式
+  PriorityMode _priorityMode = PriorityMode.engine;
+  PriorityMode get priorityMode => _priorityMode;
+
+  /// 是否正在分析
+  bool _isAnalyzing = false;
+  bool get isAnalyzing => _isAnalyzing;
+
   UCIEngine? _engine;
   EngineState _state = EngineState.idle;
 
-  // Engine configuration
-  int _depth = 15;
-  int _timeMs = 3000;
-  int _threads = 1;
-  int _hash = 64;
-  int _multiPV = 1;
-  final Map<String, dynamic> _customOptions = {};
+  /// 引擎配置
+  EngineConfiguration get config => _config;
+  int get depth => _config.depth;
+  int get timeMs => _config.timeMs;
+  int get threads => _config.threads;
+  int get hash => _config.hash;
+  int get multiPV => _config.multiPV;
+  Map<String, dynamic> get customOptions => _config.customOptions;
 
-  // Current analysis
   String? _currentFen;
   EngineInfo? _latestInfo;
   List<EngineInfo> _allInfos = [];
@@ -67,60 +85,34 @@ class EngineManager extends ChangeNotifier {
   String get engineName => _engine?.engineName ?? 'Not loaded';
   String get engineAuthor => _engine?.engineAuthor ?? '';
 
-  // Configuration
-  int get depth => _depth;
-  int get timeMs => _timeMs;
-  int get threads => _threads;
-  int get hash => _hash;
-  int get multiPV => _multiPV;
-  Map<String, dynamic> get customOptions => Map.unmodifiable(_customOptions);
-
-  // ---- Configuration Methods ----
+  // Current analysis
 
   /// Set search depth for analysis.
-  void setDepth(int depth) {
-    if (depth <= 0) return;
-    _depth = depth;
-    notifyListeners();
-  }
+  void setDepth(int depth) => _config.setDepth(depth);
 
   /// Set time limit for analysis in milliseconds.
-  void setTimeMs(int ms) {
-    if (ms <= 0) return;
-    _timeMs = ms;
-    notifyListeners();
-  }
+  void setTimeMs(int ms) => _config.setTimeMs(ms);
 
   /// Set number of threads for the engine.
-  void setThreads(int threads) {
-    if (threads <= 0) return;
-    _threads = threads;
-    notifyListeners();
-  }
+  void setThreads(int threads) => _config.setThreads(threads);
 
   /// Set hash table size in MB.
-  void setHash(int mb) {
-    if (mb <= 0) return;
-    _hash = mb;
-    notifyListeners();
-  }
+  void setHash(int mb) => _config.setHash(mb);
 
   /// Set MultiPV (number of principal variations).
-  void setMultiPV(int n) {
+  Future<void> setMultiPV(int n) async {
     if (n < 1) return;
-    _multiPV = n;
-    // Immediately apply to running engine so the change takes effect
-    // on the next analysis (or current analysis if engine supports live updates)
-    _applyMultiPVToEngine();
-    notifyListeners();
+    _config.setMultiPV(n);
+    await _applyMultiPVToEngine();
   }
 
   /// Send the current MultiPV value to the running engine.
   Future<void> _applyMultiPVToEngine() async {
-    if (_engine != null && _engine!.isReady && !isThinking) {
+    final eng = _engine;
+    if (eng != null && eng.isReady && !isThinking) {
       try {
-        await _engine!.setOption('MultiPV', _multiPV);
-        _log('MultiPV set to $_multiPV on engine');
+        await eng.setOption('MultiPV', _config.multiPV);
+        _log('MultiPV set to ${_config.multiPV} on engine');
       } catch (e) {
         _log('Failed to apply MultiPV to engine: $e');
       }
@@ -128,39 +120,47 @@ class EngineManager extends ChangeNotifier {
   }
 
   /// Set Skill Level for the engine (0-20, UCI standard).
-  void setSkillLevel(int level) {
-    if (level < 0 || level > 20) return;
-    _customOptions['Skill Level'] = level;
-    notifyListeners();
-  }
+  void setSkillLevel(int level) => _config.setSkillLevel(level);
 
   /// Set a custom engine option.
-  void setCustomOption(String name, dynamic value) {
-    _customOptions[name] = value;
+  void setCustomOption(String name, dynamic value) =>
+      _config.setCustomOption(name, value);
+
+  /// Clear a custom engine option.
+  void clearCustomOption(String name) => _config.clearCustomOption(name);
+
+  /// 同步 AppSettings 中的引擎配置到运行中的引擎
+  Future<void> syncSettingsToEngine() async {
+    final settings = AppSettings.instance;
+    setProtocol(settings.engineProtocol);
+    setDepth(settings.engineDepth);
+    setThreads(settings.engineThreads);
+    setHash(settings.engineHash);
+    setSkillLevel(settings.engineSkillLevel);
+    _config.setMultiPV(settings.multiPV);
+    await applyConfiguration();
+  }
+
+  void setAnalysisMode(EngineAnalysisMode mode) {
+    _analysisMode = mode;
     notifyListeners();
   }
 
-  /// Clear a custom engine option.
-  void clearCustomOption(String name) {
-    _customOptions.remove(name);
+  void setPriorityMode(PriorityMode mode) {
+    _priorityMode = mode;
+    notifyListeners();
+  }
+
+  void setIsAnalyzing(bool analyzing) {
+    _isAnalyzing = analyzing;
     notifyListeners();
   }
 
   /// Apply all configuration options to the running engine.
   Future<void> applyConfiguration() async {
-    if (_engine == null || !_engine!.isReady) return;
-
-    await _engine!.configure(
-      threads: _threads,
-      hash: _hash,
-      multiPV: _multiPV,
-      customOptions: _customOptions,
-    );
-
-    _log(
-      'Configuration applied: depth=$_depth, time=$_timeMs, '
-      'threads=$_threads, hash=$_hash, multiPV=$_multiPV',
-    );
+    final eng = _engine;
+    if (eng == null || !eng.isReady) return;
+    await _config.applyToEngine(eng);
   }
 
   // ---- Engine Lifecycle ----
@@ -177,6 +177,9 @@ class EngineManager extends ChangeNotifier {
       debugPrint('[EngineManager] loadEngine failed: no path configured');
       return false;
     }
+
+    // Apply protocol from AppSettings before loading
+    setProtocol(AppSettings.instance.engineProtocol);
 
     await _cleanupEngine();
 
@@ -214,6 +217,12 @@ class EngineManager extends ChangeNotifier {
       debugPrint(
         '[EngineManager] Engine loaded successfully: ${_engine!.engineName}',
       );
+
+      // Apply analysis mode settings after successful load
+      setDepth(_analysisMode.depth);
+      setTimeMs(_analysisMode.timeMs);
+      await setMultiPV(_config.multiPV);
+
       return true;
     } catch (e, st) {
       _state = EngineState.error;
@@ -234,6 +243,7 @@ class EngineManager extends ChangeNotifier {
     _allInfos.clear();
     _lastBestMove = null;
     _currentFen = null;
+    _isAnalyzing = false;
     notifyListeners();
   }
 
@@ -280,6 +290,10 @@ class EngineManager extends ChangeNotifier {
     }
 
     _currentFen = fen;
+    final activePart = fen.split(' ').length >= 2 ? fen.split(' ')[1] : '?';
+    _log(
+      'analyze() FEN activeColor=$activePart (expected: ${activePart == "r" ? "red" : "black"})',
+    );
     _allInfos.clear();
     _latestInfo = null;
     _state = EngineState.thinking;
@@ -288,9 +302,9 @@ class EngineManager extends ChangeNotifier {
     try {
       await _engine!.analyze(
         fen: fen,
-        depth: _depth,
-        timeMs: _timeMs,
-        multiPV: _multiPV,
+        depth: _config.depth,
+        timeMs: _config.timeMs,
+        multiPV: _config.multiPV,
       );
     } catch (e) {
       _state = EngineState.error;
@@ -315,7 +329,11 @@ class EngineManager extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _engine!.analyzeByDepth(fen: fen, depth: depth, multiPV: _multiPV);
+      await _engine!.analyzeByDepth(
+        fen: fen,
+        depth: depth,
+        multiPV: _config.multiPV,
+      );
     } catch (e) {
       _state = EngineState.error;
       _error = 'Analysis failed: $e';
@@ -339,7 +357,11 @@ class EngineManager extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _engine!.analyzeByTime(fen: fen, timeMs: timeMs, multiPV: _multiPV);
+      await _engine!.analyzeByTime(
+        fen: fen,
+        timeMs: timeMs,
+        multiPV: _config.multiPV,
+      );
     } catch (e) {
       _state = EngineState.error;
       _error = 'Analysis failed: $e';
@@ -400,11 +422,26 @@ class EngineManager extends ChangeNotifier {
     _latestInfo = null;
     _lastBestMove = null;
     _currentFen = null;
+    _isAnalyzing = false;
     _state = EngineState.ready;
     notifyListeners();
   }
 
   // ---- Best Move Methods ----
+
+  /// 开始分析（包装方法）
+  Future<void> startAnalysis(String fen) async {
+    _isAnalyzing = true;
+    notifyListeners();
+    await analyze(fen: fen);
+  }
+
+  /// 停止分析（包装方法）
+  Future<void> stopAnalysis() async {
+    _isAnalyzing = false;
+    await cancelAnalysis();
+    notifyListeners();
+  }
 
   /// Get the best move for the current position (blocking call).
   /// Returns the best move in ICCS format (col1row1col2row2).
@@ -421,8 +458,8 @@ class EngineManager extends ChangeNotifier {
       return null;
     }
 
-    final searchDepth = depth ?? _depth;
-    final searchTime = timeMs ?? _timeMs;
+    final searchDepth = depth ?? _config.depth;
+    final searchTime = timeMs ?? _config.timeMs;
 
     _state = EngineState.thinking;
     _currentFen = fen;
@@ -449,7 +486,7 @@ class EngineManager extends ChangeNotifier {
   /// Get the best move for engine fight mode.
   /// Similar to [getBestMove] but optimized for fight mode with fixed settings.
   Future<String?> getFightMove({required String fen}) async {
-    return getBestMove(fen: fen, depth: _depth, timeMs: _timeMs);
+    return getBestMove(fen: fen, depth: _config.depth, timeMs: _config.timeMs);
   }
 
   /// Get the best move from current analysis results (non-blocking).
@@ -487,6 +524,32 @@ class EngineManager extends ChangeNotifier {
 
   // ---- Internal ----
 
+  /// 冗余检测：引擎输出的走子方是否与当前 FEN 一致
+  /// 不一致时丢弃（防止时序竞态导致的错误数据进入 UI）
+  bool _isAnalysisForCurrentSide({EngineInfo? info}) {
+    if (_currentFen == null) return true;
+    final parts = _currentFen!.split(' ');
+    if (parts.length < 2) return true;
+    final isRedExpected = parts[1].toLowerCase() == 'r';
+    if (info != null && (info.moveColor == PieceColor.red) != isRedExpected) {
+      _log(
+        'MISMATCH: FEN says ${isRedExpected ? "red" : "black"} to move, '
+        'but EngineInfo says ${info.moveColor == PieceColor.red ? "red" : "black"} — discarded',
+      );
+      return false;
+    }
+    return true;
+  }
+
+  /// 重置引擎配置状态
+  void reset() {
+    _analysisMode = EngineAnalysisMode.deep;
+    _priorityMode = PriorityMode.engine;
+    _config.reset();
+    _isAnalyzing = false;
+    notifyListeners();
+  }
+
   void _onEngineEvent(EngineEvent event) {
     switch (event) {
       case EngineReady():
@@ -505,6 +568,17 @@ class EngineManager extends ChangeNotifier {
         notifyListeners();
 
       case EngineAnalysisUpdate(info: final info, allInfos: final allInfos):
+        if (!_isAnalysisForCurrentSide(info: info)) {
+          _log(
+            'REJECTED EngineAnalysisUpdate depth=${info.depth} '
+            'moveColor=${info.moveColor == PieceColor.red ? "red" : "black"} pv=${info.pv}',
+          );
+          break;
+        }
+        _log(
+          'ACCEPTED EngineAnalysisUpdate depth=${info.depth} '
+          'moveColor=${info.moveColor == PieceColor.red ? "red" : "black"} pv=${info.pv.take(2).join(" ")}',
+        );
         _latestInfo = info;
         _allInfos = allInfos;
         notifyListeners();

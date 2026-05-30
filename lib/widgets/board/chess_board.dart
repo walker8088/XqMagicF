@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:xqmagic/game/game_engine.dart';
 import 'package:xqmagic/models/board_render_data.dart';
 import 'package:xqmagic/utils/constants.dart';
 import 'package:xqmagic/utils/coord.dart';
@@ -23,28 +22,12 @@ class ChessBoard extends StatelessWidget {
 
   /// 构建渲染数据（从 ViewModel 提取纯数据）
   BoardRenderData _buildRenderData() {
-    final fen = viewModel.gameTree.currentFen;
-    Coord? inCheckPos;
-
-    if (fen != null) {
-      final engine = GameEngine(fen);
-      if (engine.isInCheck(viewModel.currentTurn)) {
-        for (final piece in engine.board.pieces.values) {
-          if (piece.type == PieceType.king &&
-              piece.color == viewModel.currentTurn) {
-            inCheckPos = piece.coord;
-            break;
-          }
-        }
-      }
-    }
-
     return BoardRenderData(
       pieces: viewModel.currentBoard.pieces.values.toList(),
       selectedPosition: viewModel.selectedPosition,
       possibleMoves: viewModel.possibleMoves,
       lastMove: viewModel.lastMove,
-      inCheckPosition: inCheckPos,
+      inCheckPosition: viewModel.inCheckPosition,
     );
   }
 

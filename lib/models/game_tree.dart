@@ -54,8 +54,8 @@ class GameTreeNode {
 
   bool get hasChildren => _children.isNotEmpty;
 
-  /// 添加主变着
-  GameTreeNode addMainLine(String fenAfter, MoveRecord move) {
+  /// 添加子节点（主变着或变着统一入口）
+  GameTreeNode addMove(String fenAfter, MoveRecord move) {
     final child = GameTreeNode(
       fen: fenAfter,
       move: move,
@@ -66,17 +66,13 @@ class GameTreeNode {
     return child;
   }
 
-  /// 添加变着
-  GameTreeNode addVariation(String fenAfter, MoveRecord move) {
-    final child = GameTreeNode(
-      fen: fenAfter,
-      move: move,
-      parent: this,
-      variationIndex: _children.length,
-    );
-    _children.add(child);
-    return child;
-  }
+  /// 添加主变着（兼容旧调用）
+  GameTreeNode addMainLine(String fenAfter, MoveRecord move) =>
+      addMove(fenAfter, move);
+
+  /// 添加变着（兼容旧调用）
+  GameTreeNode addVariation(String fenAfter, MoveRecord move) =>
+      addMove(fenAfter, move);
 
   /// 获取到达当前节点的路径索引
   List<int> getPathFromRoot() {

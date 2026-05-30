@@ -28,9 +28,9 @@ class MoveNotation {
   ///
   /// 示例：马二进三 → h0g2，炮８平５ → h7e7
   static String toICCS(MoveRecord move) {
-    final fromFile = _colToFile(move.from.col);
+    final fromFile = Coord.colToFile(move.from.col);
     final fromRank = move.from.row;
-    final toFile = _colToFile(move.to.col);
+    final toFile = Coord.colToFile(move.to.col);
     final toRank = move.to.row;
     return '${fromFile}${fromRank}${toFile}${toRank}';
   }
@@ -44,19 +44,11 @@ class MoveNotation {
   /// 示例：h0g2 → 马二进三，h7e7 → 炮８平５
   static (Coord, Coord) fromICCS(String iccs) {
     if (iccs.length != 4) throw ArgumentError('ICCS 格式应为4位: $iccs');
-    final fromCol = _fileToCol(iccs[0]);
+    final fromCol = Coord.fileToCol(iccs[0]);
     final fromRow = int.parse(iccs[1]);
-    final toCol = _fileToCol(iccs[2]);
+    final toCol = Coord.fileToCol(iccs[2]);
     final toRow = int.parse(iccs[3]);
     return (Coord(fromCol, fromRow), Coord(toCol, toRow));
-  }
-
-  static String _colToFile(int col) {
-    return String.fromCharCode('a'.codeUnitAt(0) + col);
-  }
-
-  static int _fileToCol(String file) {
-    return file.codeUnitAt(0) - 'a'.codeUnitAt(0);
   }
 
   // ========== 中文记谱法（人类阅读用） ==========

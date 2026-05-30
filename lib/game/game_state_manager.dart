@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:xqmagic/data/endgame_puzzles.dart';
+import 'package:xqmagic/models/panel_type.dart';
 import 'package:xqmagic/utils/coord.dart';
 
 /// UI 状态管理器：管理游戏界面的交互状态
@@ -40,9 +41,9 @@ class GameStateManager extends ChangeNotifier {
 
   // ──────────── 面板状态 ────────────
 
-  /// 左侧面板类型 ('cloud', 'none')
-  String _leftPanel = 'cloud';
-  String get leftPanel => _leftPanel;
+  /// 左侧面板类型
+  PanelType _leftPanel = PanelType.cloud;
+  PanelType get leftPanel => _leftPanel;
 
   /// 云库查询结果（用于控制左侧面板显示）
   bool _hasCloudResult = false;
@@ -128,24 +129,26 @@ class GameStateManager extends ChangeNotifier {
 
   /// 切换云库面板显示
   void toggleCloudPanel() {
-    _leftPanel = _leftPanel == 'cloud' ? 'none' : 'cloud';
+    _leftPanel = _leftPanel == PanelType.cloud
+        ? PanelType.none
+        : PanelType.cloud;
     notifyListeners();
   }
 
   /// 隐藏左侧面板
   void hideLeftPanel() {
-    _leftPanel = 'none';
+    _leftPanel = PanelType.none;
     notifyListeners();
   }
 
   /// 显示云库面板
   void showCloudPanel() {
-    _leftPanel = 'cloud';
+    _leftPanel = PanelType.cloud;
     notifyListeners();
   }
 
   /// 检查云库面板是否可见
-  bool get isCloudPanelVisible => _leftPanel == 'cloud';
+  bool get isCloudPanelVisible => _leftPanel == PanelType.cloud;
 
   /// 设置云库查询结果状态
   void setHasCloudResult(bool hasResult) {
@@ -163,7 +166,7 @@ class GameStateManager extends ChangeNotifier {
     _currentPuzzle = null;
     _puzzleSolutionIndex = 0;
     _puzzleCompleted = false;
-    _leftPanel = 'cloud';
+    _leftPanel = PanelType.cloud;
     _hasCloudResult = false;
     notifyListeners();
   }

@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:xqmagic/utils/constants.dart';
+import 'package:xqmagic/utils/coord.dart';
 
 /// UCI (Universal Chess Interface) protocol handler for Xiangqi engines.
 ///
@@ -59,6 +61,7 @@ class UCIEngine {
   StreamSubscription<String>? _stdinSubscription;
   Completer<void>? _readyCompleter;
   Completer<String>? _bestMoveCompleter;
+  Completer<void>? _stopCompleter;
 
   // Timeout defaults
   Duration _startupTimeout = const Duration(seconds: 30);
@@ -365,15 +368,15 @@ class UCIEngine {
       return;
     }
 
-    _currentInfos.clear();
-    _bestInfo = null;
-    _bestMove = null;
-    _currentFen = fen;
-
     // 如果有上一次分析在进行，先发送 stop
     if (_isAnalyzing) {
       await stopAnalysis();
     }
+
+    _currentInfos.clear();
+    _bestInfo = null;
+    _bestMove = null;
+    _currentFen = fen;
 
     final positionCmd = 'position fen $fen';
     await _sendCommand(positionCmd);
@@ -404,15 +407,15 @@ class UCIEngine {
       return;
     }
 
-    _currentInfos.clear();
-    _bestInfo = null;
-    _bestMove = null;
-    _currentFen = fen;
-
     // 如果有上一次分析在进行，先发送 stop
     if (_isAnalyzing) {
       await stopAnalysis();
     }
+
+    _currentInfos.clear();
+    _bestInfo = null;
+    _bestMove = null;
+    _currentFen = fen;
 
     final positionCmd = 'position fen $fen';
     await _sendCommand(positionCmd);
@@ -436,15 +439,15 @@ class UCIEngine {
       return;
     }
 
-    _currentInfos.clear();
-    _bestInfo = null;
-    _bestMove = null;
-    _currentFen = fen;
-
     // 如果有上一次分析在进行，先发送 stop
     if (_isAnalyzing) {
       await stopAnalysis();
     }
+
+    _currentInfos.clear();
+    _bestInfo = null;
+    _bestMove = null;
+    _currentFen = fen;
 
     await _sendCommand('position fen $fen');
     await _sendCommand('go infinite');
@@ -498,12 +501,23 @@ class UCIEngine {
     _log('Analysis started: $goCmd');
   }
 
-  /// Stop the current analysis.
+  /// Stop the current analysis. Waits for the engine to respond with bestmove
+  /// to ensure no stale bestmove arrives after new analysis starts.
   Future<void> stopAnalysis() async {
     if (!_isRunning) return;
+    if (!_isAnalyzing) return; // idle，无需等待
+
+    _stopCompleter = Completer<void>();
     await _sendCommand('stop');
     _isAnalyzing = false;
-    _log('Analysis stop requested');
+
+    // thinking 状态下发 stop，必须等引擎输出 bestmove 后才能继续
+    try {
+      await _stopCompleter!.future.timeout(const Duration(milliseconds: 1000));
+    } on TimeoutException {
+      _log('Timeout waiting for bestmove after stop');
+    }
+    _stopCompleter = null;
   }
 
   /// Get the best move for the current position (blocking).
@@ -574,9 +588,9 @@ class UCIEngine {
   static String iccsToNumeric(String iccsMove) {
     if (iccsMove.length < 4) return iccsMove;
 
-    final fromCol = _fileToCol(iccsMove[0]);
+    final fromCol = Coord.fileToCol(iccsMove[0]);
     final fromRank = int.tryParse(iccsMove[1]) ?? 0;
-    final toCol = _fileToCol(iccsMove[2]);
+    final toCol = Coord.fileToCol(iccsMove[2]);
     final toRank = int.tryParse(iccsMove[3]) ?? 0;
 
     return '$fromCol$fromRank$toCol$toRank';
@@ -585,19 +599,9 @@ class UCIEngine {
   /// Convert (col, row) coordinates to ICCS algebraic move string.
   /// Our row 0 = bottom (Red's back rank), row 9 = top (Black's back rank).
   static String coordsToICCS(int fromCol, int fromRow, int toCol, int toRow) {
-    final fromFile = _colToFile(fromCol);
-    final toFile = _colToFile(toCol);
+    final fromFile = Coord.colToFile(fromCol);
+    final toFile = Coord.colToFile(toCol);
     return '$fromFile$fromRow$toFile$toRow';
-  }
-
-  static String _colToFile(int col) {
-    // col 0-8 -> file a-i
-    return String.fromCharCode('a'.codeUnitAt(0) + col);
-  }
-
-  static int _fileToCol(String file) {
-    final lower = file.toLowerCase();
-    return lower.codeUnitAt(0) - 'a'.codeUnitAt(0);
   }
 
   // ---- Internal ----
@@ -679,9 +683,9 @@ class UCIEngine {
     if (parts.length >= 2) {
       final uciMove = parts[1];
       _bestMove = uciMove;
-      final isRedToMove = _currentFen != null
-          ? _isRedToMoveFromFen(_currentFen!)
-          : true;
+      final moveColor = _currentFen != null
+          ? _fenToMoveColor(_currentFen!)
+          : PieceColor.red;
       _bestInfo = EngineInfo(
         depth: _bestInfo?.depth ?? 0,
         score: _bestInfo?.score ?? 0,
@@ -691,8 +695,13 @@ class UCIEngine {
         nodes: _bestInfo?.nodes ?? 0,
         nps: _bestInfo?.nps ?? 0,
         timeMs: _bestInfo?.timeMs ?? 0,
-        isRedToMove: isRedToMove,
+        moveColor: moveColor,
       );
+
+      // Signal stopAnalysis that bestmove has arrived
+      if (_stopCompleter != null && !_stopCompleter!.isCompleted) {
+        _stopCompleter!.complete();
+      }
 
       // Engine outputs ICCS algebraic directly (e.g. "h7e7")
       _emitEvent(EngineBestMove(uciMove));
@@ -733,13 +742,13 @@ class UCIEngine {
     _emitEvent(EngineAnalysisUpdate(info, allInfos: List.from(_currentInfos)));
   }
 
-  /// Extract whether it's red's turn from a FEN string.
+  /// Extract which side to move from a FEN string.
   /// FEN format: `<board> <active_color> ...`
   /// `active_color` is 'r' for red, 'b' for black.
-  bool _isRedToMoveFromFen(String fen) {
+  PieceColor _fenToMoveColor(String fen) {
     final parts = fen.split(' ');
-    if (parts.length < 2) return true; // Default to red
-    return parts[1].toLowerCase() == 'r';
+    if (parts.length < 2) return PieceColor.red;
+    return parts[1].toLowerCase() == 'r' ? PieceColor.red : PieceColor.black;
   }
 
   EngineInfo? _parseInfoLine(String line) {
@@ -898,9 +907,9 @@ class UCIEngine {
       return null;
     }
 
-    final isRedToMove = _currentFen != null
-        ? _isRedToMoveFromFen(_currentFen!)
-        : true;
+    final moveColor = _currentFen != null
+        ? _fenToMoveColor(_currentFen!)
+        : PieceColor.red;
 
     return EngineInfo(
       depth: depth,
@@ -914,7 +923,7 @@ class UCIEngine {
       timeMs: timeMs,
       hashfull: hashfull,
       tbhits: tbhits,
-      isRedToMove: isRedToMove,
+      moveColor: moveColor,
     );
   }
 
@@ -1061,7 +1070,7 @@ class EngineInfo {
     this.timeMs = 0,
     this.hashfull = 0,
     this.tbhits = 0,
-    this.isRedToMove = true,
+    this.moveColor = PieceColor.red,
   });
 
   /// Search depth
@@ -1097,13 +1106,13 @@ class EngineInfo {
   /// Tablebase hits
   final int tbhits;
 
-  /// Whether it's red's turn to move
-  final bool isRedToMove;
+  /// Which side is to move
+  final PieceColor moveColor;
 
   /// 将引擎原始分数转换为红方视角：
   /// 正数 = 红方优势，负数 = 黑方优势
   /// 引擎原始分数是 side-to-move 视角，黑方走时需要取反
-  int get adjustedScore => isRedToMove ? score : -score;
+  int get adjustedScore => moveColor == PieceColor.red ? score : -score;
 
   /// Get the best move from the PV in ICCS algebraic format.
   /// PV moves are already in ICCS format (identical to UCI output).
