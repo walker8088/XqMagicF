@@ -370,9 +370,10 @@ class AnalysisPanel extends StatelessWidget {
     );
   }
 
-  /// 直接显示引擎原始着法，不做任何格式转换
+  /// 格式化为 "中文记谱(raw ICCS)"
   String _formatMoveDisplay(String iccs, PieceColor color) {
-    return iccs;
+    if (board == null) return iccs;
+    return MoveNotation.formatMoveDisplay(board!, color, iccs);
   }
 }
 
@@ -526,9 +527,10 @@ class CloudMoveList extends StatelessWidget {
     );
   }
 
-  /// 直接显示云库着法的原始 ICCS 格式
+  /// 显示云库着法的中文记谱格式
   String _iccsToChinese(String iccs) {
-    return iccs;
+    if (pieces == null || activeColor == null) return iccs;
+    return MoveNotation.formatMoveDisplay(pieces!, activeColor!, iccs);
   }
 
   Widget _buildScoreDisplay(int score) {
