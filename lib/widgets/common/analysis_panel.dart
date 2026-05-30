@@ -541,10 +541,9 @@ class CloudMoveList extends StatelessWidget {
     );
   }
 
-  /// 将 ICCS 转为显示格式
+  /// 直接显示云库着法的原始 ICCS 格式
   String _iccsToChinese(String iccs) {
-    if (pieces == null || activeColor == null) return iccs;
-    return MoveNotation.formatMoveDisplay(pieces!, activeColor!, iccs);
+    return iccs;
   }
 
   Widget _buildScoreDisplay(int score) {

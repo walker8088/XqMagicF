@@ -171,7 +171,7 @@ class GameViewModel extends ChangeNotifier {
     try {
       notation = MoveNotation.toText(engine.board.pieces, move);
     } catch (_) {
-      notation = MoveNotation.formatICCS(MoveNotation.toICCS(move));
+      notation = MoveNotation.toICCS(move);
     }
     // 设置下一步走子方
     final nextTurn = move.color == PieceColor.red
