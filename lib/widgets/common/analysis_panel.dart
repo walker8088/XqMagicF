@@ -112,14 +112,26 @@ class _LiveAnalysisPanelState extends State<LiveAnalysisPanel> {
   Widget build(BuildContext context) {
     final infos = widget.engineInfos;
 
-    // Convert EngineInfo list to EnginePVLine list, sorted by multipv
-    final pvLines =
-        infos.map((info) => EnginePVLine.fromEngineInfo(info)).toList()
-          ..sort((a, b) {
-            final idxA = infos.indexWhere((i) => i.bestMoveICCS == a.bestMove);
-            final idxB = infos.indexWhere((i) => i.bestMoveICCS == b.bestMove);
-            return idxA.compareTo(idxB);
-          });
+    // 按 first move 去重：相同 PV 分支只保留最深的那个
+    final Map<String, EngineInfo> deepestInfoForPv = {};
+    for (final info in infos) {
+      final first = info.bestMoveICCS;
+      if (first.isEmpty) continue;
+      final existing = deepestInfoForPv[first];
+      if (existing == null || info.depth > existing.depth) {
+        deepestInfoForPv[first] = info;
+      }
+    }
+
+    // 转换为 EnginePVLine 列表，按 bestMove 出现顺序排序
+    final pvLines = deepestInfoForPv.values
+        .map((info) => EnginePVLine.fromEngineInfo(info))
+        .toList();
+    pvLines.sort((a, b) {
+      final idxA = infos.indexWhere((i) => i.bestMoveICCS == a.bestMove);
+      final idxB = infos.indexWhere((i) => i.bestMoveICCS == b.bestMove);
+      return idxA.compareTo(idxB);
+    });
 
     return AnalysisPanel(
       engineInfo: widget.isEngineReady
