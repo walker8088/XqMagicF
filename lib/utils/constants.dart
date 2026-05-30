@@ -34,7 +34,7 @@ class AppConstants {
   static const double riverFontSize = 18.0;
 
   // 棋子半径比例（占格子的比例）
-  static const double pieceRadiusRatio = 0.42;
+  static const double pieceRadiusRatio = 0.45;
 }
 
 enum PieceColor { red, black }

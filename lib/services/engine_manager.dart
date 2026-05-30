@@ -1,9 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:xqmagic/models/game_mode.dart';
 import 'package:xqmagic/services/engine_configuration.dart';
 import 'package:xqmagic/services/uci_engine.dart';
+import 'package:xqmagic/utils/app_logger.dart';
 import 'package:xqmagic/utils/app_settings.dart';
 import 'package:xqmagic/utils/constants.dart';
 
@@ -169,12 +168,12 @@ class EngineManager extends ChangeNotifier {
   /// If [enginePath] is null, uses the default path.
   Future<bool> loadEngine({String? enginePath}) async {
     final path = enginePath ?? _defaultEnginePath;
-    debugPrint('[EngineManager] loadEngine: path=$path');
+    AppLogger.debug('EngineManager', 'loadEngine: path=$path');
     if (path == null || path.isEmpty) {
       _state = EngineState.error;
       _error = 'Engine path not configured';
       notifyListeners();
-      debugPrint('[EngineManager] loadEngine failed: no path configured');
+      AppLogger.warn('EngineManager', 'loadEngine failed: no path configured');
       return false;
     }
 
@@ -186,8 +185,9 @@ class EngineManager extends ChangeNotifier {
     _state = EngineState.loading;
     _error = null;
     notifyListeners();
-    debugPrint(
-      '[EngineManager] loadEngine: state=loading, creating UCIEngine...',
+    AppLogger.debug(
+      'EngineManager',
+      'loadEngine: state=loading, creating UCIEngine...',
     );
 
     try {
@@ -199,23 +199,27 @@ class EngineManager extends ChangeNotifier {
 
       // Subscribe to engine events
       _eventSubscription = _engine!.events.listen(_onEngineEvent);
-      debugPrint('[EngineManager] UCIEngine created, calling start()...');
+      AppLogger.debug('EngineManager', 'UCIEngine created, calling start()...');
 
       final started = await _engine!.start();
-      debugPrint('[EngineManager] engine start() returned: $started');
+      AppLogger.debug('EngineManager', 'engine start() returned: $started');
       if (!started) {
         _state = EngineState.error;
         _error = 'Failed to start engine';
         notifyListeners();
-        debugPrint('[EngineManager] loadEngine failed: start() returned false');
+        AppLogger.warn(
+          'EngineManager',
+          'loadEngine failed: start() returned false',
+        );
         return false;
       }
 
       _state = EngineState.ready;
       notifyListeners();
       _log('Engine loaded: ${_engine!.engineName}');
-      debugPrint(
-        '[EngineManager] Engine loaded successfully: ${_engine!.engineName}',
+      AppLogger.debug(
+        'EngineManager',
+        'Engine loaded successfully: ${_engine!.engineName}',
       );
 
       // Apply analysis mode settings after successful load
@@ -228,8 +232,8 @@ class EngineManager extends ChangeNotifier {
       _state = EngineState.error;
       _error = 'Failed to load engine: $e';
       notifyListeners();
-      debugPrint('[EngineManager] loadEngine exception: $e');
-      debugPrint('[EngineManager] stack: $st');
+      AppLogger.error('EngineManager', 'loadEngine exception: $e');
+      AppLogger.debug('EngineManager', 'stack: $st');
       return false;
     }
   }
@@ -616,7 +620,7 @@ class EngineManager extends ChangeNotifier {
 
   void _log(String message) {
     if (logEnabled) {
-      debugPrint('[EngineManager] $message');
+      AppLogger.debug('EngineManager', message);
     }
   }
 

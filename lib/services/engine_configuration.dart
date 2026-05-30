@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:xqmagic/services/uci_engine.dart';
+import 'package:xqmagic/utils/app_logger.dart';
 
 /// 引擎配置数据类：管理纯配置参数
 ///
@@ -94,9 +95,9 @@ class EngineConfiguration extends ChangeNotifier {
       customOptions: _customOptions,
     );
 
-    debugPrint(
-      '[EngineConfiguration] Applied: depth=$_depth, time=$_timeMs, '
-      'threads=$_threads, hash=$_hash, multiPV=$_multiPV',
+    AppLogger.debug(
+      'EngineConfiguration',
+      'Applied: depth=$_depth, time=$_timeMs, threads=$_threads, hash=$_hash, multiPV=$_multiPV',
     );
   }
 

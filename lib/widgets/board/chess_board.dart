@@ -16,9 +16,9 @@ class ChessBoard extends StatelessWidget {
   final GameViewModel viewModel;
 
   double get boardWidth =>
-      cellSize * (AppConstants.boardCols + AppConstants.paddingCells * 2);
+      cellSize * (AppConstants.boardCols + AppConstants.paddingCells);
   double get boardHeight =>
-      cellSize * (AppConstants.boardRows + AppConstants.paddingCells * 2);
+      cellSize * (AppConstants.boardRows + AppConstants.paddingCells);
 
   /// 构建渲染数据（从 ViewModel 提取纯数据）
   BoardRenderData _buildRenderData() {

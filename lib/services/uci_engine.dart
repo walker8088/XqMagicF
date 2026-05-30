@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
+import 'package:xqmagic/utils/app_logger.dart';
 import 'package:xqmagic/utils/constants.dart';
 import 'package:xqmagic/utils/coord.dart';
 
@@ -982,7 +982,7 @@ class UCIEngine {
 
   void _log(String message) {
     if (logEnabled) {
-      debugPrint('[UCIEngine] $message');
+      AppLogger.debug('UCIEngine', message);
     }
   }
 

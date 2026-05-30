@@ -271,7 +271,7 @@ class GameViewModel extends ChangeNotifier {
     final fen = (lastMove?.fenAfter != null && lastMove?.fenAfter == currentFen)
         ? lastMove!.fenAfter
         : currentFen;
-    debugPrint('[GameViewModel] _onMoveExecuted FEN: $fen');
+    AppLogger.debug('GameViewModel', '_onMoveExecuted FEN: $fen');
     analyzePosition(fen);
   }
 
@@ -328,7 +328,7 @@ class GameViewModel extends ChangeNotifier {
     try {
       _cloudResult = await _cloudDB.query(fen);
     } catch (e) {
-      debugPrint('[GameViewModel] Cloud query failed: $e');
+      AppLogger.debug('GameViewModel', 'Cloud query failed: $e');
     } finally {
       _isCloudQuerying = false;
       notifyListeners();

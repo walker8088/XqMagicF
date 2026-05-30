@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:xqmagic/utils/app_logger.dart';
 import 'package:http/http.dart' as http;
 import 'package:xqmagic/utils/constants.dart';
 import 'package:xqmagic/utils/lru_cache.dart';
@@ -166,12 +166,12 @@ class CloudDBClient {
     String positionFen, {
     bool useCache = true,
   }) async {
-    debugPrint('[CloudDB] 查询开始, FEN: $positionFen');
+    AppLogger.debug('CloudDB', '查询开始, FEN: $positionFen');
 
     if (useCache) {
       final cached = _cache.get(positionFen);
       if (cached != null) {
-        debugPrint('[CloudDB] 命中缓存, ${cached.moves.length} 条着法');
+        AppLogger.debug('CloudDB', '命中缓存, ${cached.moves.length} 条着法');
         return cached;
       }
     }
@@ -182,14 +182,14 @@ class CloudDBClient {
       final url = Uri.parse(
         baseUrl,
       ).replace(queryParameters: {'action': 'queryall', 'board': positionFen});
-      debugPrint('[CloudDB] 请求 URL: $url');
+      AppLogger.debug('CloudDB', '请求 URL: $url');
 
       final response = await http.get(url).timeout(const Duration(seconds: 10));
-      debugPrint('[CloudDB] 响应状态码: ${response.statusCode}');
-      debugPrint('[CloudDB] 响应内容: ${response.body}');
+      AppLogger.debug('CloudDB', '响应状态码: ${response.statusCode}');
+      AppLogger.debug('CloudDB', '响应内容: ${response.body}');
 
       if (response.statusCode != 200) {
-        debugPrint('[CloudDB] 请求失败, 状态码: ${response.statusCode}');
+        AppLogger.warn('CloudDB', '请求失败, 状态码: ${response.statusCode}');
         _isQuerying = false;
         return null;
       }
@@ -197,11 +197,12 @@ class CloudDBClient {
       final result = _parseResponse(response.body, positionFen);
       if (result != null) {
         _cache.put(positionFen, result);
-        debugPrint(
-          '[CloudDB] 解析成功, ${result.moves.length} 条着法, 最佳=${result.bestMove}',
+        AppLogger.debug(
+          'CloudDB',
+          '解析成功, ${result.moves.length} 条着法, 最佳=${result.bestMove}',
         );
       } else {
-        debugPrint('[CloudDB] 解析结果为空');
+        AppLogger.warn('CloudDB', '解析结果为空');
       }
 
       for (final listener in List.from(_listeners)) {
@@ -211,8 +212,8 @@ class CloudDBClient {
       _isQuerying = false;
       return result;
     } catch (e, st) {
-      debugPrint('[CloudDB] 查询异常: $e');
-      debugPrint('[CloudDB] 堆栈: $st');
+      AppLogger.error('CloudDB', '查询异常: $e');
+      AppLogger.debug('CloudDB', '堆栈: $st');
       _isQuerying = false;
       return null;
     }
@@ -226,7 +227,7 @@ class CloudDBClient {
   }
 
   CloudQueryResult? _parseResponse(String body, String position) {
-    debugPrint('[CloudDB] 开始解析文本响应, 长度: ${body.length}');
+    AppLogger.debug('CloudDB', '开始解析文本响应, 长度: ${body.length}');
     final moveColor = _fenToMoveColor(position);
     final result = CloudQueryResult.parseResponse(
       body,
@@ -234,11 +235,12 @@ class CloudDBClient {
       moveColor: moveColor,
     );
     if (result != null) {
-      debugPrint(
-        '[CloudDB] 解析成功: ${result.moves.length} 条着法, 最佳=${result.bestMove}',
+      AppLogger.debug(
+        'CloudDB',
+        '解析成功: ${result.moves.length} 条着法, 最佳=${result.bestMove}',
       );
     } else {
-      debugPrint('[CloudDB] 解析结果为空');
+      AppLogger.warn('CloudDB', '解析结果为空');
     }
     return result;
   }

@@ -152,8 +152,8 @@ class _GameScreenState extends State<GameScreen> {
   Widget _buildBoardArea(BuildContext context, GameViewModel vm) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final availableWidth = constraints.maxWidth * 0.95;
-        final availableHeight = constraints.maxHeight * 0.95;
+        final availableWidth = constraints.maxWidth;
+        final availableHeight = constraints.maxHeight;
         final cellSizeFromWidth =
             availableWidth /
             (AppConstants.boardCols + AppConstants.paddingCells * 2);

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:xqmagic/utils/app_logger.dart';
 import 'package:xqmagic/models/chess_piece.dart';
 import 'package:xqmagic/models/move.dart';
 import 'package:xqmagic/utils/constants.dart';
@@ -303,14 +304,15 @@ class ChineseNotation {
     bool useSimpleText,
   ) {
     if (type == null) {
-      debugPrint('[ChineseNotation] WARN: pieceType is null, color=$color');
+      AppLogger.warn('ChineseNotation', 'pieceType is null, color=$color');
       return '?';
     }
 
     // 检查索引范围
     if (type.index < 0 || type.index > 6) {
-      debugPrint(
-        '[ChineseNotation] WARN: invalid pieceType.index=${type.index}, type=$type',
+      AppLogger.warn(
+        'ChineseNotation',
+        'invalid pieceType.index=${type.index}, type=$type',
       );
       return '?';
     }
