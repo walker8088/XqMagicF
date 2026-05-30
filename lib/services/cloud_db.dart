@@ -186,7 +186,7 @@ class CloudDBClient {
 
       final response = await http.get(url).timeout(const Duration(seconds: 10));
       AppLogger.debug('CloudDB', '响应状态码: ${response.statusCode}');
-      AppLogger.debug('CloudDB', '响应内容: ${response.body}');
+      //AppLogger.debug('CloudDB', '响应内容: ${response.body}');
 
       if (response.statusCode != 200) {
         AppLogger.warn('CloudDB', '请求失败, 状态码: ${response.statusCode}');

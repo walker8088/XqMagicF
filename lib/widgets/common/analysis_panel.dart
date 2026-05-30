@@ -17,6 +17,7 @@ class EnginePVLine {
     required this.nps,
     required this.time,
     this.moveColor = PieceColor.red,
+    this.multipv = 1,
   });
 
   /// Search depth
@@ -43,6 +44,9 @@ class EnginePVLine {
   /// 引擎分析时的走子方，用于 PV 线路中文转换
   final PieceColor moveColor;
 
+  /// MultiPV index (1 = primary, 2 = secondary, etc.)
+  final int multipv;
+
   /// Factory constructor to create from EngineInfo
   factory EnginePVLine.fromEngineInfo(EngineInfo info) {
     final convertedScore = info.adjustedScore;
@@ -55,6 +59,7 @@ class EnginePVLine {
       nps: info.nps ?? 0,
       time: info.timeMs ?? 0,
       moveColor: info.moveColor,
+      multipv: info.multipv,
     );
   }
 
@@ -112,22 +117,22 @@ class _LiveAnalysisPanelState extends State<LiveAnalysisPanel> {
   Widget build(BuildContext context) {
     final infos = widget.engineInfos;
 
-    // 按 first move 去重：相同 PV 分支只保留最深的那个
-    final Map<String, EngineInfo> deepestInfoForPv = {};
+    // 按 (firstMove, multipv) 去重：相同首步且相同 multipv 只保留最新的
+    // 新的 depth 更新直接覆盖旧的（无需 depth > existing 判断）
+    final Map<(String, int), EngineInfo> infoByKey = {};
     for (final info in infos) {
       final first = info.bestMoveICCS;
       if (first.isEmpty) continue;
-      final existing = deepestInfoForPv[first];
-      if (existing == null || info.depth > existing.depth) {
-        deepestInfoForPv[first] = info;
-      }
+      infoByKey[(first, info.multipv)] = info;
     }
 
-    // 转换为 EnginePVLine 列表，按 bestMove 出现顺序排序
-    final pvLines = deepestInfoForPv.values
+    // 转换为 EnginePVLine 列表，先按 multipv 再按出现顺序排序
+    final pvLines = infoByKey.values
         .map((info) => EnginePVLine.fromEngineInfo(info))
         .toList();
     pvLines.sort((a, b) {
+      // 同一 multipv 内按原始顺序
+      if (a.multipv != b.multipv) return a.multipv.compareTo(b.multipv);
       final idxA = infos.indexWhere((i) => i.bestMoveICCS == a.bestMove);
       final idxB = infos.indexWhere((i) => i.bestMoveICCS == b.bestMove);
       return idxA.compareTo(idxB);

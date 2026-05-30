@@ -112,11 +112,13 @@ class EngineManager extends ChangeNotifier {
   /// Set hash table size in MB.
   void setHash(int mb) => _config.setHash(mb);
 
-  /// Set MultiPV (number of principal variations).
+  /// Set MultiPV (number of principal variations). Triggers apply immediately if engine is ready.
   Future<void> setMultiPV(int n) async {
     if (n < 1) return;
     _config.setMultiPV(n);
+    // Apply immediately so new analysis picks up new value
     await _applyMultiPVToEngine();
+    notifyListeners();
   }
 
   /// Send the current MultiPV value to the running engine.
