@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:xqmagic/models/chess_piece.dart';
 import 'package:xqmagic/services/cloud_db.dart';
-import 'package:xqmagic/services/uci_engine.dart';
+import 'package:xqmagic/services/engine.dart';
 import 'package:xqmagic/utils/constants.dart';
 import 'package:xqmagic/utils/coord.dart';
 import 'package:xqmagic/utils/move_notation.dart';

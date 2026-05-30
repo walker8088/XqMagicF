@@ -2,12 +2,12 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xqmagic/models/board.dart';
-import 'package:xqmagic/services/uci_engine.dart';
+import 'package:xqmagic/services/engine.dart';
 import 'package:xqmagic/utils/constants.dart';
 import 'package:xqmagic/utils/fen.dart';
 
 void main() {
-  group('UCI Engine Driver Test', () {
+  group('Engine Driver Test', () {
     // Find available engine
     String? findEngine() {
       final basePaths = ['', 'D:/01_MyCode/XqMagicF'];
@@ -57,7 +57,7 @@ void main() {
           return;
         }
 
-        final engine = UCIEngine(enginePath: enginePath, logEnabled: true);
+        final engine = Engine(enginePath: enginePath, logEnabled: true);
         try {
           final started = await engine.start();
           expect(started, isTrue, reason: 'Engine should start successfully');
@@ -82,7 +82,7 @@ void main() {
           return;
         }
 
-        final engine = UCIEngine(enginePath: enginePath, logEnabled: true);
+        final engine = Engine(enginePath: enginePath, logEnabled: true);
         try {
           final started = await engine.start();
           expect(
@@ -110,7 +110,7 @@ void main() {
           return;
         }
 
-        final engine = UCIEngine(enginePath: enginePath, logEnabled: true);
+        final engine = Engine(enginePath: enginePath, logEnabled: true);
         try {
           final started = await engine.start();
           expect(started, isTrue);
@@ -120,7 +120,7 @@ void main() {
           print('Analyzing FEN: $fen');
 
           // Start analysis
-          await engine.analyzeByDepth(fen: fen, depth: 10);
+          await engine.analyze(fen: fen, depth: 10);
 
           // Wait for bestmove event
           String? bestMove;
@@ -177,7 +177,7 @@ void main() {
           return;
         }
 
-        final engine = UCIEngine(enginePath: enginePath, logEnabled: true);
+        final engine = Engine(enginePath: enginePath, logEnabled: true);
         try {
           final started = await engine.start();
           expect(started, isTrue);
@@ -203,7 +203,7 @@ void main() {
           print('SKIP: eleeye not found');
           return;
         }
-        final engine = UCIEngine(enginePath: enginePath, logEnabled: true);
+        final engine = Engine(enginePath: enginePath, logEnabled: true);
         try {
           final started = await engine.start();
           expect(started, isTrue);
@@ -229,7 +229,7 @@ void main() {
           return;
         }
 
-        final engine = UCIEngine(enginePath: enginePath, logEnabled: true);
+        final engine = Engine(enginePath: enginePath, logEnabled: true);
         try {
           final started = await engine.start();
           expect(started, isTrue);
@@ -254,21 +254,19 @@ void main() {
       // Test numericToICCS conversion
       // Numeric "8182" → col=8, row=1 to col=8, row=2
       // ICCS: col 8 → file 'i', row 1 → rank 1, so "i1i2"
-      final iccs = UCIEngine.numericToICCS('8182');
+      final iccs = Engine.numericToICCS('8182');
       expect(iccs, 'i1i2');
 
       // Test iccsToNumeric conversion
-      final numeric = UCIEngine.iccsToNumeric('i1i2');
+      final numeric = Engine.iccsToNumeric('i1i2');
       expect(numeric, '8182');
 
       // Test coordsToICCS
-      final iccs2 = UCIEngine.coordsToICCS(0, 0, 0, 1);
+      final iccs2 = Engine.coordsToICCS(0, 0, 0, 1);
       expect(iccs2, 'a0a1');
 
       // Round-trip: coords → ICCS → numeric → ICCS
-      final roundTrip = UCIEngine.numericToICCS(
-        UCIEngine.iccsToNumeric('h7e7'),
-      );
+      final roundTrip = Engine.numericToICCS(Engine.iccsToNumeric('h7e7'));
       expect(roundTrip, 'h7e7');
     });
 
@@ -314,7 +312,7 @@ void main() {
           return;
         }
 
-        final engine = UCIEngine(enginePath: enginePath, logEnabled: true);
+        final engine = Engine(enginePath: enginePath, logEnabled: true);
         try {
           final started = await engine.start();
           expect(started, isTrue);
@@ -344,7 +342,7 @@ void main() {
 
           // Analyze initial position
           const fen = FenParser.initial;
-          await engine.analyzeByDepth(fen: fen, depth: 8);
+          await engine.analyze(fen: fen, depth: 8);
 
           // Wait for bestmove with timeout
           for (int i = 0; i < 60; i++) {
@@ -395,7 +393,7 @@ void main() {
           return;
         }
 
-        final engine = UCIEngine(enginePath: enginePath, logEnabled: true);
+        final engine = Engine(enginePath: enginePath, logEnabled: true);
         try {
           final started = await engine.start();
           expect(started, isTrue);
@@ -413,7 +411,7 @@ void main() {
 
           // Analyze with multiPV=3
           const fen = FenParser.initial;
-          await engine.analyzeByDepth(fen: fen, depth: 8, multiPV: 3);
+          await engine.analyze(fen: fen, depth: 8, multiPV: 3);
 
           // Wait for analysis to complete
           for (int i = 0; i < 60; i++) {

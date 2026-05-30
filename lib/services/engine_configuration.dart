@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:xqmagic/services/uci_engine.dart';
+import 'package:xqmagic/services/engine.dart';
 import 'package:xqmagic/utils/app_logger.dart';
 
 /// 引擎配置数据类：管理纯配置参数

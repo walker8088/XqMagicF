@@ -3,14 +3,14 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:xqmagic/models/game_mode.dart';
 import 'package:xqmagic/services/engine_configuration.dart';
-import 'package:xqmagic/services/uci_engine.dart';
+import 'package:xqmagic/services/engine.dart';
 import 'package:xqmagic/utils/app_logger.dart';
 import 'package:xqmagic/utils/app_settings.dart';
 import 'package:xqmagic/utils/constants.dart';
 
 /// Manages the lifecycle and analysis requests for a UCI Xiangqi engine.
 ///
-/// Provides a higher-level API over [UCIEngine] for common use cases:
+/// Provides a higher-level API over [Engine] for common use cases:
 /// - Loading and starting engines from configurable paths
 /// - Requesting position analysis with depth or time constraints
 /// - Cancelling ongoing analysis
@@ -26,14 +26,26 @@ class EngineManager extends ChangeNotifier {
   final bool logEnabled;
   final EngineConfiguration _config;
 
-  /// 引擎协议类型：'uci'、'ucci'、'auto'
-  String _protocol = 'auto';
-  String get protocol => _protocol;
-  void setProtocol(String protocol) {
-    if (protocol == 'uci' || protocol == 'ucci' || protocol == 'auto') {
-      _protocol = protocol;
-      notifyListeners();
+  /// 引擎协议类型
+  EngineProtocol _protocol = EngineProtocol.auto;
+  EngineProtocol get protocol => _protocol;
+  void setProtocol(EngineProtocol protocol) {
+    _protocol = protocol;
+    notifyListeners();
+  }
+
+  void setProtocolFromString(String protocol) {
+    switch (protocol) {
+      case 'uci':
+        _protocol = EngineProtocol.uci;
+        break;
+      case 'ucci':
+        _protocol = EngineProtocol.ucci;
+        break;
+      default:
+        _protocol = EngineProtocol.auto;
     }
+    notifyListeners();
   }
 
   /// 引擎分析模式
@@ -48,7 +60,7 @@ class EngineManager extends ChangeNotifier {
   bool _isAnalyzing = false;
   bool get isAnalyzing => _isAnalyzing;
 
-  UCIEngine? _engine;
+  Engine? _engine;
   EngineState _state = EngineState.idle;
 
   /// 引擎配置
@@ -71,7 +83,7 @@ class EngineManager extends ChangeNotifier {
 
   // ---- Getters ----
 
-  UCIEngine? get engine => _engine;
+  Engine? get engine => _engine;
   EngineState get state => _state;
   String? get currentFen => _currentFen;
   EngineInfo? get latestInfo => _latestInfo;
@@ -180,7 +192,7 @@ class EngineManager extends ChangeNotifier {
     }
 
     // Apply protocol from AppSettings before loading
-    setProtocol(AppSettings.instance.engineProtocol);
+    setProtocolFromString(AppSettings.instance.engineProtocol);
 
     await _cleanupEngine();
 
@@ -193,7 +205,7 @@ class EngineManager extends ChangeNotifier {
     );
 
     try {
-      _engine = UCIEngine(
+      _engine = Engine(
         enginePath: path,
         logEnabled: logEnabled,
         protocol: _protocol,
@@ -201,7 +213,7 @@ class EngineManager extends ChangeNotifier {
 
       // Subscribe to engine events
       _eventSubscription = _engine!.events.listen(_onEngineEvent);
-      AppLogger.debug('EngineManager', 'UCIEngine created, calling start()...');
+      AppLogger.debug('EngineManager', 'Engine created, calling start()...');
 
       final started = await _engine!.start();
       AppLogger.debug('EngineManager', 'engine start() returned: $started');
@@ -335,11 +347,7 @@ class EngineManager extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _engine!.analyzeByDepth(
-        fen: fen,
-        depth: depth,
-        multiPV: _config.multiPV,
-      );
+      await _engine!.analyze(fen: fen, depth: depth, multiPV: _config.multiPV);
     } catch (e) {
       _state = EngineState.error;
       _error = 'Analysis failed: $e';
@@ -363,7 +371,7 @@ class EngineManager extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _engine!.analyzeByTime(
+      await _engine!.analyze(
         fen: fen,
         timeMs: timeMs,
         multiPV: _config.multiPV,
@@ -391,7 +399,7 @@ class EngineManager extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _engine!.analyzeInfinite(fen);
+      await _engine!.analyze(fen: fen);
     } catch (e) {
       _state = EngineState.error;
       _error = 'Infinite analysis failed: $e';
