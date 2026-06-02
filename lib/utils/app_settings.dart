@@ -42,8 +42,13 @@ class AppSettings {
       final dir = await getApplicationSupportDirectory();
       final file = File('${dir.path}/magicf_settings.json');
       await file.writeAsString(jsonEncode(_data));
-    } catch (_) {
-      // Ignore save errors
+    } catch (e) {
+      // Log but don't crash — settings save failure is non-fatal
+      assert(() {
+        // ignore: avoid_print
+        print('AppSettings._save failed: $e');
+        return true;
+      }());
     }
   }
 
@@ -83,6 +88,9 @@ class AppSettings {
   int get engineSkillLevel => get<int>('engine_skill_level', 20);
   Future<void> setEngineSkillLevel(int level) =>
       set('engine_skill_level', level);
+
+  int get engineTimeMs => get<int>('engine_time_ms', 5000);
+  Future<void> setEngineTimeMs(int ms) => set('engine_time_ms', ms);
 
   String get enginePath => get<String>('engine_path', '');
   Future<void> setEnginePath(String path) => set('engine_path', path);

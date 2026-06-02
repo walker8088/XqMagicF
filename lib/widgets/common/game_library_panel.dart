@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:xqmagic/services/local_db.dart';
+import 'package:xqmagic/utils/app_logger.dart';
+import 'package:xqmagic/utils/fen.dart';
 import 'package:xqmagic/viewmodels/game_viewmodel.dart';
+import 'package:xqmagic/widgets/common/empty_state.dart';
 
 /// 棋库面板：浏览、搜索、加载已保存的棋局
 class GameLibraryPanel extends StatefulWidget {
@@ -20,10 +25,14 @@ class GameLibraryPanel extends StatefulWidget {
 class _GameLibraryPanelState extends State<GameLibraryPanel> {
   final GameRecordService _db = GameRecordService.instance;
   final TextEditingController _searchController = TextEditingController();
-  String _filter = 'all'; // all, master, classic, personal
+  _GameFilter _filter = _GameFilter.all;
   List<SavedGame> _games = [];
+  // 缓存首次加载的全量数据，避免每次按键都重复查 DB
+  List<SavedGame>? _allGamesCache;
   bool _loading = true;
   SavedGame? _loadingGame;
+
+  Timer? _searchDebounce;
 
   @override
   void initState() {
@@ -34,6 +43,7 @@ class _GameLibraryPanelState extends State<GameLibraryPanel> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -41,23 +51,54 @@ class _GameLibraryPanelState extends State<GameLibraryPanel> {
   Future<void> _loadGames() async {
     setState(() => _loading = true);
     try {
-      final allGames = await _db.getAllGames();
-      _applyFilterAndSearch(allGames);
-    } catch (_) {
-      _games = [];
-    } finally {
-      setState(() => _loading = false);
+      _allGamesCache = await _db.getAllGames();
+      _applyFilterAndSearch(_allGamesCache!);
+    } catch (e, s) {
+      AppLogger.error('GameLibraryPanel', '加载棋局库失败: $e\n$s');
+      if (mounted) {
+        setState(() {
+          _games = [];
+          _loading = false;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('棋局库加载失败')));
+      }
+      return;
     }
+    if (mounted) setState(() => _loading = false);
   }
 
   void _onSearchChanged() {
-    _applyCurrentFilters();
+    // 防抖：中文输入法连续输入、多次粘贴时避免反复跳数据库
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 300),
+      _applyCurrentFilters,
+    );
   }
 
   void _applyCurrentFilters() {
-    _db.getAllGames().then((allGames) {
-      _applyFilterAndSearch(allGames);
-    });
+    // 优先复用缓存，避免每次按键都打 DB
+    if (_allGamesCache != null) {
+      _applyFilterAndSearch(_allGamesCache!);
+      return;
+    }
+    _db.getAllGames().then(
+      (allGames) {
+        if (!mounted) return;
+        _allGamesCache = allGames;
+        _applyFilterAndSearch(allGames);
+      },
+      onError: (e, s) {
+        AppLogger.error('GameLibraryPanel', '查询棋局库失败: $e\n$s');
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('查询棋局库失败')));
+        }
+      },
+    );
   }
 
   void _applyFilterAndSearch(List<SavedGame> allGames) {
@@ -65,14 +106,14 @@ class _GameLibraryPanelState extends State<GameLibraryPanel> {
 
     // 先按分类过滤
     switch (_filter) {
-      case 'master':
+      case _GameFilter.master:
         filtered = filtered.where((g) {
           final event = g.metadata.event.toLowerCase();
           return event.contains('大师') ||
               event.contains('特级大师') ||
               event.contains('全国');
         }).toList();
-      case 'classic':
+      case _GameFilter.classic:
         filtered = filtered.where((g) {
           final event = g.metadata.event.toLowerCase();
           return event.contains('古') ||
@@ -80,8 +121,10 @@ class _GameLibraryPanelState extends State<GameLibraryPanel> {
               event.contains('谱') ||
               event.contains('名局');
         }).toList();
-      case 'personal':
+      case _GameFilter.personal:
         filtered = filtered.where((g) => g.metadata.event.isEmpty).toList();
+      case _GameFilter.all:
+        break;
     }
 
     // 再按搜索关键词过滤
@@ -106,7 +149,7 @@ class _GameLibraryPanelState extends State<GameLibraryPanel> {
     }
   }
 
-  void _onFilterChanged(String? value) {
+  void _onFilterChanged(_GameFilter? value) {
     if (value == null) return;
     setState(() => _filter = value);
     _applyCurrentFilters();
@@ -117,16 +160,14 @@ class _GameLibraryPanelState extends State<GameLibraryPanel> {
     setState(() => _loadingGame = game);
 
     try {
-      // 1. 用 FEN 初始化棋盘
-      final fen = game.fen.isNotEmpty
-          ? game.fen
-          : 'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR r - - 0 1';
+      // 1. 用 FEN 初始化棋盘（fallback 到标准初始局面）
+      final fen = game.fen.isNotEmpty ? game.fen : FenParser.initial;
       widget.viewModel.loadFromFen(fen);
 
       // 2. 重演所有着法
       for (final iccs in game.moves) {
         if (iccs.isNotEmpty && iccs.length == 4) {
-          widget.viewModel.playEngineMove(iccs);
+          widget.viewModel.engineMove(iccs);
         }
       }
 
@@ -178,9 +219,19 @@ class _GameLibraryPanelState extends State<GameLibraryPanel> {
       ),
     );
 
-    if (confirmed == true) {
+    if (confirmed != true) return;
+    try {
       await _db.deleteGame(game.id);
-      _loadGames();
+      // 手动从缓存中删除，避免 reload DB
+      _allGamesCache?.removeWhere((g) => g.id == game.id);
+      await _loadGames();
+    } catch (e, s) {
+      AppLogger.error('GameLibraryPanel', '删除棋局失败: $e\n$s');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('删除失败，请重试')));
+      }
     }
   }
 
@@ -222,8 +273,10 @@ class _GameLibraryPanelState extends State<GameLibraryPanel> {
     return Container(
       width: 260,
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.3),
-        border: Border(left: BorderSide(color: Colors.white.withOpacity(0.1))),
+        color: Colors.black.withValues(alpha: 0.3),
+        border: Border(
+          left: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -279,18 +332,18 @@ class _GameLibraryPanelState extends State<GameLibraryPanel> {
           ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
-            borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
+            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
-            borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
+            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
             borderSide: const BorderSide(color: Color(0xFFF5DEB3)),
           ),
           filled: true,
-          fillColor: Colors.white.withOpacity(0.05),
+          fillColor: Colors.white.withValues(alpha: 0.05),
           isDense: true,
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
@@ -319,7 +372,7 @@ class _GameLibraryPanelState extends State<GameLibraryPanel> {
           const SizedBox(width: 4),
           Expanded(
             child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
+              child: DropdownButton<_GameFilter>(
                 value: _filter,
                 isDense: true,
                 isExpanded: true,
@@ -331,10 +384,19 @@ class _GameLibraryPanelState extends State<GameLibraryPanel> {
                   size: 18,
                 ),
                 items: const [
-                  DropdownMenuItem(value: 'all', child: Text('全部')),
-                  DropdownMenuItem(value: 'master', child: Text('大师对局')),
-                  DropdownMenuItem(value: 'classic', child: Text('古典名局')),
-                  DropdownMenuItem(value: 'personal', child: Text('个人收藏')),
+                  DropdownMenuItem(value: _GameFilter.all, child: Text('全部')),
+                  DropdownMenuItem(
+                    value: _GameFilter.master,
+                    child: Text('大师对局'),
+                  ),
+                  DropdownMenuItem(
+                    value: _GameFilter.classic,
+                    child: Text('古典名局'),
+                  ),
+                  DropdownMenuItem(
+                    value: _GameFilter.personal,
+                    child: Text('个人收藏'),
+                  ),
                 ],
                 onChanged: _onFilterChanged,
               ),
@@ -347,32 +409,14 @@ class _GameLibraryPanelState extends State<GameLibraryPanel> {
 
   Widget _buildGameList() {
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFF5DEB3)),
-        ),
-      );
+      return const LoadingIndicator();
     }
 
     if (_games.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.inbox, size: 40, color: Colors.white24),
-            const SizedBox(height: 8),
-            const Text(
-              '暂无棋局',
-              style: TextStyle(color: Colors.white38, fontSize: 13),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              '点击底部按钮导入 PGN 棋谱',
-              style: TextStyle(color: Colors.white24, fontSize: 11),
-            ),
-          ],
-        ),
+      return const EmptyState(
+        icon: Icons.inbox,
+        message: '暂无棋局',
+        hint: '点击底部按钮导入 PGN 棋谱',
       );
     }
 
@@ -407,13 +451,13 @@ class _GameLibraryPanelState extends State<GameLibraryPanel> {
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             color: isLoading
-                ? const Color(0xFFF5DEB3).withOpacity(0.15)
-                : Colors.white.withOpacity(0.04),
+                ? const Color(0xFFF5DEB3).withValues(alpha: 0.15)
+                : Colors.white.withValues(alpha: 0.04),
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
               color: isLoading
-                  ? const Color(0xFFF5DEB3).withOpacity(0.4)
-                  : Colors.white.withOpacity(0.08),
+                  ? const Color(0xFFF5DEB3).withValues(alpha: 0.4)
+                  : Colors.white.withValues(alpha: 0.08),
             ),
           ),
           child: Column(
@@ -441,10 +485,14 @@ class _GameLibraryPanelState extends State<GameLibraryPanel> {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: _resultColor(resultLabel).withOpacity(0.15),
+                        color: _resultColor(
+                          resultLabel,
+                        ).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(
-                          color: _resultColor(resultLabel).withOpacity(0.4),
+                          color: _resultColor(
+                            resultLabel,
+                          ).withValues(alpha: 0.4),
                         ),
                       ),
                       child: Text(
@@ -495,13 +543,13 @@ class _GameLibraryPanelState extends State<GameLibraryPanel> {
                   Icon(
                     Icons.calendar_today,
                     size: 12,
-                    color: Colors.white.withOpacity(0.4),
+                    color: Colors.white.withValues(alpha: 0.4),
                   ),
                   const SizedBox(width: 4),
                   Text(
                     date,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withValues(alpha: 0.5),
                       fontSize: 11,
                     ),
                   ),
@@ -509,13 +557,13 @@ class _GameLibraryPanelState extends State<GameLibraryPanel> {
                   Icon(
                     Icons.directions_run,
                     size: 12,
-                    color: Colors.white.withOpacity(0.4),
+                    color: Colors.white.withValues(alpha: 0.4),
                   ),
                   const SizedBox(width: 4),
                   Text(
                     '$moveCount 步',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withValues(alpha: 0.5),
                       fontSize: 11,
                     ),
                   ),
@@ -527,7 +575,7 @@ class _GameLibraryPanelState extends State<GameLibraryPanel> {
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          const Color(0xFFF5DEB3).withOpacity(0.7),
+                          const Color(0xFFF5DEB3).withValues(alpha: 0.7),
                         ),
                       ),
                     ),
@@ -568,3 +616,6 @@ class _GameLibraryPanelState extends State<GameLibraryPanel> {
 
   String _pad(int n) => n.toString().padLeft(2, '0');
 }
+
+/// 棋库过滤分类（避免原来用裸字符串的“all/master/classic/personal”）
+enum _GameFilter { all, master, classic, personal }

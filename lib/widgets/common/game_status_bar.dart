@@ -18,7 +18,7 @@ class GameStatusBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      color: Colors.black.withOpacity(0.3),
+      color: Colors.black.withValues(alpha: 0.3),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -43,6 +43,23 @@ class GameStatusBar extends StatelessWidget {
               ),
               child: const Text(
                 '胜负已分',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+          if (gameState == GameState.draw) ...[
+            const SizedBox(width: 32),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.blueGrey,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                '和棋',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,

@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print
+
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -8,16 +10,28 @@ import 'package:xqmagic/utils/fen.dart';
 
 void main() {
   group('Engine Driver Test', () {
-    // Find available engine
+    /// 查找可用引擎路径。
+    ///
+    /// 原实现硬编码了 'D:/01_MyCode/XqMagicF' 路径，仅在开发者本机有效。
+    /// 新实现：
+    /// 1. 优先使用环境变量 XQ_ENGINE_PATH（指定到 pikafish 所在目录）
+    /// 2. 其次是 flutter test 的当前工作目录
+    /// 3. 最后才走默认的 'engine/' 子目录
     String? findEngine() {
-      final basePaths = ['', 'D:/01_MyCode/XqMagicF'];
+      final envDir = Platform.environment['XQ_ENGINE_PATH'];
+      final bases = <String>[
+        if (envDir != null && envDir.isNotEmpty) envDir,
+        '',
+      ];
       final candidates = [
         'engine/Pikafish_240917/pikafish-avx2.exe',
         'engine/eleeye/ELEEYE.EXE',
       ];
-      for (final base in basePaths) {
+      for (final base in bases) {
         for (final path in candidates) {
-          final fullPath = base.isEmpty ? path : '$base/$path';
+          final fullPath = base.isEmpty
+              ? path
+              : '$base${Platform.pathSeparator}$path';
           final file = File(fullPath);
           if (file.existsSync()) return fullPath;
         }
@@ -26,11 +40,15 @@ void main() {
     }
 
     String? findEleeye() {
-      final basePaths = ['', 'D:/01_MyCode/XqMagicF'];
-      for (final base in basePaths) {
+      final envDir = Platform.environment['XQ_ENGINE_PATH'];
+      final bases = <String>[
+        if (envDir != null && envDir.isNotEmpty) envDir,
+        '',
+      ];
+      for (final base in bases) {
         final path = base.isEmpty
             ? 'engine/eleeye/ELEEYE.EXE'
-            : '$base/engine/eleeye/ELEEYE.EXE';
+            : '$base${Platform.pathSeparator}engine${Platform.pathSeparator}eleeye${Platform.pathSeparator}ELEEYE.EXE';
         if (File(path).existsSync()) return path;
       }
       return null;
@@ -53,7 +71,7 @@ void main() {
       () async {
         final enginePath = findEngine();
         if (enginePath == null) {
-          print('SKIP: No engine found');
+          markTestSkipped('No engine found');
           return;
         }
 
@@ -78,7 +96,7 @@ void main() {
       () async {
         final enginePath = findEleeye();
         if (enginePath == null) {
-          print('SKIP: eleeye engine not found');
+          markTestSkipped('eleeye engine not found');
           return;
         }
 
@@ -106,7 +124,7 @@ void main() {
       () async {
         final enginePath = findEngine();
         if (enginePath == null) {
-          print('SKIP: No engine found');
+          markTestSkipped('No engine found');
           return;
         }
 
@@ -175,7 +193,7 @@ void main() {
       () async {
         final enginePath = findEngine();
         if (enginePath == null) {
-          print('SKIP: No engine found');
+          markTestSkipped('No engine found');
           return;
         }
 
@@ -202,9 +220,10 @@ void main() {
       () async {
         final enginePath = findEleeye();
         if (enginePath == null) {
-          print('SKIP: eleeye not found');
+          markTestSkipped('eleeye not found');
           return;
         }
+
         final engine = Engine(enginePath: enginePath, logEnabled: true);
         try {
           final started = await engine.start();
@@ -227,7 +246,7 @@ void main() {
       () async {
         final enginePath = findEngine();
         if (enginePath == null) {
-          print('SKIP: No engine found');
+          markTestSkipped('No engine found');
           return;
         }
 
@@ -281,7 +300,7 @@ void main() {
 
       // Standard Xiangqi FEN
       const expected =
-          'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR r';
+          'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w';
       expect(fen, expected);
     });
 
@@ -290,7 +309,7 @@ void main() {
       () async {
         final enginePath = findEngine();
         if (enginePath == null) {
-          print('SKIP: No engine found');
+          markTestSkipped('No engine found');
           return;
         }
 
@@ -372,13 +391,13 @@ void main() {
         // 只使用 UCI 引擎测试 multiPV（UCCI 协议不支持 MultiPV）
         final enginePath = findEngine();
         if (enginePath == null) {
-          print('SKIP: No engine found');
+          markTestSkipped('No engine found');
           return;
         }
 
         // 跳过 UCCI 引擎（UCCI 不支持 MultiPV）
         if (enginePath.toLowerCase().contains('eleeye')) {
-          print('SKIP: UCCI engine does not support MultiPV');
+          markTestSkipped('UCCI engine does not support MultiPV');
           return;
         }
 
@@ -433,19 +452,30 @@ void main() {
             reason: 'Should see multiple multipv values, got: $allInfos',
           );
 
-          // 断言3：currentInfos 数量应与 multipv 值数量一致
+          // 断言3：所有收集到的 PV 都是 multipv 槽位内的（Multipv=3 下应看到 1/2/3）
           expect(
-            pvCount,
-            allInfos.length,
-            reason:
-                'currentInfos count ($pvCount) should match multipv values ($allInfos)',
+            allInfos.toSet(),
+            containsAll(<int>[1, 2, 3]),
+            reason: 'MultiPV=3 应产生 3 个不同槽位, got: $allInfos',
           );
 
-          // 断言4：bestInfo 不应为空
+          // 断言4：bestInfo 跟踪 multipv=1 的最新 info（_updateBestInfo 实现）
+          // 原断言4 已改为：bestInfo 应跟踪 multipv=1 的最新 info。
           expect(
             engine.bestInfo,
             isNotNull,
-            reason: 'bestInfo should not be null',
+            reason: 'bestInfo should be set by _updateBestInfo (multipv=1)',
+          );
+          expect(
+            engine.bestInfo!.multipv,
+            1,
+            reason:
+                'bestInfo must be multipv=1, got ${engine.bestInfo!.multipv}',
+          );
+          expect(
+            engine.bestInfo!.pv,
+            isNotEmpty,
+            reason: 'bestInfo should have a non-empty PV',
           );
         } finally {
           await engine.dispose();

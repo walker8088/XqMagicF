@@ -15,9 +15,11 @@ import 'package:xqmagic/services/cloud_db.dart';
 import 'package:xqmagic/services/engine_manager.dart';
 import 'package:xqmagic/services/engine.dart';
 import 'package:xqmagic/services/opening_book.dart';
+import 'package:xqmagic/utils/app_logger.dart';
 import 'package:xqmagic/utils/app_settings.dart';
 import 'package:xqmagic/utils/constants.dart';
 import 'package:xqmagic/utils/coord.dart';
+import 'package:xqmagic/utils/fen.dart';
 import 'package:xqmagic/utils/move_notation.dart';
 
 /// 游戏视图模型：协调 GameController、AnalysisService、EngineManager 和 GameStateManager
@@ -50,8 +52,18 @@ class GameViewModel extends ChangeNotifier {
   GameMode _mode = GameMode.free;
   GameMode get mode => _mode;
 
-  /// 音效开关
-  bool soundEnabled = true;
+  // ──────────── 棋盘编辑状态 ────────────
+
+  PieceType _editPieceType = PieceType.pawn;
+  PieceColor _editPieceColor = PieceColor.red;
+  PieceColor _editSideToMove = PieceColor.red;
+  bool _editPlacing = true; // true = 放置模式, false = 删除模式
+
+  PieceType get editPieceType => _editPieceType;
+  PieceColor get editPieceColor => _editPieceColor;
+  PieceColor get editSideToMove => _editSideToMove;
+  bool get editPlacing => _editPlacing;
+  bool get isBoardEditMode => _mode == GameMode.boardEdit;
 
   // ──────────── 初始化 ────────────
 
@@ -65,9 +77,15 @@ class GameViewModel extends ChangeNotifier {
     );
     _stateManager = GameStateManager();
 
-    // 监听子模块状态变化 → 通知 UI
-    _engineManager.addListener(_onEngineChanged);
-    _engineManager.addListener(_onAnalysisChanged);
+    // 云库查询完成后通知 UI
+    _analysisService.onCloudResultUpdated = notifyListeners;
+
+    // 重要：不要直接监听 _engineManager 的 ChangeNotifier，因为配置变更
+    // (setMultiPV / setAnalysisMode / ...) 也会触发 notifyListeners，
+    // 会污染 writeAnalysisToNode。
+    // 改用专门的 onAnalysisUpdated 回调，该回调仅在 EngineAnalysisUpdate /
+    // EngineBestMove 事件时触发。
+    _engineManager.onAnalysisUpdated = _onAnalysisChanged;
     _stateManager.addListener(_onStateChanged);
 
     // 初始云库查询
@@ -127,19 +145,39 @@ class GameViewModel extends ChangeNotifier {
   List<String> get mainLineNotations => _controller.mainLineNotations;
   List<String> get moveNotations => _controller.moveNotations;
 
-  List<GameTreeNode> get variations =>
-      _controller.gameTree.current?.children ?? [];
+  // 返回当前节点的所有子节点（主变着 + 变着）。可能为空列表。
+  // 重要：不要在 getter 中新建空列表（会造成首带变着下的不必要分配）——
+  // 返回的是原列表的可空包装，调用方需自己 null check。
+  /// 缓存当前局面的开局信息。仅在 FEN 变更时重新查询。
+  ///
+  /// 背景：之前每次 UI 重建都会调用该 getter 查表。虽然 OpeningBookService
+  /// 内部有 LRU 缓存，但仍然是一次 HashMap 查询与字符串参数检查。
+  OpeningInfo? _currentOpeningCache;
+  String? _currentOpeningFen;
 
   OpeningInfo? get currentOpening {
     final fen = _controller.gameTree.currentFen;
-    if (fen == null) return null;
-    return OpeningBookService.instance.lookup(fen);
+    if (fen == null) {
+      _currentOpeningCache = null;
+      _currentOpeningFen = null;
+      return null;
+    }
+    if (fen == _currentOpeningFen) return _currentOpeningCache;
+    _currentOpeningFen = fen;
+    _currentOpeningCache = OpeningBookService.instance.lookup(fen);
+    return _currentOpeningCache;
   }
 
   // ──────────── 走子 ────────────
 
   void selectPiece(Coord pos) {
-    if (gameState == GameState.checkmate) return;
+    // 棋盘编辑模式：委托给 editTap
+    if (isBoardEditMode) {
+      editTap(pos);
+      return;
+    }
+
+    if (gameState == GameState.checkmate || gameState == GameState.draw) return;
 
     // 残局模式特殊处理
     if (_mode == GameMode.engineEndGame &&
@@ -167,8 +205,8 @@ class GameViewModel extends ChangeNotifier {
 
     // 选择己方棋子
     if (piece != null && piece.color == currentTurn) {
-      _stateManager.selectPosition(pos);
-      _stateManager.setPossibleMoves(
+      _stateManager.selectWithMoves(
+        pos,
         _controller.getLegalMoves(pos).map((m) => m.to).toList(),
       );
     } else {
@@ -176,23 +214,25 @@ class GameViewModel extends ChangeNotifier {
     }
   }
 
-  void playEngineMove(String iccs) {
+  /// 执行引擎推荐的着法。返回 true 表示走子成功。
+  ///
+  /// 是外部代码（包括 UI）的唯一入口：内部走子逻辑（如残局）和外部调用
+  /// 都走该方法，避免 `playEngineMove` / `engineMove` 两个方法双重实现。
+  bool engineMove(String iccs) {
     final ok = _controller.engineMove(iccs);
     if (ok) {
       _stateManager.clearSelection();
       _onMoveExecuted();
     }
+    return ok;
   }
 
   bool manualMove(Coord from, Coord to) {
     final ok = _controller.manualMove(from, to);
-    if (ok) _onMoveExecuted();
-    return ok;
-  }
-
-  bool engineMove(String iccs) {
-    final ok = _controller.engineMove(iccs);
-    if (ok) _onMoveExecuted();
+    if (ok) {
+      _stateManager.clearSelection();
+      _onMoveExecuted();
+    }
     return ok;
   }
 
@@ -285,37 +325,129 @@ class GameViewModel extends ChangeNotifier {
   // ──────────── 面板控制 ────────────
 
   void showCloudPanel() {
-    _stateManager.toggleCloudPanel();
+    _stateManager.showCloudPanel();
   }
 
   void hideLeftPanel() {
     _stateManager.hideLeftPanel();
   }
 
-  // ──────────── 新局 ────────────
-
+  /// 新局：重置控制器 + UI 状态 + 分析结果 + 引擎
   void newGame() {
     _controller.reset();
     _stateManager.reset();
     _analysisService.clearAnalysisResults();
     _engineManager.newGame();
-    notifyListeners();
+    _onPositionLoaded();
   }
 
   void loadFromFen(String fen) {
     _controller.loadFromFen(fen);
     _stateManager.clearSelection();
-    notifyListeners();
+    _onPositionLoaded();
   }
 
   // ──────────── 模式切换 ────────────
 
   void setMode(GameMode mode) {
     _mode = mode;
-    if (mode == GameMode.engineEndGame) {
-      _stateManager.initPuzzle(EndgameCollection.basicEndgames.first);
-      _loadPuzzle();
+    // 在同一 setMode 周期内多次状态变更只会触发一次 UI 重建
+    _stateManager.withBatchNotify(() {
+      if (mode == GameMode.engineEndGame) {
+        _stateManager.initPuzzle(EndgameCollection.basicEndgames.first);
+        _loadPuzzle();
+      } else if (mode == GameMode.engineOnline) {
+        // 连线分析模式：手动触发云库查询
+        final fen = _controller.gameTree.currentFen;
+        if (fen != null) {
+          _analysisService.queryCloud(fen);
+        }
+      } else if (mode == GameMode.boardEdit) {
+        // 进入棋盘编辑模式：停止分析，清除选择
+        _analysisService.stopAnalysis();
+        _stateManager.clearSelection();
+        _editPieceType = PieceType.pawn;
+        _editPieceColor = PieceColor.red;
+        _editSideToMove = PieceColor.red;
+        _editPlacing = true;
+      }
+    });
+    notifyListeners();
+  }
+
+  // ──────────── 棋盘编辑操作 ────────────
+
+  void setEditPieceType(PieceType type) {
+    _editPieceType = type;
+    notifyListeners();
+  }
+
+  void setEditPieceColor(PieceColor color) {
+    _editPieceColor = color;
+    notifyListeners();
+  }
+
+  void setEditSideToMove(PieceColor color) {
+    _editSideToMove = color;
+    notifyListeners();
+  }
+
+  void setEditPlacing(bool placing) {
+    _editPlacing = placing;
+    notifyListeners();
+  }
+
+  /// 编辑模式下的点击：放置或删除棋子
+  void editTap(Coord pos) {
+    if (!isBoardEditMode) return;
+    if (!_controller.currentBoard.isValidPosition(pos)) return;
+
+    if (_editPlacing) {
+      // 放置模式：在目标位置放置选定的棋子（覆盖已有棋子）
+      final piece = ChessPiece(
+        type: _editPieceType,
+        color: _editPieceColor,
+        coord: pos,
+      );
+      _controller.currentBoard.putPiece(piece);
+    } else {
+      // 删除模式：移除目标位置的棋子
+      _controller.currentBoard.removePiece(pos);
     }
+    _stateManager.clearSelection();
+    notifyListeners();
+  }
+
+  /// 清空棋盘
+  void editClearBoard() {
+    _controller.currentBoard.clear();
+    _stateManager.clearSelection();
+    notifyListeners();
+  }
+
+  /// 初始化标准局面
+  void editInitStandard() {
+    _controller.currentBoard.initialize();
+    _editSideToMove = PieceColor.red;
+    _stateManager.clearSelection();
+    notifyListeners();
+  }
+
+  /// 应用编辑：从当前棋盘生成 FEN 并开始新局
+  void editApply() {
+    final fen = FenParser.generate(_controller.currentBoard, _editSideToMove);
+    _mode = GameMode.free;
+    _controller.loadFromFen(fen);
+    _stateManager.clearSelection();
+    _analysisService.clearAnalysisResults();
+    _engineManager.newGame();
+    _onPositionLoaded();
+  }
+
+  /// 取消编辑：恢复到自由模式
+  void editCancel() {
+    _mode = GameMode.free;
+    _stateManager.clearSelection();
     notifyListeners();
   }
 
@@ -326,7 +458,7 @@ class GameViewModel extends ChangeNotifier {
     _controller.gameTree.initFromFen(puzzle.fen);
     _controller.syncEngineFromFen(puzzle.fen);
     _stateManager.clearSelection();
-    notifyListeners();
+    _onPositionLoaded();
   }
 
   // ──────────── 残局模式 ────────────
@@ -335,32 +467,26 @@ class GameViewModel extends ChangeNotifier {
     final piece = _controller.getPieceAt(from);
     if (piece == null) return;
 
-    final moveRecord = MoveRecord(
-      from: from,
-      to: to,
-      pieceType: piece.type,
-      capturedPiece: _controller.getPieceAt(to),
-      color: currentTurn,
-    );
-
     final puzzle = _stateManager.currentPuzzle;
     if (puzzle == null) return;
 
     if (_stateManager.puzzleSolutionIndex < puzzle.solution.length) {
       final expectedICCS = puzzle.solution[_stateManager.puzzleSolutionIndex];
-      final actualICCS = MoveNotation.toICCS(moveRecord);
+      // 直接用坐标计算 ICCS，不需要构造完整的 MoveRecord
+      final actualICCS = MoveNotation.iccsOf(from, to);
 
       if (actualICCS == expectedICCS) {
         _controller.manualMove(from, to);
         _stateManager.advancePuzzleSolution();
+        _onMoveExecuted();
 
         if (!_stateManager.puzzleCompleted) {
           _playPuzzleEngineMove();
         }
       } else {
         _stateManager.clearSelection();
+        notifyListeners();
       }
-      notifyListeners();
     }
   }
 
@@ -370,9 +496,10 @@ class GameViewModel extends ChangeNotifier {
 
     if (_stateManager.puzzleSolutionIndex < puzzle.solution.length) {
       final iccs = puzzle.solution[_stateManager.puzzleSolutionIndex];
-      _controller.engineMove(iccs);
-      _stateManager.advancePuzzleSolution();
-      notifyListeners();
+      if (_controller.engineMove(iccs)) {
+        _stateManager.advancePuzzleSolution();
+        _onMoveExecuted();
+      }
     }
   }
 
@@ -381,10 +508,9 @@ class GameViewModel extends ChangeNotifier {
   List<MoveRecord> getLegalMoves(Coord from) => _controller.getLegalMoves(from);
   ChessPiece? getPieceAt(Coord pos) => _controller.getPieceAt(pos);
 
-  void syncEngineFromFen(String fen) {
-    _controller.syncEngineFromFen(fen);
-  }
-
+  /// 重置：仅重置棋盘和 UI 状态（不重启引擎、不清分析）
+  ///
+  /// 如需重置引擎和分析，请使用 [newGame]。
   void reset() {
     _controller.reset();
     _stateManager.reset();
@@ -400,6 +526,16 @@ class GameViewModel extends ChangeNotifier {
         _controller.gameTree.current,
       );
     }
+    notifyListeners();
+  }
+
+  /// 局面被外部加载（loadFromFen / newGame / editApply / 残局初始化）后
+  /// 重新触发分析与节点质量评估，与 _onMoveExecuted 行为一致。
+  void _onPositionLoaded() {
+    _analysisService.onPositionChanged(
+      _controller.gameTree.currentFen ?? '',
+      _controller.gameTree.current,
+    );
     notifyListeners();
   }
 
@@ -419,13 +555,19 @@ class GameViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _onEngineChanged() {
-    notifyListeners();
-  }
-
   void _onAnalysisChanged() {
     _analysisService.writeAnalysisToNode(_controller.gameTree.current);
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    // 重置回调，避免被多次调用
+    _engineManager.onAnalysisUpdated = null;
+    _stateManager.removeListener(_onStateChanged);
+    _engineManager.dispose();
+    _stateManager.dispose();
+    super.dispose();
   }
 
   // ──────────── 启动 ────────────
@@ -433,7 +575,13 @@ class GameViewModel extends ChangeNotifier {
   Future<void> _autoLoadEngine() async {
     final enginePath = AppSettings.instance.enginePath;
     if (enginePath.isNotEmpty && !_engineManager.isReady) {
-      await loadEngine(enginePath);
+      try {
+        await loadEngine(enginePath);
+      } catch (e, st) {
+        // 自动加载失败不应该让 ViewModel 处于不一致状态，但也不应该向上抛
+        // 静默 Future 异常（main / AppLogger 在更高层兜底）
+        AppLogger.error('GameViewModel', '自动加载引擎失败: $enginePath\n$e\n$st');
+      }
     }
   }
 }

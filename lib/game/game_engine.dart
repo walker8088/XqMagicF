@@ -60,7 +60,8 @@ class GameEngine {
     final opponentColor = color == PieceColor.red
         ? PieceColor.black
         : PieceColor.red;
-    final allPieces = _board.pieces.values.toList();
+    final allPieces = _board.pieceList;
+    final obstacles = allPieces.map((p) => p.coord).toList();
 
     for (final piece in allPieces) {
       if (piece.color != opponentColor) continue;
@@ -91,7 +92,7 @@ class GameEngine {
         color: piece.color,
         from: piece.coord,
         to: kingPos,
-        obstacles: allPieces.map((p) => p.coord).toList(),
+        obstacles: obstacles,
       )) {
         return true;
       }
@@ -101,7 +102,7 @@ class GameEngine {
 
   /// 内部：生成指定棋子的所有合法走法（不限制回合）
   List<MoveRecord> _generateMovesFor(Coord from, ChessPiece piece) {
-    final allPieces = _board.pieces.values.toList();
+    final allPieces = _board.pieceList;
     // Pass full obstacles list (including target) — cannon needs this
     // to distinguish between moving (count=0) and capturing (count=1).
     // _countPiecesBetween only counts pieces BETWEEN from and to,
@@ -173,7 +174,7 @@ class GameEngine {
 
   /// 查找将/帅的位置（私有，供内部使用）
   Coord? _findGeneral(PieceColor color) {
-    for (final piece in _board.pieces.values) {
+    for (final piece in _board.pieceList) {
       if (piece.type == PieceType.king && piece.color == color) {
         return piece.coord;
       }

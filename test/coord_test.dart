@@ -45,6 +45,7 @@ void main() {
 
       test('should not be equal to non-Coord object', () {
         const c = Coord(1, 2);
+        // ignore: unrelated_type_equality_checks
         expect(c == 'not a coord', isFalse);
       });
     });

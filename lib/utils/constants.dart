@@ -10,6 +10,16 @@ class AppConstants {
   // 棋盘边距（格子数）
   static const int paddingCells = 1;
 
+  /// 引擎 MultiPV 线路数量上限
+  /// （下拉选项提供 1..maxMultiPV）
+  static const int maxMultiPV = 5;
+
+  /// 侧边面板默认尺寸
+  static const double defaultSidePanelWidth = 260.0;
+  static const double defaultRightPanelWidth = 280.0;
+  static const double maxSidePanelWidth = 500.0;
+  static const double minRightPanelWidth = 200.0;
+
   // 颜色
   static const Color boardBackground = Color(0xFFE8C576); // 木质底色
   static const Color gridLineColor = Color(0xFF5C3A1E); // 棋盘线

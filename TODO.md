@@ -1,45 +1,40 @@
-# 象棋魔术师 - TODO 清单
+# XqMagicF 修复清单
 
-> 更新日期：2026-05-24 | 版本：0.1.0
+## 🔴 高优先级
 
----
+- [x] #1 `GameViewModel` 未实现 `dispose()`，子模块 listener 未移除，引擎进程泄漏 ✅
+- [x] #2 `_queryCloud()` 竞态条件，`_isCloudQuerying` 异常时可能卡为 true ✅
+- [x] #3 `_engineTime` 永远不生效，UI 有选择但未保存/同步 ✅
+- [x] #4 `Engine._handshake()` auto 模式重启后 stdout/stderr listener 重复注册 ✅
+- [x] #5 兵卒过河后允许后退，违反中国象棋规则 ✅
+- [x] #6 `soundEnabled` 双重存储不同步，设置关闭音效不影响实际播放 ✅
 
-## 核心功能
+## 🟠 中优先级
 
-- [x] 1. 引擎集成到 GameViewModel（引擎辅助/对战模式）
-- [x] 2. 引擎对战自动走子
-- [x] 3. 将军/将杀棋盘高亮提示
-- [x] 4. PGN 打开/保存对话框
-- [x] 5. 设置对话框
-- [ ] 6. 文件拖放打开
-- [x] 7. 音效系统
-- [x] 8. 棋盘换肤系统
-- [x] 9. 图片识别局面（截图 → FEN）
-- [x] 10. 收藏/书签面板
-- [x] 11. 棋谱库浏览器面板
-- [x] 12. 云库复盘功能
-- [x] 13. 引擎复盘功能
-- [x] 14. 局面编辑功能
-- [x] 15. ECCO 开局识别显示
+- [x] #7 缺少困毙（stalemate）判断，`GameState.draw` 从未使用 ✅
+- [x] #8 `EngineManager.dispose()` 中 `await _cleanupEngine()` 在同步方法中 ✅
+- [x] #9 `ChessBoardPainter.shouldRepaint()` 只比较 `inCheckPosition` ✅
+- [x] #10 `_lastShowLeft` 初始化为 `false` 但实际左面板初始可见 ✅
+- [x] #11 PV 模拟走子时 `piece.coord` 未更新 ✅
+- [x] #12 `getWithStats()` 用 `value != null` 判断命中，统计错误；统计代码从未调用 ✅
+- [ ] #13 `_dropdown<T>()` 方法在 game_screen 和 engine_control_panel 完全重复
+- [ ] #14 `_getMultiPiecePrefixFromRed()` 与 `_getWXFMultiPiecePrefixFromRed()` 逻辑重复
+- [ ] #15 棋子中文名不一致：PieceTypeExtension 用繁体，记谱用简体
+- [x] #16 将军/胜负音效从未触发 ✅
+- [x] #17 `CloudQueryResult.parseResponse` 的 `moveColor` 参数从未使用 ✅
+- [x] #18 4 个 analyze 方法重复约 40 行相同的前置检查代码 ✅
 
----
+## 🟡 低优先级
 
-## 实现状态
-
-| 序号 | 功能 | 状态 | 备注 |
-|------|------|------|------|
-| 1 | 引擎集成 | 待实现 | 需将 EngineManager 接入 viewmodel |
-| 2 | 引擎对战自动走子 | 待实现 | 依赖 #1 |
-| 3 | 将军高亮 | 待实现 | 棋盘绘制层增加提示 |
-| 4 | PGN 对话框 | 待实现 | 使用 file_picker |
-| 5 | 设置对话框 | 待实现 | 引擎路径、深度、线程等 |
-| 6 | 文件拖放 | 待实现 | Windows 平台拖放支持 |
-| 7 | 音效 | 待实现 | 走子/吃子/将军音效 |
-| 8 | 棋盘换肤 | 待实现 | 图片棋子渲染 |
-| 9 | 图片识别 | 待实现 | 截图识别为 FEN |
-| 10 | 收藏面板 | 待实现 | LocalDB 已有数据层 |
-| 11 | 棋谱库 | 已完成 | 左侧面板集成，支持搜索/过滤/加载 |
-| 12 | 云库复盘 | 已完成 | 云库逐着评估，质量标记，着法跳转 |
-| 13 | 引擎复盘 | 已完成 | 引擎逐着深度分析，PV 显示，质量标记 |
-| 14 | 局面编辑 | 待实现 | 可视化编辑棋盘 |
-| 15 | ECCO 显示 | 待实现 | OpeningBook 已有数据 |
+- [x] #19 `GameState.idle` 和 `GameState.draw` 从未使用 ✅
+- [x] #20 `GameMode.engineOnline` 未实现 ✅
+- [x] #21 `_levelTag()` 未使用，`_write()` 硬编码字符 ✅
+- [x] #22 `newGame()` 与 `reset()` 功能重复 ✅
+- [x] #23 3 个 `with*()` 方法手动拷贝所有字段，改用 `copyWith()` ✅
+- [x] #24 `Engine.start()` 与 `_startProcess()` 代码重复 ✅
+- [x] #25 FEN 走子方 `w`/`b` 与 `r` 兼容性不一致 ✅
+- [x] #26 兵卒过河后退测试期望 `isTrue`（配合 #5 bug） ✅
+- [x] #27 兵卒后退记谱测试（非法走法） ✅
+- [x] #28 engine_test 用 `return` 静默跳过测试而非 `markAsSkip` ✅
+- [x] #29 lru_cache 空值测试无断言 ✅
+- [x] #30 `unrelated_type_equality_checks` 误报加 ignore 注释 ✅

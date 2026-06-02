@@ -26,8 +26,8 @@ Widget buildQualityBadge(String mark) {
     margin: const EdgeInsets.only(right: 6),
     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
     decoration: BoxDecoration(
-      color: color.withOpacity(0.2),
-      border: Border.all(color: color.withOpacity(0.5)),
+      color: color.withValues(alpha: 0.2),
+      border: Border.all(color: color.withValues(alpha: 0.5)),
       borderRadius: BorderRadius.circular(3),
     ),
     child: Text(

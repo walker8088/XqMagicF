@@ -71,13 +71,10 @@ class EnginePVLine {
 ///
 /// 这是 `AnalysisPanel` 的状态化包装器，接收明确的分析数据 props
 /// 而非直接依赖 GameViewModel，实现 widget 与 ViewModel 的解耦
-class LiveAnalysisPanel extends StatefulWidget {
+class LiveAnalysisPanel extends StatelessWidget {
   const LiveAnalysisPanel({
     super.key,
     required this.engineInfos,
-    required this.isEngineReady,
-    required this.isAnalyzing,
-    required this.isThinking,
     required this.bestMove,
     required this.board,
     required this.activeColor,
@@ -86,15 +83,6 @@ class LiveAnalysisPanel extends StatefulWidget {
 
   /// 引擎 PV 线路列表
   final List<EngineInfo> engineInfos;
-
-  /// 引擎是否已就绪
-  final bool isEngineReady;
-
-  /// UI 是否标记为正在分析
-  final bool isAnalyzing;
-
-  /// 引擎是否正在思考
-  final bool isThinking;
 
   /// 当前最佳着法 (ICCS)
   final String? bestMove;
@@ -109,55 +97,44 @@ class LiveAnalysisPanel extends StatefulWidget {
   final void Function(String iccs)? onBestMoveTap;
 
   @override
-  State<LiveAnalysisPanel> createState() => _LiveAnalysisPanelState();
-}
-
-class _LiveAnalysisPanelState extends State<LiveAnalysisPanel> {
-  @override
   Widget build(BuildContext context) {
-    final infos = widget.engineInfos;
+    final infos = engineInfos;
 
     // 按 (firstMove, multipv) 去重：后来的覆盖前面的（同 multipv 内的更新）
-    // 正序遍历 infos，新的覆盖旧的
+    // 同时记录首次出现顺序到 orderMap，供 O(1) 排序查找。
     final Map<(String, int), EngineInfo> infoByKey = {};
-    for (final info in infos) {
+    final Map<(String, int), int> orderMap = {};
+    for (var i = 0; i < infos.length; i++) {
+      final info = infos[i];
       final first = info.bestMoveICCS;
       if (first.isEmpty) continue;
-      infoByKey[(first, info.multipv)] = info;
+      final key = (first, info.multipv);
+      infoByKey.putIfAbsent(key, () {
+        orderMap[key] = i;
+        return info;
+      });
     }
 
-    // 转换为 EnginePVLine 列表，先按 multipv 再按出现顺序排序
-    final pvLines = infoByKey.values
-        .map((info) => EnginePVLine.fromEngineInfo(info))
-        .toList();
-    pvLines.sort((a, b) {
-      if (a.multipv != b.multipv) return a.multipv.compareTo(b.multipv);
-      final idxA = infos.indexWhere(
-        (i) => i.bestMoveICCS == a.bestMove && i.multipv == a.multipv,
-      );
-      final idxB = infos.indexWhere(
-        (i) => i.bestMoveICCS == b.bestMove && i.multipv == b.multipv,
-      );
-      return idxA.compareTo(idxB);
-    });
+    // 转换为 EnginePVLine 列表，按 (multipv, 出现顺序) 排序。
+    // 旧实现用 indexWhere 导致 O(n² log n)，高频分析下明显卡顿。
+    final pvLines =
+        infoByKey.entries
+            .map((e) => EnginePVLine.fromEngineInfo(e.value))
+            .toList()
+          ..sort((a, b) {
+            final mp = a.multipv.compareTo(b.multipv);
+            if (mp != 0) return mp;
+            return orderMap[(a.bestMove, a.multipv)]!.compareTo(
+              orderMap[(b.bestMove, b.multipv)]!,
+            );
+          });
 
     return AnalysisPanel(
-      engineInfo: widget.isEngineReady
-          ? EngineInfo(
-              depth: 0,
-              score: 0,
-              isMate: false,
-              pv: [],
-              moveColor: widget.activeColor,
-              multipv: 0,
-            )
-          : null,
-      board: widget.board,
-      activeColor: widget.activeColor,
-      bestMove: widget.bestMove,
-      isAnalyzing: widget.isAnalyzing || widget.isThinking,
+      board: board,
+      activeColor: activeColor,
+      bestMove: bestMove,
       pvLines: pvLines,
-      onBestMoveTap: widget.onBestMoveTap,
+      onBestMoveTap: onBestMoveTap,
     );
   }
 }
@@ -166,27 +143,19 @@ class _LiveAnalysisPanelState extends State<LiveAnalysisPanel> {
 class AnalysisPanel extends StatelessWidget {
   const AnalysisPanel({
     super.key,
-    this.engineInfo,
     this.cloudResult,
     this.bestMove,
-    this.isAnalyzing = false,
     this.pvLines = const [],
     this.onBestMoveTap,
     this.board,
     this.activeColor,
   });
 
-  /// Engine info (name, author, etc.)
-  final EngineInfo? engineInfo;
-
   /// Cloud database query result
   final CloudQueryResult? cloudResult;
 
   /// Best move in ICCS format
   final String? bestMove;
-
-  /// Whether the engine is currently analyzing
-  final bool isAnalyzing;
 
   /// Multiple PV lines for MultiPV analysis
   final List<EnginePVLine> pvLines;
@@ -271,13 +240,13 @@ class AnalysisPanel extends StatelessWidget {
           final index = entry.key;
           final line = entry.value;
           // 直接显示引擎原始 PV 输出，不做任何格式转换
-          return _buildPVLineRow(index, line, line.pv);
+          return _buildPVLineRow(index, line);
         }),
       ],
     );
   }
 
-  Widget _buildPVLineRow(int index, EnginePVLine line, List<String> pv) {
+  Widget _buildPVLineRow(int index, EnginePVLine line) {
     return InkWell(
       onTap: line.pv.isNotEmpty && onBestMoveTap != null
           ? () => onBestMoveTap!(line.pv.first)
@@ -287,7 +256,7 @@ class AnalysisPanel extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
           color: index == 0
-              ? Colors.white.withOpacity(0.08)
+              ? Colors.white.withValues(alpha: 0.08)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(4),
         ),
@@ -329,7 +298,7 @@ class AnalysisPanel extends StatelessWidget {
             // 引擎原始 PV 输出
             Expanded(
               child: Text(
-                pv.isNotEmpty ? pv.join(' ') : '--',
+                line.pv.isNotEmpty ? line.pv.join(' ') : '--',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: index == 0 ? FontWeight.bold : FontWeight.normal,
@@ -362,7 +331,7 @@ class AnalysisPanel extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                 decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.3),
+                  color: Colors.grey.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(3),
                 ),
                 child: const Text(
@@ -374,7 +343,7 @@ class AnalysisPanel extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         CloudMoveList(
-          pieces: board,
+          pieces: board!,
           moves: cloudResult!.moves,
           onMoveTap: onBestMoveTap,
         ),
@@ -497,7 +466,9 @@ class CloudMoveList extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
-          color: isBest ? Colors.white.withOpacity(0.08) : Colors.transparent,
+          color: isBest
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(4),
         ),
         child: Row(

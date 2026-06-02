@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:xqmagic/models/game_mode.dart';
+import 'package:xqmagic/utils/constants.dart';
+import 'package:xqmagic/widgets/common/dense_dropdown.dart';
 
 /// 引擎控制面板：分析模式、深度、线程、哈希、MultiPV
 class EngineControlPanel extends StatelessWidget {
@@ -28,7 +30,7 @@ class EngineControlPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      color: Colors.black.withOpacity(0.3),
+      color: Colors.black.withValues(alpha: 0.3),
       child: Row(
         children: [
           // 分析开关
@@ -48,7 +50,7 @@ class EngineControlPanel extends StatelessWidget {
           const SizedBox(width: 16),
 
           // 分析模式
-          _dropdown(
+          DenseDropdown<EngineAnalysisMode>(
             value: analysisMode,
             items: EngineAnalysisMode.values,
             label: (m) => m.label,
@@ -58,7 +60,7 @@ class EngineControlPanel extends StatelessWidget {
           const SizedBox(width: 8),
 
           // 优先级模式
-          _dropdown(
+          DenseDropdown<PriorityMode>(
             value: priorityMode,
             items: PriorityMode.values,
             label: (m) => m.label,
@@ -73,44 +75,14 @@ class EngineControlPanel extends StatelessWidget {
             style: TextStyle(color: Colors.white70, fontSize: 12),
           ),
           const SizedBox(width: 4),
-          SizedBox(
+          DenseDropdown<int>(
+            value: multiPV,
+            items: List.generate(AppConstants.maxMultiPV, (i) => i + 1),
+            label: (v) => '$v',
+            onChanged: onMultiPVChanged,
             width: 50,
-            child: DropdownButton<int>(
-              value: multiPV,
-              isDense: true,
-              dropdownColor: const Color(0xFF3E2723),
-              underline: const SizedBox.shrink(),
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-              items: List.generate(5, (i) => i + 1)
-                  .map((v) => DropdownMenuItem(value: v, child: Text('$v')))
-                  .toList(),
-              onChanged: (v) => v != null ? onMultiPVChanged(v) : null,
-            ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _dropdown<T>({
-    required T value,
-    required List<T> items,
-    required String Function(T) label,
-    required void Function(T) onChanged,
-    String? tooltip,
-  }) {
-    return Tooltip(
-      message: tooltip ?? '',
-      child: DropdownButton<T>(
-        value: value,
-        isDense: true,
-        dropdownColor: const Color(0xFF3E2723),
-        underline: const SizedBox.shrink(),
-        style: const TextStyle(color: Colors.white, fontSize: 12),
-        items: items.map((item) {
-          return DropdownMenuItem(value: item, child: Text(label(item)));
-        }).toList(),
-        onChanged: (v) => v != null ? onChanged(v) : null,
       ),
     );
   }

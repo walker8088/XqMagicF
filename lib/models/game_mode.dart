@@ -10,7 +10,13 @@ enum GameMode {
   engineEndGame('EngineEndGame', '杀法挑战'),
 
   /// 连线分析：连接云库获取实时评估
-  engineOnline('EngineOnline', '连线分析');
+  /// TODO: 未实现。云库查询已在 AnalysisService.queryCloud() 中提供，但
+  /// 该模式尚未添加独立的 UI/逻辑处理。在 navigation_toolbar.dart 的
+  /// ModeSelector 中可以看到该选项，但选择后无特殊行为。
+  engineOnline('EngineOnline', '连线分析'),
+
+  /// 棋盘编辑：自由增删棋子，编辑局面
+  boardEdit('BoardEdit', '棋盘编辑');
 
   const GameMode(this.id, this.label);
 

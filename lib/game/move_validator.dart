@@ -128,7 +128,14 @@ class MoveValidator {
       final forwardRow = color == PieceColor.red ? from.row + 1 : from.row - 1;
       return to.col == forwardCol && to.row == forwardRow;
     }
-    return true;
+    // 过河后：可以前进或横移，但不能后退
+    if (absRow == 1) {
+      // 纵向移动：必须前进
+      final forward = color == PieceColor.red ? from.row + 1 : from.row - 1;
+      return to.col == from.col && to.row == forward;
+    }
+    // 横向移动：允许
+    return absCol == 1 && absRow == 0;
   }
 
   /// 检查路径是否畅通（不含起点和终点）

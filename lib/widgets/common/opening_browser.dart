@@ -84,7 +84,7 @@ class _OpeningBrowserDialogState extends State<OpeningBrowserDialog> {
                     size: 20,
                   ),
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
+                  fillColor: Colors.white.withValues(alpha: 0.05),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: BorderSide.none,
@@ -155,9 +155,9 @@ class _OpeningTile extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF5DEB3).withOpacity(0.15),
+                  color: const Color(0xFFF5DEB3).withValues(alpha: 0.15),
                   border: Border.all(
-                    color: const Color(0xFFF5DEB3).withOpacity(0.4),
+                    color: const Color(0xFFF5DEB3).withValues(alpha: 0.4),
                   ),
                   borderRadius: BorderRadius.circular(4),
                 ),
@@ -238,9 +238,9 @@ class _OpeningDetailDialog extends StatelessWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF5DEB3).withOpacity(0.2),
+                      color: const Color(0xFFF5DEB3).withValues(alpha: 0.2),
                       border: Border.all(
-                        color: const Color(0xFFF5DEB3).withOpacity(0.5),
+                        color: const Color(0xFFF5DEB3).withValues(alpha: 0.5),
                       ),
                       borderRadius: BorderRadius.circular(4),
                     ),
@@ -369,7 +369,7 @@ class _OpeningDetailDialog extends StatelessWidget {
   void _playMove(BuildContext context, OpeningMove move) {
     final vm = context.read<GameViewModel>();
     // 尝试执行该着法
-    vm.playEngineMove(move.iccs);
+    vm.engineMove(move.iccs);
     Navigator.of(context).pop(); // 关闭详情
     Navigator.of(context).pop(); // 关闭浏览器
   }
@@ -380,7 +380,7 @@ class _OpeningDetailDialog extends StatelessWidget {
     vm.goToStart();
     if (opening.moves.isNotEmpty) {
       // 走到第一个推荐着法
-      vm.playEngineMove(opening.moves.first.iccs);
+      vm.engineMove(opening.moves.first.iccs);
     }
   }
 }

@@ -30,11 +30,16 @@ class MoveNotation {
   /// **结论**：ICCS rank 与内部 row 完全一致，无需转换
   ///
   /// 示例：马二进三 → h0g2，炮８平５ → h7e7
-  static String toICCS(MoveRecord move) {
-    final fromFile = Coord.colToFile(move.from.col);
-    final fromRank = move.from.row;
-    final toFile = Coord.colToFile(move.to.col);
-    final toRank = move.to.row;
+  static String toICCS(MoveRecord move) => iccsOf(move.from, move.to);
+
+  /// 直接从坐标生成 ICCS 字符串（无需构造 MoveRecord）
+  ///
+  /// 用于错误信息等只需要走子坐标、不需要完整走法元数据的场景。
+  static String iccsOf(Coord from, Coord to) {
+    final fromFile = Coord.colToFile(from.col);
+    final fromRank = from.row;
+    final toFile = Coord.colToFile(to.col);
+    final toRank = to.row;
     return '$fromFile$fromRank$toFile$toRank';
   }
 

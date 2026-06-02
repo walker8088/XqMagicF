@@ -4,7 +4,30 @@ import 'dart:io';
 
 import 'package:xqmagic/utils/app_logger.dart';
 import 'package:xqmagic/utils/constants.dart';
-import 'package:xqmagic/utils/coord.dart';
+
+/// 引擎单行输出处理函数
+typedef _LineHandler = void Function(String line);
+
+/// 引擎输出行的分派规则。
+///
+/// - [exact] = true 时要求与 [pattern] 完全匹配（例：`uciok`）
+/// - [exact] = false 时要求以 [pattern] 开头（例：`info `）
+class _LineRule {
+  const _LineRule._(this.pattern, this.exact, this.handler);
+
+  factory _LineRule.exact(String pattern, _LineHandler handler) =>
+      _LineRule._(pattern, true, handler);
+
+  factory _LineRule.startsWith(String pattern, _LineHandler handler) =>
+      _LineRule._(pattern, false, handler);
+
+  final String pattern;
+  final bool exact;
+  final _LineHandler handler;
+
+  bool matches(String line) =>
+      exact ? line == pattern : line.startsWith(pattern);
+}
 
 /// Protocol enumeration for engine communication.
 enum EngineProtocol {
@@ -41,11 +64,10 @@ enum EngineProtocol {
 /// Scores are in centipawns. Positive = red advantage, negative = black advantage.
 class Engine {
   Engine({
-    String? enginePath,
+    this._enginePath,
     this.logEnabled = false,
-    EngineProtocol protocol = EngineProtocol.auto,
-  }) : _enginePath = enginePath,
-       _protocol = protocol;
+    this._protocol = EngineProtocol.auto,
+  });
 
   final String? _enginePath;
   final bool logEnabled;
@@ -75,13 +97,13 @@ class Engine {
   final StreamController<String> _stdinController =
       StreamController<String>.broadcast();
   StreamSubscription<String>? _stdinSubscription;
-  Completer<void>? _readyCompleter;
+  StreamSubscription<String>? _stdoutSubscription;
+  StreamSubscription<String>? _stderrSubscription;
   Completer<String>? _bestMoveCompleter;
   Completer<void>? _stopCompleter;
 
   // Timeout defaults
   Duration _startupTimeout = const Duration(seconds: 30);
-  Duration _analysisTimeout = const Duration(seconds: 60);
 
   // ---- Getters ----
 
@@ -97,13 +119,9 @@ class Engine {
   /// Stream of engine events (ready, info, bestmove, error, etc.)
   Stream<EngineEvent> get events => _eventController.stream;
 
-  /// Stdin sink for sending raw UCI commands
-  StreamSink<String> get stdin => _stdinController.sink;
-
   // ---- Configuration ----
 
   void setStartupTimeout(Duration timeout) => _startupTimeout = timeout;
-  void setAnalysisTimeout(Duration timeout) => _analysisTimeout = timeout;
 
   // ---- Lifecycle ----
 
@@ -130,42 +148,8 @@ class Engine {
 
       // 使用绝对路径，避免 cmd /c 无法解析相对路径
       final absolutePath = engineFile.absolute.path;
-      _process = await Process.start(
-        Platform.isWindows ? 'cmd' : absolutePath,
-        Platform.isWindows ? ['/c', absolutePath] : [],
-        workingDirectory: engineFile.parent.path,
-      );
-
-      _isRunning = true;
+      await _startProcess(engineFile, absolutePath);
       _log('Engine process started (PID: ${_process!.pid})');
-
-      // Listen to stdout
-      _process!.stdout
-          .transform(systemEncoding.decoder)
-          .transform(const LineSplitter())
-          .listen(
-            _handleEngineOutput,
-            onDone: _handleEngineExit,
-            onError: _handleEngineError,
-          );
-
-      // Listen to stderr
-      _process!.stderr
-          .transform(systemEncoding.decoder)
-          .transform(const LineSplitter())
-          .listen(
-            (line) => _log('STDERR: $line'),
-            onDone: () {},
-            onError: (e) => _emitEvent(EngineError('Engine stderr: $e')),
-          );
-
-      // Feed stdin from our controller
-      _stdinSubscription = _stdinController.stream.listen((cmd) {
-        if (_process != null) {
-          _process!.stdin.writeln(cmd);
-        }
-        _log('>> $cmd');
-      }, onError: (e) => _log('stdin error: $e'));
 
       // Send UCI/UCCI command based on protocol setting
       final protocolOk = await _handshake();
@@ -227,6 +211,10 @@ class Engine {
   }
 
   Future<void> _cleanupProcess() async {
+    await _stdoutSubscription?.cancel();
+    _stdoutSubscription = null;
+    await _stderrSubscription?.cancel();
+    _stderrSubscription = null;
     await _stdinSubscription?.cancel();
     _stdinSubscription = null;
     _process = null;
@@ -240,7 +228,7 @@ class Engine {
     );
     _isRunning = true;
 
-    _process!.stdout
+    _stdoutSubscription = _process!.stdout
         .transform(systemEncoding.decoder)
         .transform(const LineSplitter())
         .listen(
@@ -249,7 +237,7 @@ class Engine {
           onError: _handleEngineError,
         );
 
-    _process!.stderr
+    _stderrSubscription = _process!.stderr
         .transform(systemEncoding.decoder)
         .transform(const LineSplitter())
         .listen(
@@ -285,7 +273,6 @@ class Engine {
         return ok;
 
       case EngineProtocol.auto:
-      default:
         // 先尝试 UCI
         await _sendCommand('uci');
         final uciOk = await _waitForPattern(
@@ -461,6 +448,9 @@ class Engine {
       await stopAnalysis();
     }
 
+    // 同步更新 _currentFen，确保 _fenToMoveColor 计算正确的 moveColor
+    _currentFen = fen;
+
     _bestMoveCompleter = Completer<String>();
 
     await _sendCommand('position fen $fen');
@@ -489,6 +479,9 @@ class Engine {
 
   // ---- Coordinate Conversion ----
 
+  /// 发送命令到引擎 stdin。所有调用方都 `await` 等待（约定俗成的 API 形状），
+  /// 但实际实现是同步的（StreamController.add 是即时触发）—— 保留 async 关键字
+  /// 以保持与现有 28 个 await 调用方兼容。未来如果引入真正的写入背压可改实现。
   Future<void> _sendCommand(String cmd) async {
     _stdinController.add(cmd);
   }
@@ -502,58 +495,107 @@ class Engine {
     late StreamSubscription sub;
     Timer? timer;
 
+    // 兑底：超时定时器与事件到达路径都可能尝试 complete，必须检查 isCompleted
+    // 避免重复 complete 报 `Bad state: Future already completed`
     timer = Timer(timeout, () {
+      timer = null;
       sub.cancel();
-      completer.complete(false);
+      if (!completer.isCompleted) completer.complete(false);
     });
 
     sub = _eventController.stream.listen((event) {
       if (event is EngineRawLine && event.line.contains(pattern)) {
         timer?.cancel();
+        timer = null;
         sub.cancel();
-        completer.complete(true);
+        if (!completer.isCompleted) completer.complete(true);
       }
     });
 
     return completer.future;
   }
 
+  // 输出行分发表：按顺序匹配，第一个命中者处理。
+  // 使用 late final + 函数引用，由于引用了实例方法不能设为 const。
+  late final List<_LineRule> _lineRules = [
+    _LineRule.exact('uciok', _onUciOk),
+    _LineRule.startsWith('id name ', _onIdName),
+    _LineRule.startsWith('id author ', _onIdAuthor),
+    _LineRule.startsWith('option name ', _onOptionName),
+    _LineRule.startsWith('bestmove ', _onBestMove),
+    _LineRule.startsWith('info ', _onInfo),
+  ];
+
   void _handleEngineOutput(String line) {
-    //_log('<< $line');
     _emitEvent(EngineRawLine(line));
 
     final trimmed = line.trim();
     if (trimmed.isEmpty) return;
 
-    if (trimmed == 'uciok') {
-      _emitEvent(EngineUCIOk());
-    } else if (trimmed == 'readyok') {
-      // Complete ready completer if waiting
-      _readyCompleter?.complete();
-    } else if (trimmed.startsWith('id name ')) {
-      _engineName = trimmed.substring(8).trim();
-      _emitEvent(EngineInfoEvent(name: _engineName));
-    } else if (trimmed.startsWith('id author ')) {
-      _engineAuthor = trimmed.substring(10).trim();
-      _emitEvent(EngineInfoEvent(author: _engineAuthor));
-    } else if (trimmed.startsWith('option name ')) {
-      final option = _parseOption(trimmed);
-      if (option != null) {
-        _options[option.name] = option;
-        _emitEvent(EngineInfoEvent(option: option));
+    for (final rule in _lineRules) {
+      if (rule.matches(trimmed)) {
+        rule.handler(trimmed);
+        return;
       }
-    } else if (trimmed.startsWith('bestmove ')) {
-      _isAnalyzing = false;
-      _parseBestMove(trimmed);
-      _bestMoveCompleter?.complete(_bestMove);
-      _stopCompleter?.complete();
-      _emitEvent(EngineBestMove(_bestMove ?? ''));
-    } else if (trimmed.startsWith('info ')) {
-      final info = _parseInfo(trimmed);
-      if (info != null) {
-        _currentInfos.add(info);
-        _emitEvent(EngineAnalysisUpdate(info, List.from(_currentInfos)));
-      }
+    }
+  }
+
+  void _onUciOk(String line) {
+    _emitEvent(EngineUCIOk());
+  }
+
+  void _onIdName(String line) {
+    _engineName = line.substring('id name '.length).trim();
+    _emitEvent(EngineInfoEvent(name: _engineName));
+  }
+
+  void _onIdAuthor(String line) {
+    _engineAuthor = line.substring('id author '.length).trim();
+    _emitEvent(EngineInfoEvent(author: _engineAuthor));
+  }
+
+  void _onOptionName(String line) {
+    final option = _parseOption(line);
+    if (option != null) {
+      _options[option.name] = option;
+      _emitEvent(EngineInfoEvent(option: option));
+    }
+  }
+
+  void _onBestMove(String line) {
+    _isAnalyzing = false;
+    _parseBestMove(line);
+    _bestMoveCompleter?.complete(_bestMove);
+    _stopCompleter?.complete();
+    _emitEvent(EngineBestMove(_bestMove ?? ''));
+  }
+
+  void _onInfo(String line) {
+    final info = _parseInfo(line);
+    if (info != null) {
+      _currentInfos.add(info);
+      _updateBestInfo(info);
+      _emitEvent(EngineAnalysisUpdate(info, List.from(_currentInfos)));
+    }
+  }
+
+  /// 维护主变着 (multipv=1) 中最新一条 _bestInfo。
+  ///
+  /// 原来的实现 _bestInfo 永远为 null（仅 newGame/analyze 中被重置为 null），
+  /// 导致外部轮询 bestInfo!.pv.isNotEmpty 永远不会成立——属于死字段。
+  /// 这里仅以 multipv=1 作为主变着信号，更新原则是“同深度下分数更高才覆盖”。
+  void _updateBestInfo(EngineInfo info) {
+    if (info.multipv != 1) return;
+    final current = _bestInfo;
+    // 冱度更大时无条件覆盖（深度优先）
+    if (current == null || info.depth > current.depth) {
+      _bestInfo = info;
+      return;
+    }
+    // 同深度下，adjustedScore 更大才覆盖（红方视角）
+    if (info.depth == current.depth &&
+        info.adjustedScore > current.adjustedScore) {
+      _bestInfo = info;
     }
   }
 
@@ -669,25 +711,33 @@ class Engine {
   }
 
   UCIOption? _parseOption(String line) {
-    // option name Hash type spin default 128 min 16 max 8192
-    // option name Clear Hash type button
-    // option name MultiPV type spin default 1 min 1 max 64
-    // option name UCI_EngineMode type check default true
+    // UCI 选项格式：
+    //   option name <Name> type check [default <bool>]
+    //   option name <Name> type spin  [default <n>] [min <n>] [max <n>]
+    //   option name <Name> type string [default <text with spaces>]
+    //   option name <Name> type combo [default <var>] [var <v1> [var <v2>] ...]
+    //   option name <Name> type button
+    //   option name <Name> type filename [default <text with spaces>]
 
-    final parts = line.split(' ');
-    if (parts.length < 5) return null;
+    // 定位 "type" 关键字的下标—— name 可能含空格，但 type 以后是枚举值
+    // 这样的逆向查找避免了 split(' ') 后的 i++ 走位
+    final typeIdx = line.indexOf(' type ');
+    if (typeIdx < 0) return null;
+    final typeStart = typeIdx + 6; // " type " 长度
 
-    if (parts[2] != 'name') return null;
+    // option name 的开头是固定的，取中间部分作为 name
+    const prefix = 'option name ';
+    if (!line.startsWith(prefix)) return null;
+    final name = line.substring(prefix.length, typeIdx);
 
-    int i = 3;
-    String name = parts[i++];
+    // 从 type 之后扫描下一个空格作为 type 结束
+    final tailStart = _skipChar(line, typeStart, ' ');
+    if (tailStart >= line.length) return null;
+    final typeEnd = line.indexOf(' ', tailStart);
+    final typeStr = typeEnd < 0
+        ? line.substring(tailStart)
+        : line.substring(tailStart, typeEnd);
 
-    // Collect rest of line for type and optional params
-    if (i >= parts.length) return null;
-    if (parts[i++] != 'type') return null;
-    if (i >= parts.length) return null;
-
-    final typeStr = parts[i++];
     UCIOptionType? type;
     String? defaultValue;
     int? min;
@@ -696,49 +746,41 @@ class Engine {
     switch (typeStr) {
       case 'check':
         type = UCIOptionType.check;
-        if (i < parts.length && parts[i] != 'default') {
-          defaultValue = parts[i++];
+        final (val, _) = _consumeKeyValue(line, typeEnd, 'default');
+        if (val != null) {
+          defaultValue = val;
         } else {
+          // UCI 规范中 `default` 必现，兑底是常见容错
           defaultValue = 'false';
         }
         break;
       case 'spin':
         type = UCIOptionType.spin;
-        if (i < parts.length && parts[i] == 'default') {
-          defaultValue = parts[++i];
-          i++;
-        }
-        if (i < parts.length && parts[i] == 'min') {
-          min = int.tryParse(parts[++i]);
-          i++;
-        }
-        if (i < parts.length && parts[i] == 'max') {
-          max = int.tryParse(parts[++i]);
-        }
+        final (def, afterDefault) = _consumeKeyValue(line, typeEnd, 'default');
+        defaultValue = def;
+        final (lo, afterMin) = _consumeKeyValue(line, afterDefault, 'min');
+        if (lo != null) min = int.tryParse(lo);
+        final (hi, _) = _consumeKeyValue(line, afterMin, 'max');
+        if (hi != null) max = int.tryParse(hi);
         break;
       case 'string':
         type = UCIOptionType.string;
-        if (i < parts.length && parts[i] == 'default') {
-          defaultValue = parts.sublist(++i).join(' ');
-          i = parts.length;
-        }
+        final (val, _) = _consumeKeyValueToEnd(line, typeEnd, 'default');
+        defaultValue = val;
         break;
       case 'combo':
         type = UCIOptionType.combo;
-        if (i < parts.length && parts[i] == 'default') {
-          defaultValue = parts[++i];
-          i++;
-        }
+        final (val, _) = _consumeKeyValue(line, typeEnd, 'default');
+        defaultValue = val;
+        // var <v1> [var <v2>] ... 暂不提取详细列表，需要可另行解析
         break;
       case 'button':
         type = UCIOptionType.button;
         break;
       case 'filename':
         type = UCIOptionType.filename;
-        if (i < parts.length && parts[i] == 'default') {
-          defaultValue = parts.sublist(++i).join(' ');
-          i = parts.length;
-        }
+        final (val, _) = _consumeKeyValueToEnd(line, typeEnd, 'default');
+        defaultValue = val;
         break;
       default:
         return null;
@@ -753,11 +795,72 @@ class Engine {
     );
   }
 
+  /// 从 [startIdx] 开始跳过连续的 [ch]，返回跳过后的下标（可能 == length）
+  static int _skipChar(String s, int startIdx, String ch) {
+    var i = startIdx;
+    while (i < s.length && s[i] == ch) {
+      i++;
+    }
+    return i;
+  }
+
+  /// 从 [startIdx] 开始找 ` <key> ` 关键字，提取下一个空格分隔的值。
+  /// 返回 (value, afterValue)——afterValue 是取值后的下标，可用于链式调用。
+  /// 未找到时返回 (null, startIdx)。
+  static (String?, int) _consumeKeyValue(
+    String line,
+    int startIdx,
+    String key,
+  ) {
+    if (startIdx < 0 || startIdx >= line.length) return (null, startIdx);
+    final keyIdx = line.indexOf(' $key ', startIdx);
+    if (keyIdx < 0) return (null, startIdx);
+    final valStart = keyIdx + key.length + 2; // " <key> " 长度
+    if (valStart >= line.length) return (null, startIdx);
+    final valEnd = line.indexOf(' ', valStart);
+    final val = valEnd < 0
+        ? line.substring(valStart)
+        : line.substring(valStart, valEnd);
+    return (val, valEnd < 0 ? line.length : valEnd);
+  }
+
+  /// 与 [_consumeKeyValue] 类似，但取值到行末（用于 string/filename 类型，
+  /// 其 default 值可以含空格）。
+  static (String?, int) _consumeKeyValueToEnd(
+    String line,
+    int startIdx,
+    String key,
+  ) {
+    if (startIdx < 0 || startIdx >= line.length) return (null, startIdx);
+    final keyIdx = line.indexOf(' $key ', startIdx);
+    if (keyIdx < 0) return (null, startIdx);
+    final valStart = keyIdx + key.length + 2;
+    if (valStart >= line.length) return (null, startIdx);
+    return (line.substring(valStart), line.length);
+  }
+
   void _handleEngineExit() {
     _log('Engine process exited');
     _isRunning = false;
     _isReady = false;
     _isAnalyzing = false;
+
+    // 兑底未完成的 Completer，避免调用方永久挂起
+    // getBestMove 的调用者依赖 _bestMoveCompleter 完成来获取着法
+    // stopAnalysis 的调用者依赖 _stopCompleter 完成
+    if (_bestMoveCompleter != null && !_bestMoveCompleter!.isCompleted) {
+      _bestMoveCompleter!.completeError(
+        StateError('Engine exited before bestmove'),
+      );
+    }
+    _bestMoveCompleter = null;
+    if (_stopCompleter != null && !_stopCompleter!.isCompleted) {
+      _stopCompleter!.completeError(
+        StateError('Engine exited before stop acknowledged'),
+      );
+    }
+    _stopCompleter = null;
+
     _emitEvent(EngineExited());
   }
 
@@ -780,6 +883,10 @@ class Engine {
 
   /// Dispose resources.
   Future<void> dispose() async {
+    await _stdoutSubscription?.cancel();
+    _stdoutSubscription = null;
+    await _stderrSubscription?.cancel();
+    _stderrSubscription = null;
     await _stdinSubscription?.cancel();
     _stdinSubscription = null;
     await stop();
@@ -875,13 +982,16 @@ class EngineInfo {
 
   /// Score adjusted to red's perspective (positive = red better).
   int get adjustedScore {
+    if (score == null) return 0;
     if (isMate) {
-      return score != null ? score!.abs() : 0;
+      // score > 0: side to move can mate (winning)
+      // score < 0: side to move will be mated (losing)
+      // Convert to red's perspective: preserve sign, then flip for black
+      final mateScore = score!.abs();
+      final signed = score! > 0 ? mateScore : -mateScore;
+      return moveColor == PieceColor.black ? -signed : signed;
     }
-    if (moveColor == PieceColor.black) {
-      return score != null ? -score! : 0;
-    }
-    return score ?? 0;
+    return moveColor == PieceColor.black ? -score! : score!;
   }
 
   /// Best move in ICCS format.

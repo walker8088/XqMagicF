@@ -9,6 +9,8 @@ import '../utils/constants.dart';
 import '../viewmodels/game_viewmodel.dart';
 import '../widgets/board/chess_board.dart';
 import '../widgets/common/analysis_panel.dart';
+import '../widgets/common/board_edit_panel.dart';
+import '../widgets/common/dense_dropdown.dart';
 import '../widgets/common/move_history_panel.dart';
 import '../widgets/common/opening_browser.dart';
 import 'pgn_dialog.dart';
@@ -24,7 +26,6 @@ class GameScreen extends StatefulWidget {
 class _GameScreenState extends State<GameScreen> {
   late MultiSplitViewController _splitController;
   late MultiSplitViewController _verticalSplitController;
-  bool _lastShowLeft = false;
 
   @override
   void initState() {
@@ -32,9 +33,17 @@ class _GameScreenState extends State<GameScreen> {
     // 初始显示云库查询左侧面板
     _splitController = MultiSplitViewController(
       areas: [
-        Area(size: 260, min: 0, max: 500),
+        Area(
+          size: AppConstants.defaultSidePanelWidth,
+          min: 0,
+          max: AppConstants.maxSidePanelWidth,
+        ),
         Area(flex: 1),
-        Area(size: 280, min: 200, max: 500),
+        Area(
+          size: AppConstants.defaultRightPanelWidth,
+          min: AppConstants.minRightPanelWidth,
+          max: AppConstants.maxSidePanelWidth,
+        ),
       ],
     );
     // 垂直分栏：主内容区和底部面板
@@ -57,18 +66,13 @@ class _GameScreenState extends State<GameScreen> {
   Widget build(BuildContext context) {
     return Consumer<GameViewModel>(
       builder: (context, vm, _) {
-        // 左侧面板状态变化时更新分栏
+        // 左侧面板状态变化时，在 build 之外异步更新分栏
+        // （build 应为纯函数，setter/notify 会触发额外 build）
         final shouldShowLeft =
             vm.leftPanel != PanelType.none || vm.cloudResult != null;
-        if (shouldShowLeft != _lastShowLeft) {
-          _lastShowLeft = shouldShowLeft;
-          final leftSize = shouldShowLeft ? 260.0 : 0.0;
-          _splitController.areas = [
-            Area(size: leftSize, min: 0, max: 500),
-            Area(flex: 1),
-            Area(size: 280, min: 200, max: 500),
-          ];
-        }
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _syncLeftPanelVisibility(shouldShowLeft);
+        });
 
         return Scaffold(
           body: Container(
@@ -87,7 +91,7 @@ class _GameScreenState extends State<GameScreen> {
                     data: MultiSplitViewThemeData(
                       dividerPainter: DividerPainters.grooved2(
                         backgroundColor: const Color(0xFF2E1A0E),
-                        color: const Color(0xFFF5DEB3).withOpacity(0.5),
+                        color: const Color(0xFFF5DEB3).withValues(alpha: 0.5),
                         thickness: 4,
                       ),
                     ),
@@ -104,7 +108,7 @@ class _GameScreenState extends State<GameScreen> {
                                   backgroundColor: const Color(0xFF2E1A0E),
                                   color: const Color(
                                     0xFFF5DEB3,
-                                  ).withOpacity(0.3),
+                                  ).withValues(alpha: 0.3),
                                   thickness: 2,
                                 ),
                               ),
@@ -171,6 +175,11 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildRightPanel(BuildContext context, GameViewModel vm) {
+    // 棋盘编辑模式：显示编辑面板
+    if (vm.isBoardEditMode) {
+      return BoardEditPanel(viewModel: vm);
+    }
+
     return Container(
       decoration: const BoxDecoration(
         border: Border(left: BorderSide(color: Colors.white12, width: 1)),
@@ -200,10 +209,36 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
+  /// 同步左侧面板的可见性到分栏控制器。
+  ///
+  /// 必须避免在 build 阶段直接修改 [_splitController]，因为：
+  /// 1. build 应为纯函数
+  /// 2. 同步修改会触发额外 build，可能产生闪烁
+  ///
+  /// 通过 [addPostFrameCallback] 在当前帧渲染后再更新。
+  void _syncLeftPanelVisibility(bool shouldShowLeft) {
+    final newLeftSize = shouldShowLeft
+        ? AppConstants.defaultSidePanelWidth
+        : 0.0;
+    final currentAreas = _splitController.areas;
+    if (currentAreas.isNotEmpty && currentAreas[0].size == newLeftSize) {
+      return; // 无变化
+    }
+    _splitController.areas = [
+      Area(size: newLeftSize, min: 0, max: AppConstants.maxSidePanelWidth),
+      Area(flex: 1),
+      Area(
+        size: AppConstants.defaultRightPanelWidth,
+        min: AppConstants.minRightPanelWidth,
+        max: AppConstants.maxSidePanelWidth,
+      ),
+    ];
+  }
+
   Widget _buildTopBar(BuildContext context, GameViewModel vm) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      color: Colors.black.withOpacity(0.3),
+      color: Colors.black.withValues(alpha: 0.3),
       child: Row(
         children: [
           const Text(
@@ -215,15 +250,11 @@ class _GameScreenState extends State<GameScreen> {
             ),
           ),
           const SizedBox(width: 16),
-          DropdownButton<GameMode>(
+          DenseDropdown<GameMode>(
             value: vm.mode,
-            dropdownColor: const Color(0xFF3E2723),
-            underline: const SizedBox.shrink(),
-            style: const TextStyle(color: Colors.white, fontSize: 13),
-            items: GameMode.values
-                .map((m) => DropdownMenuItem(value: m, child: Text(m.label)))
-                .toList(),
-            onChanged: (v) => v != null ? vm.setMode(v) : null,
+            items: GameMode.values,
+            label: (m) => m.label,
+            onChanged: vm.setMode,
           ),
           const SizedBox(width: 16),
           const VerticalDivider(color: Colors.white24, width: 1),
@@ -342,6 +373,14 @@ class _GameScreenState extends State<GameScreen> {
       message: tooltip,
       child: TextButton(
         onPressed: onPressed,
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          backgroundColor: isActive
+              ? Colors.white.withValues(alpha: 0.1)
+              : null,
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -362,12 +401,6 @@ class _GameScreenState extends State<GameScreen> {
             ],
           ],
         ),
-        style: TextButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          minimumSize: Size.zero,
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          backgroundColor: isActive ? Colors.white.withOpacity(0.1) : null,
-        ),
       ),
     );
   }
@@ -381,7 +414,7 @@ class _GameScreenState extends State<GameScreen> {
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             child: Row(
               children: [
                 const Icon(Icons.cloud, size: 16, color: Color(0xFFF5DEB3)),
@@ -409,9 +442,8 @@ class _GameScreenState extends State<GameScreen> {
             child: vm.cloudResult != null
                 ? CloudMoveList(
                     pieces: vm.engine.board.pieces,
-                    activeColor: vm.engine.currentTurn,
                     moves: vm.cloudResult!.moves,
-                    onMoveTap: (iccs) => vm.playEngineMove(iccs),
+                    onMoveTap: (iccs) => vm.engineMove(iccs),
                   )
                 : vm.isCloudQuerying
                 ? Center(
@@ -469,7 +501,7 @@ class _GameScreenState extends State<GameScreen> {
   Widget _buildBottomPanel(BuildContext context, GameViewModel vm) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      color: Colors.black.withOpacity(0.3),
+      color: Colors.black.withValues(alpha: 0.3),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -478,7 +510,7 @@ class _GameScreenState extends State<GameScreen> {
           Row(
             children: [
               // 分析模式
-              _dropdown(
+              DenseDropdown<EngineAnalysisMode>(
                 value: vm.analysisMode,
                 items: EngineAnalysisMode.values,
                 label: (m) => m.label,
@@ -492,19 +524,12 @@ class _GameScreenState extends State<GameScreen> {
                 style: TextStyle(color: Colors.white70, fontSize: 12),
               ),
               const SizedBox(width: 4),
-              SizedBox(
+              DenseDropdown<int>(
+                value: vm.multiPV,
+                items: List.generate(AppConstants.maxMultiPV, (i) => i + 1),
+                label: (v) => '$v',
+                onChanged: vm.setMultiPV,
                 width: 50,
-                child: DropdownButton<int>(
-                  value: vm.multiPV,
-                  isDense: true,
-                  dropdownColor: const Color(0xFF3E2723),
-                  underline: const SizedBox.shrink(),
-                  style: const TextStyle(color: Colors.white, fontSize: 12),
-                  items: List.generate(5, (i) => i + 1)
-                      .map((v) => DropdownMenuItem(value: v, child: Text('$v')))
-                      .toList(),
-                  onChanged: (v) => v != null ? vm.setMultiPV(v) : null,
-                ),
               ),
             ],
           ),
@@ -514,13 +539,10 @@ class _GameScreenState extends State<GameScreen> {
           Flexible(
             child: LiveAnalysisPanel(
               engineInfos: vm.engineInfos,
-              isEngineReady: vm.isEngineReady,
-              isAnalyzing: vm.isAnalyzing,
-              isThinking: vm.isEngineThinking,
               bestMove: vm.engineBestMove,
               board: vm.lastMove?.boardAfter ?? vm.engine.board.pieces,
               activeColor: vm.lastMove?.nextColor ?? vm.engine.currentTurn,
-              onBestMoveTap: (iccs) => vm.playEngineMove(iccs),
+              onBestMoveTap: (iccs) => vm.engineMove(iccs),
             ),
           ),
         ],
@@ -528,33 +550,10 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  Widget _dropdown<T>({
-    required T value,
-    required List<T> items,
-    required String Function(T) label,
-    required void Function(T) onChanged,
-    String? tooltip,
-  }) {
-    return Tooltip(
-      message: tooltip ?? '',
-      child: DropdownButton<T>(
-        value: value,
-        isDense: true,
-        dropdownColor: const Color(0xFF3E2723),
-        underline: const SizedBox.shrink(),
-        style: const TextStyle(color: Colors.white, fontSize: 12),
-        items: items.map((item) {
-          return DropdownMenuItem(value: item, child: Text(label(item)));
-        }).toList(),
-        onChanged: (v) => v != null ? onChanged(v) : null,
-      ),
-    );
-  }
-
   Widget _buildStatusBar(GameViewModel vm) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      color: Colors.black.withOpacity(0.4),
+      color: Colors.black.withValues(alpha: 0.4),
       child: Row(
         children: [
           Container(
@@ -591,6 +590,22 @@ class _GameScreenState extends State<GameScreen> {
               ),
               child: const Text(
                 '胜负已分',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          if (vm.gameState == GameState.draw)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.blueGrey,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Text(
+                '和棋',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -649,47 +664,90 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _showEditFenDialog(BuildContext context, GameViewModel vm) {
-    final controller = TextEditingController(
-      text: vm.gameTree.currentFen ?? '',
-    );
+    // 使用 StatefulWidget 包装对话框以管理 TextEditingController 生命周期
+    // 避免以前那种每次打开都泄漏一个 ChangeNotifier 的问题。
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('编辑局面 FEN'),
-        content: TextField(
-          controller: controller,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            hintText: '输入 FEN 字符串...',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              vm.loadFromFen(controller.text);
-              Navigator.pop(ctx);
-            },
-            child: const Text('加载'),
-          ),
-        ],
-      ),
-    );
+      builder: (ctx) =>
+          _EditFenDialog(initialFen: vm.gameTree.currentFen ?? ''),
+    ).then((result) {
+      if (result is String && result.trim().isNotEmpty) {
+        vm.loadFromFen(result);
+      }
+    });
   }
 
-  void _copyFen(BuildContext context, GameViewModel vm) {
+  void _copyFen(BuildContext context, GameViewModel vm) async {
     final fen = vm.gameTree.currentFen ?? '';
-    Clipboard.setData(ClipboardData(text: fen));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('FEN 已复制到剪贴板'),
-        duration: Duration(seconds: 1),
-        backgroundColor: Color(0xFF3E2723),
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await Clipboard.setData(ClipboardData(text: fen));
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('FEN 已复制到剪贴板'),
+          duration: Duration(seconds: 1),
+          backgroundColor: Color(0xFF3E2723),
+        ),
+      );
+    } on Exception {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('复制失败'),
+          duration: Duration(seconds: 1),
+          backgroundColor: Color(0xFF3E2723),
+        ),
+      );
+    }
+  }
+}
+
+/// FEN 编辑对话框。独立 StatefulWidget 负责释放 [TextEditingController]。
+class _EditFenDialog extends StatefulWidget {
+  const _EditFenDialog({required this.initialFen});
+
+  final String initialFen;
+
+  @override
+  State<_EditFenDialog> createState() => _EditFenDialogState();
+}
+
+class _EditFenDialogState extends State<_EditFenDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialFen);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('编辑局面 FEN'),
+      content: TextField(
+        controller: _controller,
+        maxLines: 3,
+        decoration: const InputDecoration(
+          hintText: '输入 FEN 字符串...',
+          border: OutlineInputBorder(),
+        ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, _controller.text),
+          child: const Text('加载'),
+        ),
+      ],
     );
   }
 }

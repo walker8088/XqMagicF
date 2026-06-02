@@ -138,6 +138,15 @@ class _ParsedMove {
 class PGNService {
   PGNService();
 
+  // ──── 预编译正则（避免热路径重复编译） ────
+  static final _reHeader = RegExp(r'^\[(\w+)\s+"([^"]*)"\]');
+  static final _reIccs4 = RegExp(r'^\d{4}$');
+  static final _reNumber = RegExp(r'^\d+$');
+  static final _reMoveNumber = RegExp(r'^\d+\.$');
+  static final _reNAG = RegExp(r'^\$\d+$');
+  static final _reNagInText = RegExp(r'\$\d+');
+  static final _reDigit = RegExp(r'\d');
+
   // ─────────────────────────────────────────────
   // File I/O
   // ─────────────────────────────────────────────
@@ -259,7 +268,7 @@ class PGNService {
 
       if (trimmed.startsWith('[') && !foundMoveText) {
         // Parse header tag
-        final headerMatch = RegExp(r'^\[(\w+)\s+"(.*)"\]').firstMatch(trimmed);
+        final headerMatch = _reHeader.firstMatch(trimmed);
         if (headerMatch != null) {
           final tag = headerMatch.group(1)!;
           var value = headerMatch.group(2)!;
@@ -455,12 +464,12 @@ class PGNService {
   bool _isMoveNumber(_MoveTextTokenizer tokenizer) {
     final token = tokenizer.peek();
     // Match patterns like "1.", "12.", "123." or just the number before a dot
-    if (RegExp(r'^\d+$').hasMatch(token)) {
+    if (_reNumber.hasMatch(token)) {
       final next = tokenizer.peekNext();
       return next == '.';
     }
     // Also handle "1." as a single token
-    if (RegExp(r'^\d+\.$').hasMatch(token)) {
+    if (_reMoveNumber.hasMatch(token)) {
       return true;
     }
     return false;
@@ -474,12 +483,12 @@ class PGNService {
   }
 
   bool _isNAG(String token) {
-    return RegExp(r'^\$\d+$').hasMatch(token);
+    return _reNAG.hasMatch(token);
   }
 
   _ParsedMove? _tryParseMove(String token, PieceColor color) {
     // ICCS format: exactly 4 digits
-    if (RegExp(r'^\d{4}$').hasMatch(token)) {
+    if (_reIccs4.hasMatch(token)) {
       try {
         final (from, to) = MoveNotation.fromICCS(token);
         return _ParsedMove(from: from, to: to, color: color);
@@ -490,7 +499,7 @@ class PGNService {
 
     // Some PGN files might use lowercase or have spaces
     final cleaned = token.replaceAll(' ', '');
-    if (RegExp(r'^\d{4}$').hasMatch(cleaned)) {
+    if (_reIccs4.hasMatch(cleaned)) {
       return _tryParseMove(cleaned, color);
     }
 
@@ -519,7 +528,7 @@ class PGNService {
         errors.add(
           PGNParseError(
             message:
-                'Could not apply move ${MoveNotation.toICCS(MoveRecord(from: move.from, to: move.to, capturedPiece: null, color: move.color))}',
+                'Could not apply move ${MoveNotation.iccsOf(move.from, move.to)}',
           ),
         );
         continue;
@@ -595,7 +604,7 @@ class PGNService {
       errors.add(
         PGNParseError(
           message:
-              'No piece at ${move.from} to move (ICCS: ${MoveNotation.toICCS(MoveRecord(from: move.from, to: move.to, capturedPiece: null, color: move.color))})',
+              'No piece at ${move.from} to move (ICCS: ${MoveNotation.iccsOf(move.from, move.to)})',
         ),
       );
       return null;
@@ -624,6 +633,7 @@ class PGNService {
     return MoveRecord(
       from: move.from,
       to: move.to,
+      pieceType: piece.type,
       capturedPiece: captured,
       color: move.color,
     );
@@ -689,6 +699,11 @@ class PGNService {
 
   /// Generate move text from a GameTree
   String _generateMoveText(GameTree gameTree, GameResult result) {
+    // 访问 gameTree.root 会在未初始化时抛 LateInitializationError。
+    // 未初始化的 GameTree 是合法状态（例如刚创建还没 initFromFen），
+    // 此时只输出结果符号即可。
+    if (gameTree.current == null) return '';
+
     if (gameTree.root.children.isEmpty) {
       return gameTree.root.move != null ? gameTree.root.comment : '';
     }
@@ -696,33 +711,37 @@ class PGNService {
     final buffer = StringBuffer();
     final state = _MoveTextWriterState();
 
-    // Remember current path to restore position later
+    // 使用 try/finally 确保 gameTree.current 被恢复。
+    // 旧实现仅在 happy path 恢复，任何中间异常都会导致 gameTree 状态损坏。
     final savedPath = gameTree.current?.getPathFromRoot() ?? [];
-
-    // Go to start
     gameTree.goToStart();
-
-    _writeVariation(buffer, gameTree, state, result, 0);
-
-    // Restore current position by navigating back
-    gameTree.goToStart();
-    for (final index in savedPath) {
-      if (!gameTree.goForward(variationIndex: index)) break;
+    try {
+      _writeLine(buffer, gameTree, state);
+    } finally {
+      // Restore original position
+      gameTree.goToStart();
+      for (final index in savedPath) {
+        if (!gameTree.goForward(variationIndex: index)) break;
+      }
     }
 
+    buffer.write(result.symbol);
     return buffer.toString();
   }
 
-  void _writeVariation(
+  /// 递归写入一条主变线（及其所有变着）到 buffer。
+  ///
+  /// 合并原 `_writeVariation` 与 `_writeVariationLine`：二者 95% 逻辑相同。
+  /// 区别仅在于：主变着走到末尾写完结果后返回；嵌套变着走到末尾不加结果。
+  /// 以 `_isMainLine` 参数区分。
+  void _writeLine(
     StringBuffer buffer,
     GameTree gameTree,
-    _MoveTextWriterState state,
-    GameResult result,
-    int depth,
-  ) {
+    _MoveTextWriterState state, {
+    bool isMainLine = true,
+  }) {
     while (gameTree.current?.hasChildren == true) {
       final node = gameTree.current!;
-
       final child = node.mainLineChild!;
       final move = child.move;
       if (move == null) break;
@@ -738,8 +757,7 @@ class PGNService {
       state.halfMoveCount++;
 
       // Write move in ICCS
-      final iccs = MoveNotation.toICCS(move);
-      buffer.write('$iccs');
+      buffer.write(MoveNotation.toICCS(move));
 
       // Write NAG annotations
       if (child.moveAnnotation?.isNotEmpty == true) {
@@ -752,90 +770,27 @@ class PGNService {
       if (child.comment.isNotEmpty) {
         buffer.write(' {${child.comment}}');
       }
-
       buffer.write(' ');
 
-      // Write variations (children beyond the first)
+      // Write variations (siblings beyond the first child)
       for (int i = 1; i < node.children.length; i++) {
+        final sibling = node.children[i];
+        if (sibling.move == null) continue;
         buffer.write('(');
-        final variationChild = node.children[i];
-        final variationMove = variationChild.move;
-        if (variationMove != null) {
-          final variationState = _MoveTextWriterState(
-            halfMoveCount: state.halfMoveCount - 1,
-          );
-
-          // Navigate to variation
-          gameTree.goForward(variationIndex: i);
-
-          _writeVariationLine(buffer, gameTree, variationState, 0);
-
-          // Go back
+        // -1: 修正为父变着增 1 后的计数（变着从父节点同一位置开始）
+        final variationState = _MoveTextWriterState(
+          halfMoveCount: state.halfMoveCount - 1,
+        );
+        gameTree.goForward(variationIndex: i);
+        try {
+          _writeLine(buffer, gameTree, variationState, isMainLine: false);
+        } finally {
           gameTree.goBack();
         }
         buffer.write(') ');
       }
 
       // Go forward to main line child
-      gameTree.goForward();
-    }
-
-    // Write result at end
-    buffer.write(result.symbol);
-  }
-
-  void _writeVariationLine(
-    StringBuffer buffer,
-    GameTree gameTree,
-    _MoveTextWriterState state,
-    int depth,
-  ) {
-    while (gameTree.current?.hasChildren == true) {
-      final node = gameTree.current!;
-      final child = node.mainLineChild!;
-      final move = child.move;
-      if (move == null) break;
-
-      // Write move number
-      if (move.color == PieceColor.red) {
-        state.halfMoveCount++;
-        final moveNum = (state.halfMoveCount + 1) ~/ 2;
-        buffer.write('$moveNum. ');
-      } else {
-        buffer.write('${_moveNumber(state.halfMoveCount)}... ');
-      }
-      state.halfMoveCount++;
-
-      // Write move in ICCS
-      buffer.write('${MoveNotation.toICCS(move)}');
-
-      // Write annotations
-      if (child.moveAnnotation?.isNotEmpty == true) {
-        for (final nag in _parseNags(child.moveAnnotation!)) {
-          buffer.write(' $nag');
-        }
-      }
-
-      if (child.comment.isNotEmpty) {
-        buffer.write(' {${child.comment}}');
-      }
-
-      buffer.write(' ');
-
-      // Write sub-variations
-      for (int i = 1; i < node.children.length; i++) {
-        buffer.write('(');
-        gameTree.goForward(variationIndex: i);
-
-        final subState = _MoveTextWriterState(
-          halfMoveCount: state.halfMoveCount - 1,
-        );
-        _writeVariationLine(buffer, gameTree, subState, depth + 1);
-
-        gameTree.goBack();
-        buffer.write(') ');
-      }
-
       gameTree.goForward();
     }
   }
@@ -846,8 +801,7 @@ class PGNService {
 
   List<String> _parseNags(String annotation) {
     final nags = <String>[];
-    final regex = RegExp(r'\$\d+');
-    for (final match in regex.allMatches(annotation)) {
+    for (final match in _reNagInText.allMatches(annotation)) {
       nags.add(match.group(0)!);
     }
     return nags;
@@ -860,8 +814,6 @@ class _MoveTextWriterState {
   int halfMoveCount;
 }
 
-/// Simple board implementation for move application during PGN parsing.
-/// Uses 2D array _grid[row][col] internally, consistent with Board.
 /// Tokenizer for PGN move text
 class _MoveTextTokenizer {
   _MoveTextTokenizer(String text) {
@@ -902,7 +854,7 @@ class _MoveTextTokenizer {
       if (char == '\$') {
         final start = i;
         i++;
-        while (i < text.length && RegExp(r'\d').hasMatch(text[i])) {
+        while (i < text.length && PGNService._reDigit.hasMatch(text[i])) {
           i++;
         }
         tokens.add(text.substring(start, i));
@@ -910,9 +862,9 @@ class _MoveTextTokenizer {
       }
 
       // Move numbers and dots (e.g., "1.", "12.", or standalone "1")
-      if (RegExp(r'\d').hasMatch(char)) {
+      if (PGNService._reDigit.hasMatch(char)) {
         final start = i;
-        while (i < text.length && RegExp(r'\d').hasMatch(text[i])) {
+        while (i < text.length && PGNService._reDigit.hasMatch(text[i])) {
           i++;
         }
         if (i < text.length && text[i] == '.') {
@@ -923,26 +875,27 @@ class _MoveTextTokenizer {
       }
 
       // Results: 1-0, 0-1, 1/2-1/2, *
-      if (char == '*' || char == '1' || char == '0') {
-        // Check for result patterns
-        if (i + 2 < text.length &&
-            text.substring(i, i + 3) == '1/2' &&
-            i + 6 < text.length &&
-            text.substring(i, i + 7) == '1/2-1/2') {
-          tokens.add('1/2-1/2');
-          i += 7;
-          continue;
-        }
-        if (i + 2 < text.length && text.substring(i, i + 3) == '1-0') {
-          tokens.add('1-0');
-          i += 3;
-          continue;
-        }
-        if (i + 2 < text.length && text.substring(i, i + 3) == '0-1') {
-          tokens.add('0-1');
-          i += 3;
-          continue;
-        }
+      // 必须先匹配具体结果字符串，最后再处理单独的 '*'，否则 '*' 会卡死循环
+      if (i + 6 < text.length && text.substring(i, i + 7) == '1/2-1/2') {
+        tokens.add('1/2-1/2');
+        i += 7;
+        continue;
+      }
+      if (i + 2 < text.length && text.substring(i, i + 3) == '1-0') {
+        tokens.add('1-0');
+        i += 3;
+        continue;
+      }
+      if (i + 2 < text.length && text.substring(i, i + 3) == '0-1') {
+        tokens.add('0-1');
+        i += 3;
+        continue;
+      }
+      if (char == '*') {
+        // ongoing game result: 单个 '*'
+        tokens.add('*');
+        i++;
+        continue;
       }
 
       // Generic token (move notation, usually 4 digits for ICCS)

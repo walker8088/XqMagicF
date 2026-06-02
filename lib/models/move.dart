@@ -9,7 +9,7 @@ class MoveRecord {
   const MoveRecord({
     required this.from,
     required this.to,
-    this.pieceType,
+    required this.pieceType,
     this.capturedPiece,
     required this.color,
     this.notation,
@@ -22,7 +22,7 @@ class MoveRecord {
 
   final Coord from;
   final Coord to;
-  final PieceType? pieceType;
+  final PieceType pieceType;
 
   /// 被吃的棋子（null = 移动未吃子）
   /// 若 type == PieceType.king 则表示将/帅被吃，游戏结束
@@ -53,39 +53,49 @@ class MoveRecord {
   bool get killedKing =>
       capturedPiece != null && capturedPiece!.type == PieceType.king;
 
-  /// 创建副本并更新记谱
-  MoveRecord withNotation(String notation) {
+  /// 通用 copyWith：仅更新传入的字段
+  MoveRecord copyWith({
+    Coord? from,
+    Coord? to,
+    PieceType? pieceType,
+    ChessPiece? capturedPiece,
+    bool clearCapturedPiece = false,
+    PieceColor? color,
+    PieceColor? nextColor,
+    bool clearNextColor = false,
+    String? notation,
+    bool clearNotation = false,
+    Map<Coord, ChessPiece>? boardBefore,
+    Map<Coord, ChessPiece>? boardAfter,
+    String? fenBefore,
+    bool clearFenBefore = false,
+    String? fenAfter,
+    bool clearFenAfter = false,
+  }) {
     return MoveRecord(
-      from: from,
-      to: to,
-      pieceType: pieceType,
-      capturedPiece: capturedPiece,
-      color: color,
-      notation: notation,
-      nextColor: nextColor,
-      boardBefore: boardBefore,
-      boardAfter: boardAfter,
-      fenBefore: fenBefore,
-      fenAfter: fenAfter,
+      from: from ?? this.from,
+      to: to ?? this.to,
+      pieceType: pieceType ?? this.pieceType,
+      capturedPiece: clearCapturedPiece
+          ? null
+          : (capturedPiece ?? this.capturedPiece),
+      color: color ?? this.color,
+      nextColor: clearNextColor ? null : (nextColor ?? this.nextColor),
+      notation: clearNotation ? null : (notation ?? this.notation),
+      boardBefore: boardBefore ?? this.boardBefore,
+      boardAfter: boardAfter ?? this.boardAfter,
+      fenBefore: clearFenBefore ? null : (fenBefore ?? this.fenBefore),
+      fenAfter: clearFenAfter ? null : (fenAfter ?? this.fenAfter),
     );
   }
 
+  /// 创建副本并更新记谱
+  MoveRecord withNotation(String notation) =>
+      copyWith(notation: notation, clearNotation: false);
+
   /// 创建副本并设置下一步走子方
-  MoveRecord withNextColor(PieceColor nextColor) {
-    return MoveRecord(
-      from: from,
-      to: to,
-      pieceType: pieceType,
-      capturedPiece: capturedPiece,
-      color: color,
-      notation: notation,
-      nextColor: nextColor,
-      boardBefore: boardBefore,
-      boardAfter: boardAfter,
-      fenBefore: fenBefore,
-      fenAfter: fenAfter,
-    );
-  }
+  MoveRecord withNextColor(PieceColor nextColor) =>
+      copyWith(nextColor: nextColor, clearNextColor: false);
 
   /// 创建完整副本（含走子前后状态）
   MoveRecord withBoardState({
@@ -94,14 +104,7 @@ class MoveRecord {
     required String fenBefore,
     required String fenAfter,
   }) {
-    return MoveRecord(
-      from: from,
-      to: to,
-      pieceType: pieceType,
-      capturedPiece: capturedPiece,
-      color: color,
-      notation: notation,
-      nextColor: nextColor,
+    return copyWith(
       boardBefore: boardBefore,
       boardAfter: boardAfter,
       fenBefore: fenBefore,

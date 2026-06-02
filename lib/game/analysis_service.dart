@@ -30,9 +30,15 @@ class AnalysisService {
   /// 云库查询结果（可由外部读取）
   CloudQueryResult? cloudResult;
 
+  /// 云库查询完成回调（用于通知 UI 刷新）
+  Function()? onCloudResultUpdated;
+
   /// 是否正在查询云库
   bool get isCloudQuerying => _isCloudQuerying;
   bool _isCloudQuerying = false;
+
+  /// 云库查询代次（用于丢弃过期结果）
+  int _cloudQueryGeneration = 0;
 
   // ──────────── 分析触发 ────────────
 
@@ -47,18 +53,24 @@ class AnalysisService {
 
   // ──────────── 云库查询 ────────────
 
-  void _queryCloud(String fen) {
+  Future<void> _queryCloud(String fen) async {
     _isCloudQuerying = true;
+    final generation = ++_cloudQueryGeneration;
 
-    _cloudDB
-        .query(fen)
-        .then((result) {
-          cloudResult = result;
-          _isCloudQuerying = false;
-        })
-        .catchError((error) {
-          _isCloudQuerying = false;
-        });
+    try {
+      final result = await _cloudDB.query(fen);
+      // 仅当代次匹配时才更新（丢弃过期查询结果）
+      if (generation == _cloudQueryGeneration) {
+        cloudResult = result;
+      }
+    } catch (e) {
+      _log('Cloud query failed: $e');
+    } finally {
+      if (generation == _cloudQueryGeneration) {
+        _isCloudQuerying = false;
+      }
+      onCloudResultUpdated?.call();
+    }
   }
 
   /// 手动触发云库查询

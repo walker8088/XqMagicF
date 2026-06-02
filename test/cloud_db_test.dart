@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xqmagic/services/cloud_db.dart';
+import 'package:xqmagic/utils/lru_cache.dart';
 
 void main() {
   group('CloudQueryResult', () {
@@ -184,10 +185,6 @@ void main() {
       expect(client.cache.size, 0);
     });
 
-    test('should not be querying initially', () {
-      expect(client.isQuerying, isFalse);
-    });
-
     test('should have correct base URL', () {
       expect(CloudDBClient.baseUrl, 'https://www.chessdb.cn/chessdb.php');
     });
@@ -199,27 +196,29 @@ void main() {
       });
     });
 
-    group('listeners', () {
-      test('should add and remove listeners', () {
-        void listener(CloudQueryResult? result) {}
-        client.addListener(listener);
-        client.removeListener(listener);
-        // No exception means it worked
-      });
-
-      test('should not fail when removing non-existent listener', () {
-        void listener(CloudQueryResult? result) {}
-        client.removeListener(listener);
-        // Should not throw
-      });
-    });
-
     group('clearCache', () {
       test('should clear the cache', () {
-        // Note: We can't actually populate the cache without a real query,
-        // but we can verify the method exists and calls cache.clear()
-        client.clearCache();
-        expect(client.cache.size, 0);
+        // 原实现是死测试：在空 cache 上调 clearCache()，再断言 size==0
+        // （本来就是 0）。这里用构造器注入预填数据的 cache，才有意义。
+        final prePopulated = LRUCache<String, CloudQueryResult>();
+        prePopulated.put(
+          'fen1',
+          CloudQueryResult(position: 'fen1', moves: [], bestMove: ''),
+        );
+        prePopulated.put(
+          'fen2',
+          CloudQueryResult(position: 'fen2', moves: [], bestMove: ''),
+        );
+        final c = CloudDBClient(cache: prePopulated);
+        expect(
+          c.cache.size,
+          2,
+          reason: 'sanity: pre-populated cache has 2 items',
+        );
+
+        c.clearCache();
+        expect(c.cache.size, 0);
+        expect(prePopulated.keys, isEmpty);
       });
     });
   });

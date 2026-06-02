@@ -90,6 +90,7 @@ void main() {
           color: PieceColor.red,
           coord: Coord(1, 2),
         );
+        // ignore: unrelated_type_equality_checks
         expect(piece == 'not a piece', isFalse);
       });
 

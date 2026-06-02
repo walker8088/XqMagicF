@@ -11,6 +11,45 @@ import 'package:xqmagic/utils/coord.dart';
 /// - 残局状态（puzzleState）
 /// - 面板可见性
 class GameStateManager extends ChangeNotifier {
+  // ──────────── 批量通知机制 ────────────
+
+  /// 嵌套批处理计数。> 0 时所有 notifyListeners() 被吞咽，
+  /// 仅在最外层 batch 退出时真正通知一次。
+  int _batchDepth = 0;
+  bool _pendingNotify = false;
+
+  /// 在一个 [action] 期间抑制重复通知，仅在 [action] 结束时最多触发一次。
+  ///
+  /// 用于多 setter 顺序调用造成多次 UI 重建的场景：
+  /// ```dart
+  /// stateManager.withBatchNotify(() {
+  ///   stateManager.selectPosition(pos);
+  ///   stateManager.setPossibleMoves(moves);
+  /// });
+  /// ```
+  /// 嵌套调用是安全的（计数 +1 / -1），仅最外层退出时才真正通知。
+  void withBatchNotify(void Function() action) {
+    _batchDepth++;
+    try {
+      action();
+    } finally {
+      _batchDepth--;
+      if (_batchDepth == 0 && _pendingNotify) {
+        _pendingNotify = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  @override
+  void notifyListeners() {
+    if (_batchDepth > 0) {
+      _pendingNotify = true;
+      return;
+    }
+    super.notifyListeners();
+  }
+
   // ──────────── 棋子选择状态 ────────────
 
   /// 当前选中位置
@@ -45,9 +84,13 @@ class GameStateManager extends ChangeNotifier {
   PanelType _leftPanel = PanelType.cloud;
   PanelType get leftPanel => _leftPanel;
 
-  /// 云库查询结果（用于控制左侧面板显示）
-  bool _hasCloudResult = false;
-  bool get hasCloudResult => _hasCloudResult;
+  /// 原子操作：同时设置选中位置和可行走法位置。
+  /// 比单独调用 [selectPosition] + [setPossibleMoves] 少一次 UI 重建。
+  void selectWithMoves(Coord? position, List<Coord> moves) {
+    _selectedPosition = position;
+    _possibleMoves = moves;
+    notifyListeners();
+  }
 
   // ──────────── 棋子选择方法 ────────────
 
@@ -150,12 +193,6 @@ class GameStateManager extends ChangeNotifier {
   /// 检查云库面板是否可见
   bool get isCloudPanelVisible => _leftPanel == PanelType.cloud;
 
-  /// 设置云库查询结果状态
-  void setHasCloudResult(bool hasResult) {
-    _hasCloudResult = hasResult;
-    notifyListeners();
-  }
-
   // ──────────── 状态重置 ────────────
 
   /// 重置所有 UI 状态
@@ -167,7 +204,6 @@ class GameStateManager extends ChangeNotifier {
     _puzzleSolutionIndex = 0;
     _puzzleCompleted = false;
     _leftPanel = PanelType.cloud;
-    _hasCloudResult = false;
     notifyListeners();
   }
 }

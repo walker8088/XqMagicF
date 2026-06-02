@@ -1,6 +1,5 @@
 import 'package:xqmagic/utils/app_logger.dart';
 import 'package:http/http.dart' as http;
-import 'package:xqmagic/utils/constants.dart';
 import 'package:xqmagic/utils/lru_cache.dart';
 
 /// 云端棋库查询结果
@@ -23,11 +22,7 @@ class CloudQueryResult {
   ///
   /// 格式: move:c3c4,score:1,rank:2,note:! (44-02),winrate:50.08|move:...
   /// [moveColor] 当前走子方，用于将得分转换为红方视角
-  static CloudQueryResult? parseResponse(
-    String body,
-    String position, {
-    PieceColor moveColor = PieceColor.red,
-  }) {
+  static CloudQueryResult? parseResponse(String body, String position) {
     if (body.isEmpty) return null;
 
     final moveStrings = body.split('|');
@@ -148,19 +143,6 @@ class CloudDBClient {
 
   LRUCache<String, CloudQueryResult> get cache => _cache;
 
-  bool _isQuerying = false;
-  bool get isQuerying => _isQuerying;
-
-  final List<void Function(CloudQueryResult?)> _listeners = [];
-
-  void addListener(void Function(CloudQueryResult?) listener) {
-    _listeners.add(listener);
-  }
-
-  void removeListener(void Function(CloudQueryResult?) listener) {
-    _listeners.remove(listener);
-  }
-
   /// 查询局面最佳着法
   Future<CloudQueryResult?> query(
     String positionFen, {
@@ -176,8 +158,6 @@ class CloudDBClient {
       }
     }
 
-    _isQuerying = true;
-
     try {
       final url = Uri.parse(
         baseUrl,
@@ -190,7 +170,6 @@ class CloudDBClient {
 
       if (response.statusCode != 200) {
         AppLogger.warn('CloudDB', '请求失败, 状态码: ${response.statusCode}');
-        _isQuerying = false;
         return null;
       }
 
@@ -205,35 +184,17 @@ class CloudDBClient {
         AppLogger.warn('CloudDB', '解析结果为空');
       }
 
-      for (final listener in List.from(_listeners)) {
-        listener(result);
-      }
-
-      _isQuerying = false;
       return result;
     } catch (e, st) {
       AppLogger.error('CloudDB', '查询异常: $e');
       AppLogger.debug('CloudDB', '堆栈: $st');
-      _isQuerying = false;
       return null;
     }
   }
 
-  /// 从 FEN 字符串提取走子方
-  static PieceColor _fenToMoveColor(String fen) {
-    final parts = fen.split(' ');
-    if (parts.length < 2) return PieceColor.red;
-    return parts[1].toLowerCase() == 'r' ? PieceColor.red : PieceColor.black;
-  }
-
   CloudQueryResult? _parseResponse(String body, String position) {
     AppLogger.debug('CloudDB', '开始解析文本响应, 长度: ${body.length}');
-    final moveColor = _fenToMoveColor(position);
-    final result = CloudQueryResult.parseResponse(
-      body,
-      position,
-      moveColor: moveColor,
-    );
+    final result = CloudQueryResult.parseResponse(body, position);
     if (result != null) {
       AppLogger.debug(
         'CloudDB',

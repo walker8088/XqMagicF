@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:path_provider/path_provider.dart';
+import 'package:xqmagic/utils/app_logger.dart';
 
 /// 音效管理器：走子、吃子、将军等音效
 class SoundManager {
@@ -130,11 +132,8 @@ class SoundManager {
     return bytes.toBytes();
   }
 
-  // Simple sin approximation
-  double _sin(double x) {
-    // Use Dart's built-in
-    return x.sin();
-  }
+  // Use dart:math sin instead of a custom Taylor-series approximation
+  double _sin(double x) => math.sin(x);
 
   void _writeInt16(BytesBuilder bytes, int value) {
     bytes.addByte(value & 0xFF);
@@ -179,20 +178,43 @@ class SoundManager {
   }
 
   /// 播放音效文件
+  ///
+  /// 各平台实现：
+  /// - **Windows**：通过 PowerShell 的 `Media.SoundPlayer` 播放
+  /// - **Linux**：优先 `paplay`（PulseAudio），fallback `aplay`（ALSA）
+  /// - **macOS**：使用内建 `afplay`
+  /// - **iOS / Android**：暂不支持（无依赖包），记录 debug 日志后跳过
   Future<void> _playSound(String? path) async {
     if (path == null) return;
     final file = File(path);
     if (!await file.exists()) return;
 
     try {
-      // 使用系统默认方式播放
-      // 在 Windows 上可以使用 Process.run 调用 powershell
-      await Process.run('powershell', [
-        '-c',
-        '(New-Object Media.SoundPlayer "$path").PlaySync();',
-      ]).timeout(const Duration(seconds: 2));
-    } catch (_) {
-      // 播放失败，静默处理
+      if (Platform.isWindows) {
+        await Process.run('powershell', [
+          '-c',
+          '(New-Object Media.SoundPlayer "$path").PlaySync();',
+        ]).timeout(const Duration(seconds: 2));
+      } else if (Platform.isLinux) {
+        final result = await Process.run('paplay', [path]).timeout(
+          const Duration(seconds: 2),
+          onTimeout: () => ProcessResult(1, 1, '', 'paplay timeout'),
+        );
+        if (result.exitCode != 0) {
+          await Process.run('aplay', [
+            path,
+          ]).timeout(const Duration(seconds: 2));
+        }
+      } else if (Platform.isMacOS) {
+        await Process.run('afplay', [path]).timeout(const Duration(seconds: 2));
+      } else {
+        AppLogger.debug(
+          'SoundManager',
+          '当前平台 (${Platform.operatingSystem}) 不支持本地音频播放，跳过',
+        );
+      }
+    } catch (e) {
+      AppLogger.warn('SoundManager', '播放失败 ($path): $e');
     }
   }
 
@@ -209,17 +231,5 @@ class SoundManager {
   /// 释放资源
   void dispose() {
     _initialized = false;
-  }
-}
-
-/// Extension for sin on double
-extension _DoubleExtension on double {
-  double sin() {
-    // Simple Taylor series approximation
-    double x = this;
-    // Normalize to -pi to pi
-    while (x > 3.14159265) x -= 2 * 3.14159265;
-    while (x < -3.14159265) x += 2 * 3.14159265;
-    return x - x * x * x / 6 + x * x * x * x * x / 120;
   }
 }

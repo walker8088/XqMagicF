@@ -210,6 +210,26 @@ class Board {
     }
   }
 
+  /// 获取所有棋子列表（直接从网格构建，不经过 Map）
+  List<ChessPiece> get pieceList {
+    final result = <ChessPiece>[];
+    for (int row = 0; row < AppConstants.boardRows; row++) {
+      for (int col = 0; col < AppConstants.boardCols; col++) {
+        final char = _grid[row][col];
+        if (char != '.') {
+          final entry = _charToPiece[char];
+          if (entry != null) {
+            final (type, color) = entry;
+            result.add(
+              ChessPiece(type: type, color: color, coord: Coord(col, row)),
+            );
+          }
+        }
+      }
+    }
+    return result;
+  }
+
   /// 获取某方的所有棋子
   List<ChessPiece> getPiecesOfColor(PieceColor color) {
     final result = <ChessPiece>[];

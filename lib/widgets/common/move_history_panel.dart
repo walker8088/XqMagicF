@@ -75,8 +75,8 @@ class _MoveHistoryPanelState extends State<MoveHistoryPanel> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.2),
-        border: Border(left: BorderSide(color: Colors.white.withOpacity(0.1))),
+        color: Colors.black.withValues(alpha: 0.2),
+        border: Border(left: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -172,7 +172,7 @@ class _MoveHistoryPanelState extends State<MoveHistoryPanel> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         decoration: BoxDecoration(
-          color: isRootSelected ? Colors.white.withOpacity(0.2) : null,
+          color: isRootSelected ? Colors.white.withValues(alpha: 0.2) : null,
           borderRadius: BorderRadius.circular(4),
         ),
         child: Row(
@@ -207,7 +207,7 @@ class _MoveHistoryPanelState extends State<MoveHistoryPanel> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         decoration: BoxDecoration(
-          color: isActive ? Colors.white.withOpacity(0.2) : null,
+          color: isActive ? Colors.white.withValues(alpha: 0.2) : null,
           borderRadius: BorderRadius.circular(4),
         ),
         child: Row(

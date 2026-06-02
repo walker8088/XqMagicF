@@ -239,7 +239,7 @@ class ChessBoardPainter extends SimplePainter {
         Offset(cx, cy),
         radius + 6,
         Paint()
-          ..color = Colors.red.withOpacity(0.4)
+          ..color = Colors.red.withValues(alpha: 0.4)
           ..style = PaintingStyle.fill,
       );
     }
@@ -248,7 +248,7 @@ class ChessBoardPainter extends SimplePainter {
     canvas.drawCircle(
       Offset(cx + 2, cy + 2),
       radius,
-      Paint()..color = Colors.black.withOpacity(0.15),
+      Paint()..color = Colors.black.withValues(alpha: 0.15),
     );
 
     // 棋子底色
@@ -279,7 +279,7 @@ class ChessBoardPainter extends SimplePainter {
             (piece.color == PieceColor.red
                     ? AppConstants.redPieceColor
                     : AppConstants.blackPieceColor)
-                .withOpacity(0.3)
+                .withValues(alpha: 0.3)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1,
     );
@@ -334,9 +334,9 @@ class ChessBoardPainter extends SimplePainter {
   double _gridY(int row) =>
       gridOffset + (AppConstants.boardRows - 1 - row) * cellSize;
 
+  // 棋盘状态变化频繁（选子、移动、将军等），始终重绘
   @override
-  bool shouldRepaint(covariant ChessBoardPainter oldDelegate) =>
-      renderData.inCheckPosition != oldDelegate.renderData.inCheckPosition;
+  bool shouldRepaint(covariant ChessBoardPainter oldDelegate) => true;
 }
 
 /// 简化版 CustomPainter，始终重绘

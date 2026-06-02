@@ -131,7 +131,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
     _enginePath = settings.enginePath;
     _engineProtocol = settings.engineProtocol;
     _engineDepth = settings.engineDepth;
-    _engineTime = 5; // Default 5s, stored as seconds
+    _engineTime = settings.engineTimeMs ~/ 1000; // ms → seconds for UI
     _engineThreads = settings.engineThreads;
     _engineHash = settings.engineHash;
     _engineSkillLevel = settings.engineSkillLevel;
@@ -151,6 +151,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
     await settings.setEnginePath(_enginePath);
     await settings.setEngineProtocol(_engineProtocol);
     await settings.setEngineDepth(_engineDepth);
+    await settings.setEngineTimeMs(_engineTime * 1000); // seconds → ms
     await settings.setEngineThreads(_engineThreads);
     await settings.setEngineHash(_engineHash);
     await settings.setEngineSkillLevel(_engineSkillLevel);
@@ -164,7 +165,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
     await settings.setSoundEnabled(_soundEnabled);
     await settings.setVolume(_volume);
 
-    if (context.mounted) {
+    if (mounted) {
       Navigator.of(context).pop();
     }
   }
@@ -547,7 +548,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
           ),
         const SizedBox(height: 4),
         DropdownButtonFormField<T>(
-          value: value,
+          initialValue: value,
           items: items,
           onChanged: onChanged,
           isExpanded: true,

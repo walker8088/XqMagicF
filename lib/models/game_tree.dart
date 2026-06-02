@@ -74,12 +74,20 @@ class GameTreeNode {
   GameTreeNode addVariation(String fenAfter, MoveRecord move) =>
       addMove(fenAfter, move);
 
-  /// 获取到达当前节点的路径索引
+  /// 清空所有子节点（用于在历史位置走新棋时截断后续分支）
+  void clearChildren() {
+    _children.clear();
+  }
+
+  /// 获取到达当前节点的路径索引（迭代实现，O(depth)）
   List<int> getPathFromRoot() {
-    if (parent == null) return [];
-    final parentPath = parent!.getPathFromRoot();
-    parentPath.add(parent!._children.indexOf(this));
-    return parentPath;
+    final indices = <int>[];
+    var node = this;
+    while (node.parent != null) {
+      indices.add(node.parent!._children.indexOf(node));
+      node = node.parent!;
+    }
+    return indices.reversed.toList();
   }
 
   /// 提取从根到当前节点的走法序列
@@ -122,13 +130,26 @@ class GameTree {
   }
 
   /// 走一步棋并添加到树中
+  ///
+  /// 根据当前节点状态自动选择 mainLine 或 variation：
+  /// - **无 mainLine 续走**（典型：主变着末端的走子）→ 作为 mainLine 添加
+  /// - **已有 mainLine 续走**（典型：用户回到历史位置走新棋）→ 作为 variation 追加
+  ///
+  /// 本方法**不**截断已有分支。如需强制覆盖 mainLine（例如 PGN 解析后
+  /// 用户主动重走某步），请显式调用 `_current!.clearChildren()` 后再调用本方法。
   GameTreeNode makeMove(MoveRecord move, String fenAfter) {
+    if (_current!.mainLineChild != null) {
+      // 已有 mainLine 续走：自动转 variation，避免覆盖既有分支
+      return makeVariation(move, fenAfter);
+    }
     final child = _current!.addMainLine(fenAfter, move);
     _current = child;
     return child;
   }
 
-  /// 走变着
+  /// 走一步变着：作为当前节点的 variation 子节点追加
+  ///
+  /// 本方法**不**截断已有分支。多次调用会在同一节点下追加多个 variation。
   GameTreeNode makeVariation(MoveRecord move, String fenAfter) {
     final child = _current!.addVariation(fenAfter, move);
     _current = child;
@@ -160,21 +181,19 @@ class GameTree {
   }
 
   /// 回到主变着线
+  ///
+  /// 从 root 沿主变着线（始终走 `_children[0]`）走到与当前节点相同的深度。
+  /// - 若当前已在主变着线上，则原地不动
+  /// - 若当前在变着上，则跳到主变着对应深度的节点
+  /// - 若主变着比当前变着浅，则走到主变着能到的最深节点
   bool goToMainLine() {
     if (_current == null) return false;
-    var node = _current!;
-    while (node.parent != null) {
-      node = node.parent!;
-    }
-    // Now navigate to current depth on main line
-    final path = _current!.getPathFromRoot();
+    // 先记录目标深度（_current 即将被改写），再从 root 沿主变着走相应深度
+    final targetDepth = _current!.getPathFromRoot().length;
     _current = root;
-    for (int i = 0; i < path.length; i++) {
-      if (i < _current!.children.length) {
-        _current = _current!.children[0];
-      } else {
-        break;
-      }
+    for (int i = 0; i < targetDepth; i++) {
+      if (_current!.children.isEmpty) break;
+      _current = _current!.children[0];
     }
     return true;
   }

@@ -86,7 +86,10 @@ class FenParser {
     final parts = fen.trim().split(' ');
     assert(parts.length >= 2, 'FEN 至少需要两个字段（布局 + 走子方），收到: "$fen"');
     final boardStr = parts[0];
-    final activeColor = parts[1] == 'b' ? PieceColor.black : PieceColor.red;
+    // 兼容多种走子方表示：'w' (UCI 标准)、'r' (部分引擎)、其他默认为红方
+    final activeColor = parts[1].toLowerCase() == 'b'
+        ? PieceColor.black
+        : PieceColor.red;
 
     final fenRows = boardStr.split('/');
     for (

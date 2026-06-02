@@ -55,7 +55,6 @@ class PVChineseConverter {
     final chineseMoves = <String>[];
     // 轻量级副本：只复制 Map，不创建引擎
     final boardCopy = Map<Coord, ChessPiece>.from(board);
-    var currentColor = activeColor;
 
     for (final iccs in pv) {
       if (iccs.length != 4) break;
@@ -72,14 +71,9 @@ class PVChineseConverter {
         );
         chineseMoves.add(MoveNotation.toText(boardCopy, move));
 
-        // 模拟走子：移动棋子
-        boardCopy[to] = piece;
+        // 模拟走子：移动棋子（更新 coord）
+        boardCopy[to] = piece.copyWith(coord: to);
         boardCopy.remove(from);
-
-        // 切换回合
-        currentColor = currentColor == PieceColor.red
-            ? PieceColor.black
-            : PieceColor.red;
       } catch (_) {
         break;
       }

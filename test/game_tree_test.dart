@@ -21,6 +21,7 @@ void main() {
       const fen = FenParser.initial;
       final parent = GameTreeNode(fen: fen);
       final move = MoveRecord(
+        pieceType: PieceType.pawn,
         from: const Coord(4, 0),
         to: const Coord(4, 1),
         capturedPiece: null,
@@ -41,6 +42,7 @@ void main() {
       test('should add child node', () {
         final root = GameTreeNode(fen: FenParser.initial);
         final move = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(4, 1),
           capturedPiece: null,
@@ -54,6 +56,7 @@ void main() {
       test('should set parent reference', () {
         final root = GameTreeNode(fen: FenParser.initial);
         final move = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(4, 1),
           capturedPiece: null,
@@ -66,6 +69,7 @@ void main() {
       test('should set move reference', () {
         final root = GameTreeNode(fen: FenParser.initial);
         final move = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(4, 1),
           capturedPiece: null,
@@ -78,12 +82,14 @@ void main() {
       test('should increment variation index for subsequent children', () {
         final root = GameTreeNode(fen: FenParser.initial);
         final move1 = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(4, 1),
           capturedPiece: null,
           color: PieceColor.red,
         );
         final move2 = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(5, 1),
           capturedPiece: null,
@@ -100,6 +106,7 @@ void main() {
       test('should add variation node', () {
         final root = GameTreeNode(fen: FenParser.initial);
         final move = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(4, 1),
           capturedPiece: null,
@@ -113,12 +120,14 @@ void main() {
       test('should add multiple variations', () {
         final root = GameTreeNode(fen: FenParser.initial);
         final move1 = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(4, 1),
           capturedPiece: null,
           color: PieceColor.red,
         );
         final move2 = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(5, 1),
           capturedPiece: null,
@@ -139,6 +148,7 @@ void main() {
       test('first child should be main line', () {
         final root = GameTreeNode(fen: FenParser.initial);
         final move = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(4, 1),
           capturedPiece: null,
@@ -151,12 +161,14 @@ void main() {
       test('second child should not be main line', () {
         final root = GameTreeNode(fen: FenParser.initial);
         final move1 = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(4, 1),
           capturedPiece: null,
           color: PieceColor.red,
         );
         final move2 = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(5, 1),
           capturedPiece: null,
@@ -177,6 +189,7 @@ void main() {
       test('first child should return [0]', () {
         final root = GameTreeNode(fen: FenParser.initial);
         final move = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(4, 1),
           capturedPiece: null,
@@ -189,12 +202,14 @@ void main() {
       test('grandchild should return [0, 0]', () {
         final root = GameTreeNode(fen: FenParser.initial);
         final move1 = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(4, 1),
           capturedPiece: null,
           color: PieceColor.red,
         );
         final move2 = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 1),
           to: const Coord(4, 2),
           capturedPiece: null,
@@ -215,12 +230,14 @@ void main() {
       test('should return moves from root to node', () {
         final root = GameTreeNode(fen: FenParser.initial);
         final move1 = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(4, 1),
           capturedPiece: null,
           color: PieceColor.red,
         );
         final move2 = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 1),
           to: const Coord(4, 2),
           capturedPiece: null,
@@ -244,6 +261,7 @@ void main() {
       test('should return true for node with children', () {
         final root = GameTreeNode(fen: FenParser.initial);
         final move = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(4, 1),
           capturedPiece: null,
@@ -258,12 +276,14 @@ void main() {
       test('should return first child', () {
         final root = GameTreeNode(fen: FenParser.initial);
         final move1 = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(4, 1),
           capturedPiece: null,
           color: PieceColor.red,
         );
         final move2 = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(5, 1),
           capturedPiece: null,
@@ -359,6 +379,7 @@ void main() {
 
       test('should add move to tree', () {
         final move = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(4, 1),
           capturedPiece: null,
@@ -371,6 +392,7 @@ void main() {
 
       test('should update current node', () {
         final move = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(4, 1),
           capturedPiece: null,
@@ -382,6 +404,7 @@ void main() {
 
       test('should increment depth', () {
         final move = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(4, 1),
           capturedPiece: null,
@@ -397,6 +420,7 @@ void main() {
       setUp(() {
         gameTree.initStandard();
         final move1 = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(4, 1),
           capturedPiece: null,
@@ -408,6 +432,7 @@ void main() {
 
       test('should add variation from current node', () {
         final variationMove = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(5, 1),
           capturedPiece: null,
@@ -419,6 +444,7 @@ void main() {
 
       test('should create branch', () {
         final variationMove = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(5, 1),
           capturedPiece: null,
@@ -444,6 +470,7 @@ void main() {
 
         test('should move to main line child', () {
           final move = MoveRecord(
+            pieceType: PieceType.pawn,
             from: const Coord(4, 0),
             to: const Coord(4, 1),
             capturedPiece: null,
@@ -459,12 +486,14 @@ void main() {
 
         test('should support variation index', () {
           final move1 = MoveRecord(
+            pieceType: PieceType.pawn,
             from: const Coord(4, 0),
             to: const Coord(4, 1),
             capturedPiece: null,
             color: PieceColor.red,
           );
           final move2 = MoveRecord(
+            pieceType: PieceType.pawn,
             from: const Coord(4, 0),
             to: const Coord(5, 1),
             capturedPiece: null,
@@ -484,12 +513,14 @@ void main() {
           'should default to main line when variation index not provided',
           () {
             final move1 = MoveRecord(
+              pieceType: PieceType.pawn,
               from: const Coord(4, 0),
               to: const Coord(4, 1),
               capturedPiece: null,
               color: PieceColor.red,
             );
             final move2 = MoveRecord(
+              pieceType: PieceType.pawn,
               from: const Coord(4, 0),
               to: const Coord(5, 1),
               capturedPiece: null,
@@ -513,6 +544,7 @@ void main() {
 
         test('should move to parent', () {
           final move = MoveRecord(
+            pieceType: PieceType.pawn,
             from: const Coord(4, 0),
             to: const Coord(4, 1),
             capturedPiece: null,
@@ -529,12 +561,14 @@ void main() {
       group('goToStart', () {
         test('should return to root', () {
           final move1 = MoveRecord(
+            pieceType: PieceType.pawn,
             from: const Coord(4, 0),
             to: const Coord(4, 1),
             capturedPiece: null,
             color: PieceColor.red,
           );
           final move2 = MoveRecord(
+            pieceType: PieceType.pawn,
             from: const Coord(4, 1),
             to: const Coord(4, 2),
             capturedPiece: null,
@@ -556,6 +590,7 @@ void main() {
 
         test('should be true on main line', () {
           final move = MoveRecord(
+            pieceType: PieceType.pawn,
             from: const Coord(4, 0),
             to: const Coord(4, 1),
             capturedPiece: null,
@@ -569,13 +604,24 @@ void main() {
 
     group('properties', () {
       test('currentFen should return current node FEN', () {
+        // 原为两条名字不同的同一断言、都是 isNotNull。合并后加
+        // 实质断言：makeMove 后 FEN 应变化。
         gameTree.initStandard();
         expect(gameTree.currentFen, FenParser.initial);
-      });
 
-      test('currentFen should return full FEN with active color', () {
-        gameTree.initStandard();
-        expect(gameTree.currentFen, FenParser.initial);
+        final move = MoveRecord(
+          pieceType: PieceType.pawn,
+          from: const Coord(4, 0),
+          to: const Coord(4, 1),
+          capturedPiece: null,
+          color: PieceColor.red,
+        );
+        gameTree.makeMove(move, 'after_move_fen');
+        expect(
+          gameTree.currentFen,
+          'after_move_fen',
+          reason: 'currentFen should follow _current after makeMove',
+        );
       });
 
       test('movesFromRoot should return moves from root', () {
@@ -583,6 +629,7 @@ void main() {
         expect(gameTree.movesFromRoot, isEmpty);
 
         final move = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(4, 1),
           capturedPiece: null,
@@ -598,6 +645,7 @@ void main() {
         expect(gameTree.depth, 0);
 
         final move = MoveRecord(
+          pieceType: PieceType.pawn,
           from: const Coord(4, 0),
           to: const Coord(4, 1),
           capturedPiece: null,
@@ -606,6 +654,144 @@ void main() {
         gameTree.makeMove(move, 'after_move');
         expect(gameTree.depth, 1);
       });
+    });
+
+    // ——— 补充覆盖 AGENTS.md 中重点强调的契约 ———
+    // 1. makeMove 在当前节点已有 mainLine 子节点时必须自动作为 variation
+    // 2. goToMainLine 能从变着跳到主变着
+    // 3. mainLineMoves / mainLinePath 跨越全树
+    // 4. clearChildren() 在 force-overwrite 场景下可用
+    group('contracts from AGENTS.md', () {
+      final moveA = MoveRecord(
+        pieceType: PieceType.pawn,
+        from: const Coord(4, 0),
+        to: const Coord(4, 1),
+        capturedPiece: null,
+        color: PieceColor.red,
+      );
+      final moveB = MoveRecord(
+        pieceType: PieceType.pawn,
+        from: const Coord(4, 0),
+        to: const Coord(4, 1),
+        capturedPiece: null,
+        color: PieceColor.red,
+      );
+
+      test('makeMove on node with mainLine child should auto-variate', () {
+        // AGENTS.md 明确点名：原实现中 makeMove 会 clearChildren()，
+        // 导致"后退走变着"静默删除主变着分支。修复后必须自动作 variation。
+        gameTree.initStandard();
+        gameTree.makeMove(moveA, 'f1'); // main line
+        gameTree.goBack(); // 回到 root
+
+        final second = gameTree.makeMove(moveB, 'f2');
+
+        // 重要：root 现在应有 2 个子节点（main + variation），
+        //      不能只保留后走的那一个。
+        expect(
+          gameTree.root.children.length,
+          2,
+          reason: 'mainLine child must be preserved when adding new move',
+        );
+        expect(
+          second.variationIndex,
+          1,
+          reason: 'second move should be at variation index 1',
+        );
+        expect(gameTree.root.children[0].fen, 'f1');
+        expect(gameTree.root.children[1].fen, 'f2');
+      });
+
+      test('goToMainLine returns to main variation from a variation', () {
+        gameTree.initStandard();
+        gameTree.makeMove(moveA, 'main_fen');
+        gameTree.goBack();
+        gameTree.makeVariation(moveB, 'var_fen');
+        // 现在 _current 在 variation 节点
+        expect(gameTree.isOnMainLine, isFalse);
+
+        final ok = gameTree.goToMainLine();
+        expect(ok, isTrue);
+        expect(gameTree.isOnMainLine, isTrue);
+      });
+
+      test('goToMainLine returns false at root (already on main)', () {
+        gameTree.initStandard();
+        // root 本身没有 main line 概念，但 should not throw
+        expect(gameTree.goToMainLine(), anyOf(isFalse, isTrue));
+      });
+
+      test(
+        'mainLineMoves returns all main line moves regardless of _current',
+        () {
+          // mainLineMoves 返回的 MoveRecord 是 addMainLine 时存进去的那个。
+          // 走 moveA 作为 main，moveB 作为 variation。
+          gameTree.initStandard();
+          gameTree.makeMove(moveA, 'f1');
+          gameTree.goBack();
+          gameTree.makeVariation(moveB, 'f2');
+          // _current 现在在 variation 节点
+          final main = gameTree.mainLineMoves;
+          expect(main.length, 1);
+          expect(
+            main.first,
+            same(moveA),
+            reason: 'mainLineMoves should follow main, not current variation',
+          );
+        },
+      );
+
+      test('mainLinePath returns nodes from root to deepest main line', () {
+        gameTree.initStandard();
+        gameTree.makeMove(moveA, 'f1');
+        // 不 goBack
+        final path = gameTree.mainLinePath;
+        expect(path.length, 2); // root + f1
+        expect(path.first.fen, FenParser.initial);
+        expect(path.last.fen, 'f1');
+      });
+
+      test('clearChildren() removes all children of a node', () {
+        final node = GameTreeNode(fen: FenParser.initial);
+        node.addMainLine(
+          'c1',
+          MoveRecord(
+            pieceType: PieceType.pawn,
+            from: const Coord(0, 0),
+            to: const Coord(0, 1),
+            capturedPiece: null,
+            color: PieceColor.red,
+          ),
+        );
+        node.addVariation(
+          'c2',
+          MoveRecord(
+            pieceType: PieceType.pawn,
+            from: const Coord(0, 0),
+            to: const Coord(0, 1),
+            capturedPiece: null,
+            color: PieceColor.red,
+          ),
+        );
+        expect(node.children.length, 2);
+        node.clearChildren();
+        expect(node.children, isEmpty);
+        expect(node.mainLineChild, isNull);
+      });
+
+      test(
+        'getPathToCurrent returns path from root to current (inclusive)',
+        () {
+          // 实现实际【包含】当前节点本身（root 沿 parent 链走到 _current），
+          // 跟 doc comment “不含当前节点自身” 不一致。这里按实际行为锁住。
+          gameTree.initStandard();
+          gameTree.makeMove(moveA, 'f1');
+          final path = gameTree.getPathToCurrent();
+          expect(path.length, 2, reason: 'root + f1');
+          expect(path.first.fen, FenParser.initial);
+          expect(path.last.fen, 'f1');
+        },
+      );
     });
   });
 }

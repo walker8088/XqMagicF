@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:xqmagic/utils/app_logger.dart';
 import 'package:xqmagic/models/chess_piece.dart';
 import 'package:xqmagic/models/move.dart';
@@ -15,6 +14,10 @@ import 'package:xqmagic/utils/coord.dart';
 ///
 /// WXF格式：单字母+数字+方向+目标，作为中间表示便于简繁转换
 /// - 例: C2.5 (炮二平五), N8+7 (马8进7), R2+3 (车二进三)
+
+/// 走法方向分类（用于消除中文/WXF 之间的重复方向判断逻辑）
+enum _MovementType { flat, forward, backward }
+
 class ChineseNotation {
   ChineseNotation._();
 
@@ -74,12 +77,16 @@ class ChineseNotation {
   }
 
   /// Normalize 走法记录：将黑方走法转为红方视角
+  ///
+  /// 使用 [MoveRecord.copyWith] 以保留 `notation` / `nextColor` /
+  /// `boardBefore/After` / `fenBefore/After` 等所有可选字段。
+  /// 旧实现重新构造 MoveRecord 会丢失这些字段——任何未来调用者如果
+  /// 将结果存储或传递，就会静默丢数据。
   static MoveRecord normalizeMove(MoveRecord move) {
     if (move.color == PieceColor.red) return move;
-    return MoveRecord(
+    return move.copyWith(
       from: normalizeCoord(move.from, move.color),
       to: normalizeCoord(move.to, move.color),
-      pieceType: move.pieceType,
       capturedPiece: move.capturedPiece != null
           ? ChessPiece(
               type: move.capturedPiece!.type,
@@ -87,7 +94,6 @@ class ChineseNotation {
               coord: normalizeCoord(move.capturedPiece!.coord, move.color),
             )
           : null,
-      color: move.color,
     );
   }
 
@@ -356,6 +362,30 @@ class ChineseNotation {
         type == PieceType.pawn;
   }
 
+  /// 统一的"走法概要"：(方向类型, 步数或目标纵线)
+  ///
+  /// 返回的字段分别表示：
+  /// - [_MovementType] 平/进/退 三类
+  /// - 步数（直线前进/后退时）或目标纵线（横向/斜线时）
+  static (_MovementType type, int value) _resolveMovement(
+    int colDiff,
+    int rowDiff,
+    PieceType? type,
+  ) {
+    if (rowDiff == 0) {
+      // 平：rowDiff=0，colDiff 必非零（否则不可能是合法走法）
+      return (_MovementType.flat, 0);
+    }
+    final isStraight = type != null && _isStraightPiece(type);
+    if (isStraight && colDiff == 0) {
+      return (
+        rowDiff > 0 ? _MovementType.forward : _MovementType.backward,
+        rowDiff.abs(),
+      );
+    }
+    return (rowDiff > 0 ? _MovementType.forward : _MovementType.backward, 0);
+  }
+
   /// 获取中文记谱法的动作和目标（红方视角）
   static (String action, String target) _getActionAndTarget(
     int colDiff,
@@ -364,20 +394,24 @@ class ChineseNotation {
     PieceType? type,
     bool isRed,
   ) {
-    if (rowDiff == 0) {
-      return ('平', toFile);
-    }
-
-    final isStraight = type != null && _isStraightPiece(type);
-    // 红方视角：rowDiff > 0 = 进，rowDiff < 0 = 退
-    final direction = rowDiff > 0 ? '进' : '退';
-
-    if (isStraight && colDiff == 0) {
-      final steps = rowDiff.abs();
-      final target = isRed ? _chineseNumbers[steps] : steps.toString();
-      return (direction, target);
-    } else {
-      return (direction, toFile);
+    final movementResult = _resolveMovement(colDiff, rowDiff, type);
+    switch (movementResult.$1) {
+      case _MovementType.flat:
+        return ('平', toFile);
+      case _MovementType.forward:
+        if (movementResult.$2 > 0) {
+          final v = movementResult.$2;
+          final t = isRed ? _chineseNumbers[v] : v.toString();
+          return ('进', t);
+        }
+        return ('进', toFile);
+      case _MovementType.backward:
+        if (movementResult.$2 > 0) {
+          final v = movementResult.$2;
+          final t = isRed ? _chineseNumbers[v] : v.toString();
+          return ('退', t);
+        }
+        return ('退', toFile);
     }
   }
 
@@ -388,18 +422,44 @@ class ChineseNotation {
     int toFile,
     PieceType? type,
   ) {
-    if (rowDiff == 0) {
-      return ('.', toFile.toString());
+    final movementResult = _resolveMovement(colDiff, rowDiff, type);
+    switch (movementResult.$1) {
+      case _MovementType.flat:
+        return ('.', toFile.toString());
+      case _MovementType.forward:
+        if (movementResult.$2 > 0) {
+          return ('+', movementResult.$2.toString());
+        }
+        return ('+', toFile.toString());
+      case _MovementType.backward:
+        if (movementResult.$2 > 0) {
+          return ('-', movementResult.$2.toString());
+        }
+        return ('-', toFile.toString());
     }
+  }
 
-    final isStraight = type != null && _isStraightPiece(type);
-    final direction = rowDiff > 0 ? '+' : '-';
-
-    if (isStraight && colDiff == 0) {
-      return (direction, rowDiff.abs().toString());
-    } else {
-      return (direction, toFile.toString());
+  /// 收集与 [move] 同色同类型且同纵线的棋子（红方视角，按"前"到"后"排序）
+  ///
+  /// 返回 `null` 表示无需前缀（线上仅 1 个棋子）；否则返回 (棋子总数, 移动方在排序中的索引)
+  static (int total, int idx)? _collectSameFilePieces(
+    Map<Coord, ChessPiece> board,
+    MoveRecord move,
+  ) {
+    final moveFile = 9 - move.from.col;
+    final pieces = <ChessPiece>[];
+    for (final piece in board.values) {
+      if (piece.type == move.pieceType && piece.color == move.color) {
+        final pieceFile = 9 - piece.coord.col;
+        if (pieceFile == moveFile) pieces.add(piece);
+      }
     }
+    if (pieces.length <= 1) return null;
+
+    // 红方视角：row 越大越靠前
+    pieces.sort((a, b) => b.coord.row.compareTo(a.coord.row));
+    final idx = pieces.indexWhere((p) => p.coord == move.from);
+    return (pieces.length, idx);
   }
 
   /// 检查同线是否有同类型棋子，返回前/后/中缀（红方视角）
@@ -407,37 +467,15 @@ class ChineseNotation {
     Map<Coord, ChessPiece> board,
     MoveRecord move,
   ) {
-    if (move.pieceType == null) return null;
-
-    int countOnFile = 0;
-    List<ChessPiece> piecesOnFile = [];
-    final moveFile = 9 - move.from.col;
-    for (final piece in board.values) {
-      if (piece.type == move.pieceType! && piece.color == move.color) {
-        final pieceFile = 9 - piece.coord.col;
-        if (pieceFile == moveFile) {
-          countOnFile++;
-          piecesOnFile.add(piece);
-        }
-      }
-    }
-
-    if (countOnFile <= 1) return null;
-
-    // 按"前/后"排序（红方视角：row 越大越靠前）
-    piecesOnFile.sort((a, b) => b.coord.row.compareTo(a.coord.row));
-
-    final myIdx = piecesOnFile.indexWhere((p) => p.coord == move.from);
-
-    if (countOnFile == 2) {
-      return myIdx == 0 ? '前' : '后';
-    } else {
-      if (myIdx == 0) return '前';
-      if (myIdx == countOnFile - 1) return '后';
-      if (countOnFile == 3 && myIdx == 1) return '中';
-      const numWords = ['', '一', '二', '三', '四', '五'];
-      return '${numWords[myIdx + 1]}';
-    }
+    final result = _collectSameFilePieces(board, move);
+    if (result == null) return null;
+    final (count, myIdx) = result;
+    if (count == 2) return myIdx == 0 ? '前' : '后';
+    if (myIdx == 0) return '前';
+    if (myIdx == count - 1) return '后';
+    if (count == 3 && myIdx == 1) return '中';
+    const numWords = ['', '一', '二', '三', '四', '五'];
+    return numWords[myIdx + 1];
   }
 
   /// 获取 WXF 格式的多子前缀（红方视角）
@@ -445,35 +483,13 @@ class ChineseNotation {
     Map<Coord, ChessPiece> board,
     MoveRecord move,
   ) {
-    if (move.pieceType == null) return null;
-
-    int countOnFile = 0;
-    List<ChessPiece> piecesOnFile = [];
-    final moveFile = 9 - move.from.col;
-    for (final piece in board.values) {
-      if (piece.type == move.pieceType! && piece.color == move.color) {
-        final pieceFile = 9 - piece.coord.col;
-        if (pieceFile == moveFile) {
-          countOnFile++;
-          piecesOnFile.add(piece);
-        }
-      }
-    }
-
-    if (countOnFile <= 1) return null;
-
-    // 红方视角：row 越大越靠前
-    piecesOnFile.sort((a, b) => b.coord.row.compareTo(a.coord.row));
-
-    final myIdx = piecesOnFile.indexWhere((p) => p.coord == move.from);
-
-    if (countOnFile == 2) {
-      return myIdx == 0 ? 'f' : 'b';
-    } else {
-      if (myIdx == 0) return 'f';
-      if (myIdx == countOnFile - 1) return 'b';
-      return 'm'; // middle
-    }
+    final result = _collectSameFilePieces(board, move);
+    if (result == null) return null;
+    final (count, myIdx) = result;
+    if (count == 2) return myIdx == 0 ? 'f' : 'b';
+    if (myIdx == 0) return 'f';
+    if (myIdx == count - 1) return 'b';
+    return 'm'; // middle
   }
 
   /// 通过 WXF 棋子字母找到棋盘上的对应棋子坐标
@@ -537,52 +553,46 @@ class ChineseNotation {
         final toCol = isRed ? 9 - target : target - 1;
         return Coord(toCol, from.row);
       case '+':
-        // 进（向前）
-        if (_isStraightPiece(type)) {
-          // 直线前进：红方 row 增大，黑方 row 减小
-          return Coord(from.col, isRed ? from.row + target : from.row - target);
-        } else if (type == PieceType.knight) {
-          // 马：走日字，col 变化1则 row 变化2，col 变化2则 row 变化1
-          final toCol = isRed ? 9 - target : target - 1;
-          final colChange = (toCol - from.col).abs();
-          final rowChange = colChange == 1 ? 2 : 1;
-          return Coord(
-            toCol,
-            isRed ? from.row + rowChange : from.row - rowChange,
-          );
-        } else {
-          // 士/象：斜线前进，target 是目标纵线
-          final toCol = isRed ? 9 - target : target - 1;
-          final rowOffset = (toCol - from.col).abs();
-          // 红方前进 = row 增大，黑方前进 = row 减小
-          return Coord(
-            toCol,
-            isRed ? from.row + rowOffset : from.row - rowOffset,
-          );
-        }
       case '-':
-        // 退（向后）
-        if (_isStraightPiece(type)) {
-          return Coord(from.col, isRed ? from.row - target : from.row + target);
-        } else if (type == PieceType.knight) {
-          final toCol = isRed ? 9 - target : target - 1;
-          final colChange = (toCol - from.col).abs();
-          final rowChange = colChange == 1 ? 2 : 1;
-          return Coord(
-            toCol,
-            isRed ? from.row - rowChange : from.row + rowChange,
-          );
-        } else {
-          final toCol = isRed ? 9 - target : target - 1;
-          final rowOffset = (toCol - from.col).abs();
-          return Coord(
-            toCol,
-            isRed ? from.row - rowOffset : from.row + rowOffset,
-          );
-        }
+        return _calculateForwardBackward(
+          from,
+          direction == '+' ? 1 : -1,
+          target,
+          isRed,
+          type,
+        );
       default:
         return null;
     }
+  }
+
+  /// 计算进/退方向的目标坐标。
+  /// [rowSign] = +1 表示进，-1 表示退
+  static Coord? _calculateForwardBackward(
+    Coord from,
+    int rowSign,
+    int target,
+    bool isRed,
+    PieceType type,
+  ) {
+    if (_isStraightPiece(type)) {
+      // 直线移动（车/炮/帅/兵）
+      // 红方：进=row 增大，退=row 减小；黑方相反
+      final rowDelta = (isRed ? rowSign : -rowSign) * target;
+      return Coord(from.col, from.row + rowDelta);
+    }
+    // 斜线/马：target 是目标纵线
+    final toCol = isRed ? 9 - target : target - 1;
+    final colChange = (toCol - from.col).abs();
+    final rowDelta = isRed ? rowSign : -rowSign;
+
+    if (type == PieceType.knight) {
+      // 马：走日字，col 变化1则 row 变化2，col 变化2则 row 变化1
+      final rowChange = colChange == 1 ? 2 : 1;
+      return Coord(toCol, from.row + rowDelta * rowChange);
+    }
+    // 士/象：斜线移动
+    return Coord(toCol, from.row + rowDelta * colChange);
   }
 
   /// WXF 棋子字母转 PieceType

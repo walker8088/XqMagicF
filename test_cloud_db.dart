@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print
+
 // 云库查询测试脚本
 // 运行: dart test_cloud_db.dart
 

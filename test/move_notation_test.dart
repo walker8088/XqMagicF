@@ -9,6 +9,7 @@ void main() {
   group('MoveNotation.toICCS', () {
     test('should convert move from (4, 0) to (4, 1) correctly', () {
       final move = MoveRecord(
+        pieceType: PieceType.pawn,
         from: const Coord(4, 0),
         to: const Coord(4, 1),
         capturedPiece: null,
@@ -21,6 +22,7 @@ void main() {
 
     test('should convert move from (4, 9) to (4, 8) correctly', () {
       final move = MoveRecord(
+        pieceType: PieceType.pawn,
         from: const Coord(4, 9),
         to: const Coord(4, 8),
         capturedPiece: null,
@@ -33,6 +35,7 @@ void main() {
 
     test('should convert horizontal move correctly', () {
       final move = MoveRecord(
+        pieceType: PieceType.pawn,
         from: const Coord(0, 0),
         to: const Coord(8, 0),
         capturedPiece: null,
@@ -45,6 +48,7 @@ void main() {
 
     test('should convert cannon move from (1, 2) to (1, 5)', () {
       final move = MoveRecord(
+        pieceType: PieceType.pawn,
         from: const Coord(1, 2),
         to: const Coord(1, 5),
         capturedPiece: null,
@@ -83,6 +87,7 @@ void main() {
 
     test('should round-trip moves involving row 0', () {
       final move = MoveRecord(
+        pieceType: PieceType.pawn,
         from: const Coord(4, 0),
         to: const Coord(4, 1),
         capturedPiece: null,
@@ -97,6 +102,7 @@ void main() {
 
     test('should round-trip moves involving row 9', () {
       final move = MoveRecord(
+        pieceType: PieceType.pawn,
         from: const Coord(4, 9),
         to: const Coord(4, 8),
         capturedPiece: null,
@@ -117,6 +123,7 @@ void main() {
 
     test('should round-trip: toICCS then fromICCS', () {
       final move = MoveRecord(
+        pieceType: PieceType.pawn,
         from: const Coord(3, 5),
         to: const Coord(6, 2),
         capturedPiece: null,

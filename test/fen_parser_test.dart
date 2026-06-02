@@ -109,7 +109,7 @@ void main() {
       test('should have correct initial FEN format', () {
         expect(
           FenParser.initial,
-          'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR r',
+          'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w',
         );
       });
 
@@ -119,7 +119,7 @@ void main() {
       });
 
       test('should end with active color', () {
-        expect(FenParser.initial.endsWith('r'), isTrue);
+        expect(FenParser.initial.endsWith('w'), isTrue);
       });
     });
 
@@ -193,12 +193,12 @@ void main() {
       });
 
       test('should handle empty board FEN', () {
-        FenParser.parse('9/9/9/9/9/9/9/9/9/9 r', board);
+        FenParser.parse('9/9/9/9/9/9/9/9/9/9 w', board);
         expect(board.pieces.isEmpty, isTrue);
       });
 
       test('should handle single piece FEN', () {
-        FenParser.parse('9/9/9/9/9/9/9/9/9/K7 r', board);
+        FenParser.parse('9/9/9/9/9/9/9/9/9/K7 w', board);
         expect(board.pieces.length, 1);
         // K is red general, FEN row 9 → our row 0, col 0
         final piece = board.getPiece(const Coord(0, 0));
@@ -225,13 +225,13 @@ void main() {
         board.initialize();
         final fenRed = FenParser.generate(board, PieceColor.red);
         final fenBlack = FenParser.generate(board, PieceColor.black);
-        expect(fenRed.endsWith('r'), isTrue);
+        expect(fenRed.endsWith('w'), isTrue);
         expect(fenBlack.endsWith('b'), isTrue);
       });
 
       test('should generate FEN for empty board', () {
         final fen = FenParser.generate(board, PieceColor.red);
-        expect(fen, '9/9/9/9/9/9/9/9/9/9 r');
+        expect(fen, '9/9/9/9/9/9/9/9/9/9 w');
       });
 
       test('should generate FEN for partial board', () {

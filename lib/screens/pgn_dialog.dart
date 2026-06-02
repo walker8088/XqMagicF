@@ -607,7 +607,7 @@ class _PGNSaveDialogState extends State<PGNSaveDialog> {
 
       if (mounted) {
         await Future.delayed(const Duration(milliseconds: 800));
-        Navigator.of(context).pop();
+        if (mounted) Navigator.of(context).pop();
       }
     } catch (e) {
       setState(() {
@@ -751,7 +751,7 @@ class _PGNSaveDialogState extends State<PGNSaveDialog> {
             const SizedBox(width: 8),
             Expanded(
               child: DropdownButtonFormField<GameResult>(
-                value: _result,
+                initialValue: _result,
                 isDense: true,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),

@@ -33,7 +33,7 @@ class MenuScreen extends StatelessWidget {
                 '中国象棋',
                 style: TextStyle(
                   fontSize: 18,
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                   letterSpacing: 8,
                 ),
               ),

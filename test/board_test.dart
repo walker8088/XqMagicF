@@ -351,5 +351,95 @@ void main() {
         expect(() => board.pieces.clear(), throwsUnsupportedError);
       });
     });
+
+    // —— 越界坐标行为：getPiece / putPiece / movePiece / removePiece 表现
+    // 不同，必须锁定。getPiece 走 isValidPosition 返回 null；
+    // 后三者未走保护检查，会直接抛 RangeError（原代码设计选择）。———
+    group('out-of-range coordinates', () {
+      test('getPiece on out-of-range returns null', () {
+        expect(board.getPiece(const Coord(-1, 0)), isNull);
+        expect(board.getPiece(const Coord(9, 0)), isNull);
+        expect(board.getPiece(const Coord(0, -1)), isNull);
+        expect(board.getPiece(const Coord(0, 10)), isNull);
+      });
+
+      test('putPiece with out-of-range coord throws RangeError', () {
+        expect(
+          () => board.putPiece(
+            const ChessPiece(
+              type: PieceType.rook,
+              color: PieceColor.red,
+              coord: Coord(20, 20),
+            ),
+          ),
+          throwsRangeError,
+        );
+      });
+
+      test('movePiece with out-of-range from throws RangeError', () {
+        board.putPiece(
+          const ChessPiece(
+            type: PieceType.rook,
+            color: PieceColor.red,
+            coord: Coord(0, 0),
+          ),
+        );
+        expect(
+          () => board.movePiece(const Coord(-1, 0), const Coord(0, 1)),
+          throwsRangeError,
+        );
+      });
+
+      test('movePiece with out-of-range to throws RangeError', () {
+        board.putPiece(
+          const ChessPiece(
+            type: PieceType.rook,
+            color: PieceColor.red,
+            coord: Coord(0, 0),
+          ),
+        );
+        expect(
+          () => board.movePiece(const Coord(0, 0), const Coord(0, 100)),
+          throwsRangeError,
+        );
+      });
+
+      test('removePiece with out-of-range coord throws RangeError', () {
+        expect(() => board.removePiece(const Coord(99, 99)), throwsRangeError);
+      });
+    });
+
+    // —— pieceList getter 是公开 API 却从未被测过。——
+    group('pieceList', () {
+      test('should return all pieces on board', () {
+        board.initialize();
+        expect(board.pieceList.length, 32);
+      });
+
+      test('should return empty list on fresh board', () {
+        expect(board.pieceList, isEmpty);
+      });
+
+      test('returned pieces should be in board positions', () {
+        board.putPiece(
+          const ChessPiece(
+            type: PieceType.knight,
+            color: PieceColor.red,
+            coord: Coord(1, 0),
+          ),
+        );
+        board.putPiece(
+          const ChessPiece(
+            type: PieceType.bishop,
+            color: PieceColor.black,
+            coord: Coord(2, 9),
+          ),
+        );
+        final positions = board.pieceList.map((p) => p.coord).toSet();
+        expect(positions, contains(const Coord(1, 0)));
+        expect(positions, contains(const Coord(2, 9)));
+        expect(board.pieceList.length, 2);
+      });
+    });
   });
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:xqmagic/services/local_db.dart';
+import 'package:xqmagic/utils/app_logger.dart';
 import 'package:xqmagic/viewmodels/game_viewmodel.dart';
+import 'package:xqmagic/widgets/common/empty_state.dart';
 import 'package:provider/provider.dart';
 
 /// 书签/收藏面板：管理收藏的棋局局面和最近打开的文件
@@ -95,87 +97,24 @@ class _BookmarkPanelState extends State<BookmarkPanel>
     if (fen == null) return;
 
     final moveCount = vm.depth;
-    final nameController = TextEditingController(text: '局面 #$moveCount');
-    final commentController = TextEditingController();
-    final tagsController = TextEditingController();
 
-    final confirmed = await showDialog<bool>(
+    // 使用子 widget 管理 TextEditingController 生命周期，
+    // 避免以前关闭对话框后 controller 仍然存活 → ChangeNotifier 泄漏。
+    final result = await showDialog<_AddBookmarkResult>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('添加收藏'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: '名称',
-                  border: OutlineInputBorder(),
-                ),
-                autofocus: true,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: commentController,
-                decoration: const InputDecoration(
-                  labelText: '备注',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 2,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: tagsController,
-                decoration: const InputDecoration(
-                  labelText: '标签',
-                  hintText: '用逗号分隔，如：开局, 中局',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 8),
-              // FEN 预览
-              Text(
-                'FEN: ${fen.length > 50 ? '${fen.substring(0, 50)}...' : fen}',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: Colors.grey),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('收藏'),
-          ),
-        ],
-      ),
+      builder: (ctx) =>
+          _AddBookmarkDialog(moveCount: moveCount, fenPreview: fen),
     );
 
-    if (confirmed != true) return;
-
-    final name = nameController.text.trim();
-    if (name.isEmpty) return;
-
-    final tags = tagsController.text
-        .split(',')
-        .map((t) => t.trim())
-        .where((t) => t.isNotEmpty)
-        .toList();
+    if (result == null) return;
+    if (result.name.isEmpty) return;
 
     try {
       await BookmarkService.instance.addBookmark(
         fen: fen,
-        name: name,
-        comment: commentController.text.trim(),
-        tags: tags,
+        name: result.name,
+        comment: result.comment,
+        tags: result.tags,
       );
       await _loadBookmarks();
       if (mounted) {
@@ -186,7 +125,8 @@ class _BookmarkPanelState extends State<BookmarkPanel>
           ),
         );
       }
-    } catch (_) {
+    } catch (e, s) {
+      AppLogger.error('BookmarkPanel', '添加收藏失败: $e\n$s');
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -285,8 +225,10 @@ class _BookmarkPanelState extends State<BookmarkPanel>
     return Container(
       width: 250,
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.2),
-        border: Border(left: BorderSide(color: Colors.white.withOpacity(0.1))),
+        color: Colors.black.withValues(alpha: 0.2),
+        border: Border(
+          left: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -330,7 +272,7 @@ class _BookmarkPanelState extends State<BookmarkPanel>
                   decoration: InputDecoration(
                     hintText: '搜索名称或标签',
                     hintStyle: TextStyle(
-                      color: Colors.white.withOpacity(0.4),
+                      color: Colors.white.withValues(alpha: 0.4),
                       fontSize: 13,
                     ),
                     prefixIcon: const Icon(
@@ -343,7 +285,7 @@ class _BookmarkPanelState extends State<BookmarkPanel>
                       vertical: 4,
                     ),
                     filled: true,
-                    fillColor: Colors.white.withOpacity(0.08),
+                    fillColor: Colors.white.withValues(alpha: 0.08),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide.none,
@@ -361,7 +303,9 @@ class _BookmarkPanelState extends State<BookmarkPanel>
                 onPressed: _addBookmark,
                 tooltip: '添加收藏',
                 style: IconButton.styleFrom(
-                  backgroundColor: const Color(0xFFF5DEB3).withOpacity(0.2),
+                  backgroundColor: const Color(
+                    0xFFF5DEB3,
+                  ).withValues(alpha: 0.2),
                   foregroundColor: const Color(0xFFF5DEB3),
                   padding: EdgeInsets.zero,
                   minimumSize: const Size(36, 36),
@@ -374,34 +318,11 @@ class _BookmarkPanelState extends State<BookmarkPanel>
         // 书签列表
         Expanded(
           child: _bookmarksLoading
-              ? const Center(
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Color(0xFFF5DEB3),
-                    ),
-                  ),
-                )
+              ? const LoadingIndicator()
               : _filteredBookmarks.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.bookmark_border,
-                        size: 40,
-                        color: Colors.white.withOpacity(0.2),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _searchQuery.isEmpty ? '暂无收藏' : '没有找到匹配的结果',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.4),
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
+              ? EmptyState(
+                  icon: Icons.bookmark_border,
+                  message: _searchQuery.isEmpty ? '暂无收藏' : '没有找到匹配的结果',
                 )
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -420,7 +341,7 @@ class _BookmarkPanelState extends State<BookmarkPanel>
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Material(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
@@ -449,7 +370,7 @@ class _BookmarkPanelState extends State<BookmarkPanel>
                     Text(
                       _formatDate(bookmark.createdAt),
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.4),
+                        color: Colors.white.withValues(alpha: 0.4),
                         fontSize: 11,
                       ),
                     ),
@@ -460,7 +381,7 @@ class _BookmarkPanelState extends State<BookmarkPanel>
                 Text(
                   _fenPreview(bookmark.fen),
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.35),
+                    color: Colors.white.withValues(alpha: 0.35),
                     fontSize: 11,
                     fontFamily: 'monospace',
                   ),
@@ -473,7 +394,7 @@ class _BookmarkPanelState extends State<BookmarkPanel>
                   Text(
                     bookmark.comment,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withValues(alpha: 0.5),
                       fontSize: 11,
                       fontStyle: FontStyle.italic,
                     ),
@@ -494,7 +415,9 @@ class _BookmarkPanelState extends State<BookmarkPanel>
                           vertical: 1,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF5DEB3).withOpacity(0.15),
+                          color: const Color(
+                            0xFFF5DEB3,
+                          ).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -544,35 +467,9 @@ class _BookmarkPanelState extends State<BookmarkPanel>
         // 最近文件列表
         Expanded(
           child: _recentFilesLoading
-              ? const Center(
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Color(0xFFF5DEB3),
-                    ),
-                  ),
-                )
+              ? const LoadingIndicator()
               : _recentFiles.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.history,
-                        size: 40,
-                        color: Colors.white.withOpacity(0.2),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '暂无最近文件',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.4),
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
+              ? const EmptyState(icon: Icons.history, message: '暂无最近文件')
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   itemCount: _recentFiles.length,
@@ -590,7 +487,7 @@ class _BookmarkPanelState extends State<BookmarkPanel>
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Material(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
@@ -607,7 +504,7 @@ class _BookmarkPanelState extends State<BookmarkPanel>
                     Icon(
                       Icons.insert_drive_file,
                       size: 16,
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withValues(alpha: 0.5),
                     ),
                     const SizedBox(width: 6),
                     Expanded(
@@ -625,7 +522,7 @@ class _BookmarkPanelState extends State<BookmarkPanel>
                     Text(
                       _formatDate(entry.lastOpened),
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.4),
+                        color: Colors.white.withValues(alpha: 0.4),
                         fontSize: 11,
                       ),
                     ),
@@ -638,7 +535,7 @@ class _BookmarkPanelState extends State<BookmarkPanel>
                   child: Text(
                     entry.path,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.3),
+                      color: Colors.white.withValues(alpha: 0.3),
                       fontSize: 10,
                     ),
                     maxLines: 1,
@@ -650,6 +547,126 @@ class _BookmarkPanelState extends State<BookmarkPanel>
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 添加收藏对话框返回的结果。
+class _AddBookmarkResult {
+  const _AddBookmarkResult({
+    required this.name,
+    required this.comment,
+    required this.tags,
+  });
+
+  final String name;
+  final String comment;
+  final List<String> tags;
+}
+
+/// 添加收藏对话框。独立 StatefulWidget 以正确释放 3 个 TextEditingController。
+class _AddBookmarkDialog extends StatefulWidget {
+  const _AddBookmarkDialog({required this.moveCount, required this.fenPreview});
+
+  final int moveCount;
+  final String fenPreview;
+
+  @override
+  State<_AddBookmarkDialog> createState() => _AddBookmarkDialogState();
+}
+
+class _AddBookmarkDialogState extends State<_AddBookmarkDialog> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _commentController;
+  late final TextEditingController _tagsController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: '局面 #${widget.moveCount}');
+    _commentController = TextEditingController();
+    _tagsController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _commentController.dispose();
+    _tagsController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fenPreview = widget.fenPreview;
+    return AlertDialog(
+      title: const Text('添加收藏'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: '名称',
+                border: OutlineInputBorder(),
+              ),
+              autofocus: true,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _commentController,
+              decoration: const InputDecoration(
+                labelText: '备注',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _tagsController,
+              decoration: const InputDecoration(
+                labelText: '标签',
+                hintText: '用逗号分隔，如：开局, 中局',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'FEN: ${fenPreview.length > 50 ? '${fenPreview.substring(0, 50)}...' : fenPreview}',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: Colors.grey),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final tags = _tagsController.text
+                .split(',')
+                .map((t) => t.trim())
+                .where((t) => t.isNotEmpty)
+                .toList();
+            Navigator.pop(
+              context,
+              _AddBookmarkResult(
+                name: _nameController.text.trim(),
+                comment: _commentController.text.trim(),
+                tags: tags,
+              ),
+            );
+          },
+          child: const Text('收藏'),
+        ),
+      ],
     );
   }
 }

@@ -18,9 +18,8 @@ import 'package:xqmagic/utils/constants.dart';
 /// - Engine state management
 /// Manages the lifecycle and analysis requests for a UCI/UCCI Xiangqi engine.
 class EngineManager extends ChangeNotifier {
-  EngineManager({String? defaultEnginePath, this.logEnabled = false})
-    : _defaultEnginePath = defaultEnginePath,
-      _config = EngineConfiguration();
+  EngineManager({this._defaultEnginePath, this.logEnabled = false})
+    : _config = EngineConfiguration();
 
   final String? _defaultEnginePath;
   final bool logEnabled;
@@ -77,6 +76,14 @@ class EngineManager extends ChangeNotifier {
   List<EngineInfo> _allInfos = [];
   String? _lastBestMove;
   String? _error;
+
+  /// 专门的分析数据变更回调（独立于 [notifyListeners]）。
+  ///
+  /// 区别于 ChangeNotifier 的 [notifyListeners]：
+  /// - [notifyListeners] 会在配置变更 / 状态变更 / 分析更新时都触发（UI 需要）
+  /// - [onAnalysisUpdated] 只在实际收到 [EngineAnalysisUpdate] / [EngineBestMove]
+  ///   时触发（消费者如 ViewModel 需要在节点上写入质量评估，不应该被配置变更污染）
+  VoidCallback? onAnalysisUpdated;
 
   // Subscription to engine events
   StreamSubscription<EngineEvent>? _eventSubscription;
@@ -149,6 +156,7 @@ class EngineManager extends ChangeNotifier {
     final settings = AppSettings.instance;
     setProtocolFromString(settings.engineProtocol);
     setDepth(settings.engineDepth);
+    setTimeMs(settings.engineTimeMs);
     setThreads(settings.engineThreads);
     setHash(settings.engineHash);
     setSkillLevel(settings.engineSkillLevel);
@@ -300,24 +308,34 @@ class EngineManager extends ChangeNotifier {
 
   // ---- Analysis Methods ----
 
-  /// Start analysis on a position using the configured depth.
-  Future<void> analyze({required String fen}) async {
+  /// 检查引擎是否就绪，未就绪时设置 error 状态并返回 false
+  bool _requireEngine() {
     if (_engine == null || !_engine!.isReady) {
       _state = EngineState.error;
       _error = 'Engine not ready';
       notifyListeners();
-      return;
+      return false;
     }
+    return true;
+  }
 
+  /// 准备分析：设置 FEN、清除旧结果、切换到 thinking 状态
+  void _prepareAnalysis(String fen) {
     _currentFen = fen;
-    final activePart = fen.split(' ').length >= 2 ? fen.split(' ')[1] : '?';
-    _log(
-      'analyze() FEN activeColor=$activePart (expected: ${activePart == "r" ? "red" : "black"})',
-    );
     _allInfos.clear();
     _latestInfo = null;
     _state = EngineState.thinking;
     notifyListeners();
+  }
+
+  /// Start analysis on a position using the configured depth.
+  Future<void> analyze({required String fen}) async {
+    if (!_requireEngine()) return;
+    final activePart = fen.split(' ').length >= 2 ? fen.split(' ')[1] : '?';
+    _log(
+      'analyze() FEN activeColor=$activePart (expected: ${activePart != "b" ? "red" : "black"})',
+    );
+    _prepareAnalysis(fen);
 
     try {
       await _engine!.analyze(
@@ -335,18 +353,8 @@ class EngineManager extends ChangeNotifier {
 
   /// Start analysis with a specific depth.
   Future<void> analyzeByDepth({required String fen, required int depth}) async {
-    if (_engine == null || !_engine!.isReady) {
-      _state = EngineState.error;
-      _error = 'Engine not ready';
-      notifyListeners();
-      return;
-    }
-
-    _currentFen = fen;
-    _allInfos.clear();
-    _latestInfo = null;
-    _state = EngineState.thinking;
-    notifyListeners();
+    if (!_requireEngine()) return;
+    _prepareAnalysis(fen);
 
     try {
       await _engine!.analyze(fen: fen, depth: depth, multiPV: _config.multiPV);
@@ -359,18 +367,8 @@ class EngineManager extends ChangeNotifier {
 
   /// Start analysis with a specific time limit.
   Future<void> analyzeByTime({required String fen, required int timeMs}) async {
-    if (_engine == null || !_engine!.isReady) {
-      _state = EngineState.error;
-      _error = 'Engine not ready';
-      notifyListeners();
-      return;
-    }
-
-    _currentFen = fen;
-    _allInfos.clear();
-    _latestInfo = null;
-    _state = EngineState.thinking;
-    notifyListeners();
+    if (!_requireEngine()) return;
+    _prepareAnalysis(fen);
 
     try {
       await _engine!.analyze(
@@ -387,18 +385,8 @@ class EngineManager extends ChangeNotifier {
 
   /// Start infinite analysis (runs until cancelled).
   Future<void> analyzeInfinite({required String fen}) async {
-    if (_engine == null || !_engine!.isReady) {
-      _state = EngineState.error;
-      _error = 'Engine not ready';
-      notifyListeners();
-      return;
-    }
-
-    _currentFen = fen;
-    _allInfos.clear();
-    _latestInfo = null;
-    _state = EngineState.thinking;
-    notifyListeners();
+    if (!_requireEngine()) return;
+    _prepareAnalysis(fen);
 
     try {
       await _engine!.analyze(fen: fen);
@@ -541,7 +529,7 @@ class EngineManager extends ChangeNotifier {
     if (_currentFen == null) return true;
     final parts = _currentFen!.split(' ');
     if (parts.length < 2) return true;
-    final isRedExpected = parts[1].toLowerCase() == 'r';
+    final isRedExpected = parts[1].toLowerCase() != 'b';
     if (info != null && (info.moveColor == PieceColor.red) != isRedExpected) {
       _log(
         'MISMATCH: FEN says ${isRedExpected ? "red" : "black"} to move, '
@@ -577,6 +565,7 @@ class EngineManager extends ChangeNotifier {
         _lastBestMove = move;
         _state = EngineState.ready;
         notifyListeners();
+        onAnalysisUpdated?.call();
 
       case EngineAnalysisUpdate(info: final info, allInfos: final allInfos):
         if (!_isAnalysisForCurrentSide(info: info)) {
@@ -593,6 +582,7 @@ class EngineManager extends ChangeNotifier {
         _latestInfo = info;
         _allInfos = allInfos;
         notifyListeners();
+        onAnalysisUpdated?.call();
 
       case EngineError(message: final message):
         _state = EngineState.error;
@@ -633,7 +623,9 @@ class EngineManager extends ChangeNotifier {
 
   @override
   void dispose() {
-    _cleanupEngine();
+    // _cleanupEngine 是 async，但 dispose 必须同步。
+    // 使用 unawaited 确保清理启动，同时避免阻塞 dispose
+    unawaited(_cleanupEngine());
     super.dispose();
   }
 }

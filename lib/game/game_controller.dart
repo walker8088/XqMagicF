@@ -4,6 +4,8 @@ import 'package:xqmagic/models/chess_piece.dart';
 import 'package:xqmagic/models/game_state.dart';
 import 'package:xqmagic/models/game_tree.dart';
 import 'package:xqmagic/models/move.dart';
+import 'package:xqmagic/utils/app_logger.dart';
+import 'package:xqmagic/utils/app_settings.dart';
 import 'package:xqmagic/utils/constants.dart';
 import 'package:xqmagic/utils/coord.dart';
 import 'package:xqmagic/utils/move_notation.dart';
@@ -40,8 +42,8 @@ class GameController {
   /// 游戏状态
   GameState gameState = GameState.playing;
 
-  /// 音效开关
-  bool soundEnabled = true;
+  /// 音效开关（绑定 AppSettings）
+  bool get soundEnabled => AppSettings.instance.soundEnabled;
 
   // ──────────── 访问器 ────────────
 
@@ -61,7 +63,9 @@ class GameController {
 
   /// 手动走子：校验合法性后执行。返回 true 表示走子成功
   bool manualMove(Coord from, Coord to) {
-    if (gameState == GameState.checkmate) return false;
+    if (gameState == GameState.checkmate || gameState == GameState.draw) {
+      return false;
+    }
 
     final legalMoves = engine.getLegalMoves(from);
     if (!legalMoves.any((m) => m.to == to)) return false;
@@ -81,6 +85,10 @@ class GameController {
   }
 
   /// 引擎走子：从 ICCS 解析并执行。返回 true 表示走子成功
+  ///
+  /// 失败时返回 `false`。**注意**：bool 返回值无法区分"ICCS 格式解析失败"
+  /// 与"走法非法（吃己方棋子、越界、违反回合等）"——具体原因请查看日志。
+  /// TODO: 改为返回 enum `EngineMoveResult` 以让调用方能精确分支。
   bool engineMove(String iccs) {
     if (gameState != GameState.playing) return false;
 
@@ -99,7 +107,9 @@ class GameController {
       );
       _executeMove(move);
       return true;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warn('GameController', 'ICCS 解析/走子失败 "$iccs": $e');
+      AppLogger.debug('GameController', '堆栈: $st');
       return false;
     }
   }
@@ -131,7 +141,13 @@ class GameController {
     String notation;
     try {
       notation = MoveNotation.toText(engine.board.pieces, move);
-    } catch (_) {
+    } catch (e, st) {
+      // 记谱生成失败不阻塞走子——fallback 到 ICCS 字符串
+      AppLogger.warn(
+        'GameController',
+        '中文记谱生成失败，回退到 ICCS (move=${MoveNotation.toICCS(move)}): $e',
+      );
+      AppLogger.debug('GameController', '堆栈: $st');
       notation = MoveNotation.toICCS(move);
     }
 
@@ -223,15 +239,42 @@ class GameController {
   void _checkGameEnd() {
     if (lastMove?.capturedPiece?.type == PieceType.king) {
       gameState = GameState.checkmate;
+      _playEndSound();
       return;
     }
-    gameState = engine.isCheckmate(engine.currentTurn)
-        ? GameState.checkmate
-        : GameState.playing;
+    if (engine.isCheckmate(engine.currentTurn)) {
+      gameState = GameState.checkmate;
+      _playEndSound();
+      return;
+    }
+    if (engine.isStalemate(engine.currentTurn)) {
+      gameState = GameState.draw;
+      return;
+    }
+    gameState = GameState.playing;
+  }
+
+  void _playEndSound() {
+    if (!soundEnabled) return;
+    // 刚走子的一方获胜（对方被将杀 → 对方是 currentTurn）
+    final winner = engine.currentTurn == PieceColor.red
+        ? PieceColor.black
+        : PieceColor.red;
+    if (winner == PieceColor.red) {
+      SoundManager.instance.playWin();
+    } else {
+      SoundManager.instance.playLose();
+    }
   }
 
   void _playMoveSound(MoveRecord move) {
     if (!soundEnabled) return;
+
+    // 检查对方是否被将军
+    if (engine.isInCheck(engine.currentTurn)) {
+      SoundManager.instance.playCheck();
+      return;
+    }
     if (move.capturedPiece != null) {
       SoundManager.instance.playCapture();
     } else {

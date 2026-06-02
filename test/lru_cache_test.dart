@@ -154,41 +154,6 @@ void main() {
       });
     });
 
-    group('stats', () {
-      test('should track hits and misses', () {
-        cache.put('a', 1);
-        cache.getWithStats('a'); // hit
-        cache.getWithStats('a'); // hit
-        cache.getWithStats('b'); // miss
-        expect(cache.hitRate, closeTo(2 / 3, 0.001));
-      });
-
-      test('should return 0.0 hit rate when no accesses', () {
-        expect(cache.hitRate, 0.0);
-      });
-
-      test('should return 1.0 hit rate when all hits', () {
-        cache.put('a', 1);
-        cache.getWithStats('a');
-        cache.getWithStats('a');
-        expect(cache.hitRate, 1.0);
-      });
-
-      test('should return 0.0 hit rate when all misses', () {
-        cache.getWithStats('a');
-        cache.getWithStats('b');
-        expect(cache.hitRate, 0.0);
-      });
-
-      test('should reset stats', () {
-        cache.put('a', 1);
-        cache.getWithStats('a');
-        cache.getWithStats('b');
-        cache.resetStats();
-        expect(cache.hitRate, 0.0);
-      });
-    });
-
     group('default maxSize', () {
       test('should default to 10000', () {
         final defaultCache = LRUCache<String, int>();
@@ -206,13 +171,49 @@ void main() {
         expect(smallCache.size, 1);
       });
 
-      test('should handle null values', () {
-        // Note: This depends on whether the cache allows null values
-        // If V is nullable, this should work
+      test('should handle null values via containsKey', () {
         final nullableCache = LRUCache<String, int?>();
         nullableCache.put('a', null);
-        // get returns null for both missing and null value
-        // This is a potential issue in the cache design
+        // get 返回 null 既可能是 missing 也可能是存了 null
+        // 用 containsKey 区分
+        expect(nullableCache.containsKey('a'), isTrue);
+        expect(nullableCache.containsKey('missing'), isFalse);
+      });
+
+      test('get on null value should not evict the key (regression)', () {
+        // 原实现的 bug：get 误用 remove 的返回值判定，
+        // 会把存了 null 的键在第一次 get 时静默驱逐。
+        // 修复后：键必须保留，且 hits 应递增。
+        final cache = LRUCache<String, int?>();
+        cache.put('a', null);
+        // 多次 get 后键仍应存在
+        expect(cache.get('a'), isNull);
+        expect(
+          cache.containsKey('a'),
+          isTrue,
+          reason: 'key must not be evicted',
+        );
+        expect(cache.get('a'), isNull);
+        expect(
+          cache.containsKey('a'),
+          isTrue,
+          reason: 'still present after 2nd get',
+        );
+        expect(cache.hitRate, 1.0, reason: 'all gets were hits');
+      });
+
+      test('hitRate should reflect hits and misses', () {
+        final cache = LRUCache<String, int>();
+        cache.put('a', 1);
+        cache.get('a'); // hit
+        cache.get('a'); // hit
+        cache.get('b'); // miss
+        expect(cache.hitRate, closeTo(2 / 3, 1e-9));
+      });
+
+      test('hitRate should be 0.0 when no operations performed', () {
+        final cache = LRUCache<String, int>();
+        expect(cache.hitRate, 0.0);
       });
     });
   });

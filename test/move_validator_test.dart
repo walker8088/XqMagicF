@@ -233,8 +233,8 @@ void main() {
         );
       });
 
-      test('should reject moving across river', () {
-        // Red elephant cannot go to row > 4
+      test('should allow elephant to boundary row 4', () {
+        // row 4 是红象的合法边界
         expect(
           MoveValidator.isValidMove(
             type: PieceType.bishop,
@@ -243,22 +243,22 @@ void main() {
             to: const Coord(4, 4),
             obstacles: [],
           ),
-          isTrue, // row 4 is boundary, still on red side
+          isTrue,
         );
       });
 
-      test('should reject elephant crossing river completely', () {
-        // From (6, 2) to (4, 4) is still on red side (row 4)
-        // This is actually a valid move - row 4 is the last red row
+      test('should reject red elephant crossing river to row 5+', () {
+        // 原测试名说"应拒绝跨过河"但断言 isTrue，是误名。
+        // 真正“跨过河”走法是 (2,3)→(4,5)：row 5 越出红方领地。
         expect(
           MoveValidator.isValidMove(
             type: PieceType.bishop,
             color: PieceColor.red,
-            from: const Coord(6, 2),
-            to: const Coord(4, 4),
+            from: const Coord(2, 3),
+            to: const Coord(4, 5),
             obstacles: [],
           ),
-          isTrue, // row 4 is on red side, this is valid
+          isFalse,
         );
       });
 
@@ -289,7 +289,7 @@ void main() {
       });
 
       group('black elephant', () {
-        test('should not cross river (cannot go to row < 5)', () {
+        test('should allow black elephant within own territory (row 5-9)', () {
           expect(
             MoveValidator.isValidMove(
               type: PieceType.bishop,
@@ -302,21 +302,18 @@ void main() {
           );
         });
 
-        test('should reject crossing river to row 4', () {
-          // From (2, 7) to (4, 5) would be row 5, still black side
-          // From (2, 7) to (0, 5) is row 5, still valid
-          // To check crossing: from (2, 7), going to (4, 5) is valid
-          // Going to (4, 4) is not possible (not 田字)
-          // Black crossing would be: from (2, 9) to (4, 7) - valid
+        test('should reject black elephant crossing river to row 4-', () {
+          // 原测试名为“should reject crossing to row 4”但断言 isTrue，是误名。
+          // 真正“跨过河”走法是 (2,6)→(0,4)：row 4 越出黑方领地。
           expect(
             MoveValidator.isValidMove(
               type: PieceType.bishop,
               color: PieceColor.black,
-              from: const Coord(2, 9),
-              to: const Coord(4, 7),
+              from: const Coord(2, 6),
+              to: const Coord(0, 4),
               obstacles: [],
             ),
-            isTrue,
+            isFalse,
           );
         });
 
@@ -743,8 +740,8 @@ void main() {
           );
         });
 
-        test('should allow backward move after crossing', () {
-          // After crossing, soldier can move forward, backward, left, right
+        test('should reject backward move after crossing', () {
+          // 兵卒过河后也不能后退
           expect(
             MoveValidator.isValidMove(
               type: PieceType.pawn,
@@ -753,7 +750,7 @@ void main() {
               to: const Coord(0, 4),
               obstacles: [],
             ),
-            isTrue,
+            isFalse,
           );
         });
 
