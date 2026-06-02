@@ -66,13 +66,16 @@ class AppLogger {
         '${now.second.toString().padLeft(2, '0')}';
   }
 
-  static void _write(String tag, String module, String message) {
-    final line = '[$tag] [$_timestamp()] [$module] $message';
+  static void _write(LogLevel level, String module, String message) {
+    final tag = _levelTag(level);
+    // 插值里必须用 ${fn()} 才能调用函数，`$fn()` 会被解析为
+    // 标识符插值 + 字面量 '()'，打印出 `Closure: ...` 而不是返回值。
+    final line = '[$tag] [${_timestamp()}] [$module] $message';
 
     // Always print to console in debug mode
     if (kDebugMode) {
       // ignore: avoid_print
-      print('[$tag] [${_timestamp()}] [$module] $message');
+      print(line);
     }
 
     // Write to file if enabled
@@ -89,28 +92,28 @@ class AppLogger {
   /// Log a debug message.
   static void debug(String module, String message) {
     if (LogLevel.debug.index >= _minLevel.index) {
-      _write('D', module, message);
+      _write(LogLevel.debug, module, message);
     }
   }
 
   /// Log an info message.
   static void info(String module, String message) {
     if (LogLevel.info.index >= _minLevel.index) {
-      _write('I', module, message);
+      _write(LogLevel.info, module, message);
     }
   }
 
   /// Log a warning message.
   static void warn(String module, String message) {
     if (LogLevel.warn.index >= _minLevel.index) {
-      _write('W', module, message);
+      _write(LogLevel.warn, module, message);
     }
   }
 
   /// Log an error message.
   static void error(String module, String message) {
     if (LogLevel.error.index >= _minLevel.index) {
-      _write('E', module, message);
+      _write(LogLevel.error, module, message);
     }
   }
 }
