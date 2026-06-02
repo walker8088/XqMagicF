@@ -1,5 +1,3 @@
-import 'package:xqmagic/utils/lru_cache.dart';
-
 /// 着法来源
 enum OpeningSource {
   master('master'), // 大师对局
@@ -42,28 +40,6 @@ class OpeningMove {
 
   /// ECCO 开局分类代码
   final String? eccoCode;
-
-  OpeningMove copyWith({
-    String? iccs,
-    String? chineseName,
-    int? frequency,
-    double? winRate,
-    OpeningSource? source,
-    String? eccoCode,
-  }) {
-    return OpeningMove(
-      iccs: iccs ?? this.iccs,
-      chineseName: chineseName ?? this.chineseName,
-      frequency: frequency ?? this.frequency,
-      winRate: winRate ?? this.winRate,
-      source: source ?? this.source,
-      eccoCode: eccoCode ?? this.eccoCode,
-    );
-  }
-
-  @override
-  String toString() =>
-      'OpeningMove($iccs, $chineseName, freq=$frequency, wr=${winRate.toStringAsFixed(2)})';
 }
 
 /// 开局信息 (某一步的局面及可选着法)
@@ -86,27 +62,6 @@ class OpeningInfo {
 
   /// 开局中文名称
   final String? eccoName;
-
-  OpeningInfo copyWith({
-    String? positionFen,
-    List<OpeningMove>? moves,
-    String? eccoCode,
-    String? eccoName,
-  }) {
-    return OpeningInfo(
-      positionFen: positionFen ?? this.positionFen,
-      moves: moves ?? this.moves,
-      eccoCode: eccoCode ?? this.eccoCode,
-      eccoName: eccoName ?? this.eccoName,
-    );
-  }
-}
-
-/// ECCO 开局编码与名称映射
-class EccoEntry {
-  const EccoEntry(this.code, this.name);
-  final String code;
-  final String name;
 }
 
 /// 开局库服务 (单例)
@@ -117,41 +72,6 @@ class OpeningBookService {
   static OpeningBookService? _instance;
   static OpeningBookService get instance =>
       _instance ??= OpeningBookService._();
-
-  /// LRU 缓存查询结果
-  final LRUCache<String, OpeningInfo?> _cache = LRUCache(maxSize: 500);
-
-  /// ECCO 编码 → 开局名称
-  static const Map<String, String> _eccoNames = {
-    'A00': '不规则开局',
-    'A01': '仙人指路',
-    'A02': '仙人指路对卒底炮',
-    'A03': '仙人指路对飞象',
-    'B00': '中炮局',
-    'B01': '中炮对顺手炮',
-    'B02': '中炮对列手炮',
-    'B03': '中炮对屏风马',
-    'B04': '中炮对反宫马',
-    'B05': '中炮对单提马',
-    'B06': '中炮对拐角马',
-    'C00': '飞相局',
-    'C01': '飞相对左中炮',
-    'C02': '飞相对右中炮',
-    'C03': '飞相对士角炮',
-    'D00': '士角炮',
-    'D01': '士角炮对中炮',
-    'D02': '士角炮对飞象',
-    'E00': '过宫炮',
-    'E01': '过宫炮对左中炮',
-    'E02': '过宫炮对右中炮',
-    'F00': '起马局',
-    'F01': '起马对中炮',
-    'F02': '起马对挺卒',
-    'G00': '金钩炮',
-    'G01': '金钩炮对左中炮',
-    'H00': '边兵局',
-    'H01': '边兵局对中炮',
-  };
 
   /// 内置开局库 (FEN → OpeningInfo)
   ///
@@ -1090,117 +1010,57 @@ class OpeningBookService {
         ),
   };
 
-  /// 清除缓存
-  void clearCache() {
-    _cache.clear();
-  }
-
-  /// 获取缓存统计信息
-  CacheStats get cacheStats =>
-      CacheStats(size: _cache.size, hitRate: _cache.hitRate);
-
   /// 根据局面 FEN 查询开局信息
   ///
   /// [positionFen] 完整 FEN（必须包含走子方 r/b）
   /// 返回该局面下的推荐着法列表
   OpeningInfo? lookup(String positionFen) {
-    final fen = _normalizeFen(positionFen);
-
-    // 尝试从缓存获取
-    final cached = _cache.get(fen);
-    if (cached != null) return cached;
-
-    // 查找开局库
-    final info = _openingBook[fen];
-
-    // 缓存结果
-    _cache.put(fen, info);
-
-    return info;
+    return _openingBook[_normalizeFen(positionFen)];
   }
 
-  /// 根据 ECCO 代码获取开局名称
-  ///
-  /// 返回 (code, name) 元组，如果找不到则返回 null
-  (String code, String name)? getECCOInfo(String eccoCode) {
-    final name = _eccoNames[eccoCode];
-    if (name == null) return null;
-    return (eccoCode, name);
-  }
+  /// 获取所有开局信息列表（按 eccoCode 去重，按 ECCO 代码排序）
+  List<OpeningInfo> getAllOpenings() =>
+      _uniqueOpenings().toList()..sort((a, b) {
+        final codeA = a.eccoCode ?? 'ZZZ';
+        final codeB = b.eccoCode ?? 'ZZZ';
+        return codeA.compareTo(codeB);
+      });
 
-  /// 获取所有开局信息列表
-  List<OpeningInfo> getAllOpenings() {
-    // 按 eccoCode 分组，每个开局只返回一次
-    final seen = <String?>{};
-    final openings = <OpeningInfo>[];
-
-    for (final info in _openingBook.values) {
-      final key = info.eccoCode ?? info.positionFen;
-      if (!seen.contains(key)) {
-        seen.add(key);
-        openings.add(info);
-      }
-    }
-
-    // 按 ECCO 代码排序
-    openings.sort((a, b) {
-      final codeA = a.eccoCode ?? 'ZZZ';
-      final codeB = b.eccoCode ?? 'ZZZ';
-      return codeA.compareTo(codeB);
-    });
-
-    return openings;
-  }
-
-  /// 获取所有已知的 ECCO 开局编码和名称
-  List<EccoEntry> getAllECCOCodes() {
-    return _eccoNames.entries.map((e) => EccoEntry(e.key, e.value)).toList()
-      ..sort((a, b) => a.code.compareTo(b.code));
-  }
-
-  /// 按名称搜索开局
+  /// 按名称搜索开局。空关键字返回全部。
   List<OpeningInfo> searchByName(String keyword) {
-    final seen = <String?>{};
-    final results = <OpeningInfo>[];
+    if (keyword.isEmpty) return getAllOpenings();
+    return _uniqueOpenings()
+        .where(
+          (info) =>
+              info.eccoName?.contains(keyword) == true ||
+              info.eccoCode?.contains(keyword.toUpperCase()) == true,
+        )
+        .toList();
+  }
 
-    for (final info in _openingBook.values) {
-      final key = info.eccoCode ?? info.positionFen;
-      if (seen.contains(key)) continue;
-
-      final matchesName = info.eccoName?.contains(keyword) == true;
-      final matchesCode = info.eccoCode?.contains(keyword) == true;
-
-      if (matchesName || matchesCode) {
-        seen.add(key);
-        results.add(info);
-      }
+  /// 按 eccoCode 去重遍历。空字符串/空 ECCO 走 positionFen。
+  Iterable<OpeningInfo> _uniqueOpenings() sync* {
+    final seen = <String>{};
+    for (final entry in _openingBook.entries) {
+      final key = entry.value.eccoCode ?? entry.key;
+      if (seen.add(key)) yield entry.value;
     }
-
-    return results;
   }
 
   /// 开局库大小
   int get size => _openingBook.length;
 
   /// 确保 FEN 包含走子方（r/b），若缺失则默认补 'r'
+  ///
+  /// 正确处理多字段 FEN：只取第一个 token（走子方）来判断，保留原始 FEN
+  /// 的所有后续字段（半回合计数、全回合计数等）。
   static String _normalizeFen(String fen) {
     final trimmed = fen.trim();
-    final spaceIdx = trimmed.indexOf(' ');
-    if (spaceIdx < 0) return '$trimmed r';
-    final activeColor = trimmed.substring(spaceIdx + 1).trim();
+    final firstSpace = trimmed.indexOf(' ');
+    if (firstSpace < 0) return '$trimmed r';
+    // splitOnce：仅在第一个空格处切分
+    final activeColor = trimmed.substring(firstSpace + 1, firstSpace + 2);
     if (activeColor == 'r' || activeColor == 'b') return trimmed;
     return '$trimmed r';
   }
-}
-
-/// 缓存统计信息
-class CacheStats {
-  const CacheStats({required this.size, required this.hitRate});
-
-  final int size;
-  final double hitRate;
-
-  @override
-  String toString() =>
-      'CacheStats(size: $size, hitRate: ${(hitRate * 100).toStringAsFixed(1)}%)';
 }
