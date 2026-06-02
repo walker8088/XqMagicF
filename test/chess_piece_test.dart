@@ -294,6 +294,34 @@ void main() {
       expect(PieceType.cannon.displayName(PieceColor.black), '砲');
       expect(PieceType.pawn.displayName(PieceColor.black), '卒');
     });
+
+    test('useSimpleText: true returns simplified for both colors', () {
+      // 与记谱默认一致：红黑双方都用简体。
+      expect(
+        PieceType.knight.displayName(PieceColor.red, useSimpleText: true),
+        '马',
+      );
+      expect(
+        PieceType.rook.displayName(PieceColor.red, useSimpleText: true),
+        '车',
+      );
+      expect(
+        PieceType.cannon.displayName(PieceColor.black, useSimpleText: true),
+        '炮',
+      );
+      expect(
+        PieceType.knight.displayName(PieceColor.black, useSimpleText: true),
+        '马',
+      );
+    });
+
+    test('PieceNames字表与 PieceType 索引一一对应', () {
+      // 防止 PieceNames 数组长度变化（增/减 PieceType）时静默越界。
+      expect(PieceNames.redSimple.length, PieceType.values.length);
+      expect(PieceNames.blackSimple.length, PieceType.values.length);
+      expect(PieceNames.redTraditional.length, PieceType.values.length);
+      expect(PieceNames.blackTraditional.length, PieceType.values.length);
+    });
   });
 
   group('PieceColor', () {

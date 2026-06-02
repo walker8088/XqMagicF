@@ -18,6 +18,9 @@ import 'package:xqmagic/utils/coord.dart';
 /// 走法方向分类（用于消除中文/WXF 之间的重复方向判断逻辑）
 enum _MovementType { flat, forward, backward }
 
+/// 多子前缀输出风格
+enum _PrefixStyle { chinese, wxf }
+
 class ChineseNotation {
   ChineseNotation._();
 
@@ -133,7 +136,11 @@ class ChineseNotation {
     final toFile = _getFileNumberFromRed(normMove.to.col, isRed);
 
     // 同线多子检测（红方视角）
-    final prefix = _getMultiPiecePrefixFromRed(normBoard, normMove);
+    final prefix = _getMultiPiecePrefix(
+      normBoard,
+      normMove,
+      _PrefixStyle.chinese,
+    );
 
     final colDiff = normMove.to.col - normMove.from.col;
     final rowDiff = normMove.to.row - normMove.from.row;
@@ -176,7 +183,7 @@ class ChineseNotation {
     final toFile = 9 - normMove.to.col;
 
     // 同线多子检测（红方视角）
-    final prefix = _getWXFMultiPiecePrefixFromRed(normBoard, normMove);
+    final prefix = _getMultiPiecePrefix(normBoard, normMove, _PrefixStyle.wxf);
 
     final colDiff = normMove.to.col - normMove.from.col;
     final rowDiff = normMove.to.row - normMove.from.row;
@@ -325,18 +332,14 @@ class ChineseNotation {
 
     if (useSimpleText) {
       // 简体中文：红黑双方用不同的字
-      const redNames = ['帅', '仕', '相', '马', '车', '炮', '兵'];
-      const blackNames = ['将', '士', '象', '马', '车', '炮', '卒'];
       return color == PieceColor.red
-          ? redNames[type.index]
-          : blackNames[type.index];
+          ? PieceNames.redSimple[type.index]
+          : PieceNames.blackSimple[type.index];
     } else {
       // 繁体中文
-      const redNames = ['帥', '仕', '相', '傌', '俥', '砲', '兵'];
-      const blackNames = ['將', '士', '象', '馬', '車', '砲', '卒'];
       return color == PieceColor.red
-          ? redNames[type.index]
-          : blackNames[type.index];
+          ? PieceNames.redTraditional[type.index]
+          : PieceNames.blackTraditional[type.index];
     }
   }
 
@@ -462,35 +465,34 @@ class ChineseNotation {
     return (pieces.length, idx);
   }
 
-  /// 检查同线是否有同类型棋子，返回前/后/中缀（红方视角）
-  static String? _getMultiPiecePrefixFromRed(
+  /// 检查同线是否有同类型棋子，返回前/后/中缀（红方视角）。
+  ///
+  /// [style] 决定输出格式：chinese 用 "前/后/中/一/二/..."，WXF 用 "f/b/m"。
+  /// 两个分支对 first/last 的判定完全一致（红方视角下的前后），仅中间
+  /// 位置的中缀字面量不同。WXF 在多子场景中始终用 'm' 表示 middle；
+  /// 中文仅 count==3 的中间位置用 '中'，超过 3 个时用中文数字。
+  static String? _getMultiPiecePrefix(
     Map<Coord, ChessPiece> board,
     MoveRecord move,
+    _PrefixStyle style,
   ) {
     final result = _collectSameFilePieces(board, move);
     if (result == null) return null;
     final (count, myIdx) = result;
-    if (count == 2) return myIdx == 0 ? '前' : '后';
-    if (myIdx == 0) return '前';
-    if (myIdx == count - 1) return '后';
+    if (count == 2) return myIdx == 0 ? _first(style) : _last(style);
+    if (myIdx == 0) return _first(style);
+    if (myIdx == count - 1) return _last(style);
+    if (style == _PrefixStyle.wxf) return 'm'; // middle
     if (count == 3 && myIdx == 1) return '中';
     const numWords = ['', '一', '二', '三', '四', '五'];
     return numWords[myIdx + 1];
   }
 
-  /// 获取 WXF 格式的多子前缀（红方视角）
-  static String? _getWXFMultiPiecePrefixFromRed(
-    Map<Coord, ChessPiece> board,
-    MoveRecord move,
-  ) {
-    final result = _collectSameFilePieces(board, move);
-    if (result == null) return null;
-    final (count, myIdx) = result;
-    if (count == 2) return myIdx == 0 ? 'f' : 'b';
-    if (myIdx == 0) return 'f';
-    if (myIdx == count - 1) return 'b';
-    return 'm'; // middle
-  }
+  static String _first(_PrefixStyle style) =>
+      style == _PrefixStyle.chinese ? '前' : 'f';
+
+  static String _last(_PrefixStyle style) =>
+      style == _PrefixStyle.chinese ? '后' : 'b';
 
   /// 通过 WXF 棋子字母找到棋盘上的对应棋子坐标
   static Coord? _findPieceByCol(

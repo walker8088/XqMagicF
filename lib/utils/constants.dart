@@ -59,11 +59,39 @@ enum PieceType {
   pawn, // 卒/兵
 }
 
+/// 棋子名称字表（中文，按 [PieceType] 索引顺序）。
+///
+/// 与 [ChineseNotation] 共享同一份数据源，避免记谱/界面两侧的繁简
+/// 漂移。索引必须与 [PieceType] 一一对应（长度恒为 7）。
+class PieceNames {
+  PieceNames._();
+
+  // ──── 简体中文（默认，与记谱一致） ────
+  static const redSimple = ['帅', '仕', '相', '马', '车', '炮', '兵'];
+  static const blackSimple = ['将', '士', '象', '马', '车', '炮', '卒'];
+
+  // ──── 繁体中文 ────
+  static const redTraditional = ['帥', '仕', '相', '傌', '俥', '砲', '兵'];
+  static const blackTraditional = ['將', '士', '象', '馬', '車', '砲', '卒'];
+}
+
 extension PieceTypeExtension on PieceType {
-  String displayName(PieceColor color) {
-    const redNames = ['帅', '仕', '相', '傌', '俥', '炮', '兵'];
-    const blackNames = ['将', '士', '象', '馬', '車', '砲', '卒'];
-    final names = color == PieceColor.red ? redNames : blackNames;
-    return names[index];
+  // 保留传统棋具的"红黑混繁简"显示习惯（红方马/车用傌/俥，黑方马/车/炮
+  // 用馬/車/砲，其余简体）。该字表与 [PieceNames] 不可由简单公式推导，
+  // 因此单独维护——如需统一为简体，调用方传 `useSimpleText: true`。
+  static const _redMixed = ['帅', '仕', '相', '傌', '俥', '炮', '兵'];
+  static const _blackMixed = ['将', '士', '象', '馬', '車', '砲', '卒'];
+
+  /// 棋子显示名。
+  ///
+  /// - [useSimpleText] = false（默认）：保留"红黑混繁简"的传统显示习惯
+  /// - [useSimpleText] = true：统一为简体（与 [ChineseNotation] 记谱一致）
+  String displayName(PieceColor color, {bool useSimpleText = false}) {
+    if (useSimpleText) {
+      return color == PieceColor.red
+          ? PieceNames.redSimple[index]
+          : PieceNames.blackSimple[index];
+    }
+    return color == PieceColor.red ? _redMixed[index] : _blackMixed[index];
   }
 }

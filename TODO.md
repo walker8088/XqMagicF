@@ -17,9 +17,9 @@
 - [x] #10 `_lastShowLeft` 初始化为 `false` 但实际左面板初始可见 ✅
 - [x] #11 PV 模拟走子时 `piece.coord` 未更新 ✅
 - [x] #12 `getWithStats()` 用 `value != null` 判断命中，统计错误；统计代码从未调用 ✅
-- [ ] #13 `_dropdown<T>()` 方法在 game_screen 和 engine_control_panel 完全重复
-- [ ] #14 `_getMultiPiecePrefixFromRed()` 与 `_getWXFMultiPiecePrefixFromRed()` 逻辑重复
-- [ ] #15 棋子中文名不一致：PieceTypeExtension 用繁体，记谱用简体
+- [x] #13 `_dropdown<T>()` 方法在 game_screen 和 engine_control_panel 完全重复 ✅
+- [x] #14 `_getMultiPiecePrefixFromRed()` 与 `_getWXFMultiPiecePrefixFromRed()` 逻辑重复 ✅
+- [x] #15 棋子中文名不一致：PieceTypeExtension 用繁体，记谱用简体 ✅
 - [x] #16 将军/胜负音效从未触发 ✅
 - [x] #17 `CloudQueryResult.parseResponse` 的 `moveColor` 参数从未使用 ✅
 - [x] #18 4 个 analyze 方法重复约 40 行相同的前置检查代码 ✅
