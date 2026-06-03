@@ -74,16 +74,11 @@ class AnalysisService {
   }
 
   /// 手动触发云库查询
+  ///
+  /// 复用 [_queryCloud] 的 generation 保护逻辑，避免快速连续调用时
+  /// 过期结果覆盖最新结果。
   Future<void> queryCloud(String fen) async {
-    _isCloudQuerying = true;
-
-    try {
-      cloudResult = await _cloudDB.query(fen);
-    } catch (e) {
-      _log('Cloud query failed: $e');
-    } finally {
-      _isCloudQuerying = false;
-    }
+    await _queryCloud(fen);
   }
 
   /// 清除云库查询结果
