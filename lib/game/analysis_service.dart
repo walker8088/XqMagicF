@@ -40,6 +40,9 @@ class AnalysisService {
   /// 云库查询代次（用于丢弃过期结果）
   int _cloudQueryGeneration = 0;
 
+  /// 分析开始时的节点引用（用于防止导航竞争写入错误节点）
+  GameTreeNode? _analysisTargetNode;
+
   // ──────────── 分析触发 ────────────
 
   /// 在走子/导航后触发分析
@@ -47,6 +50,7 @@ class AnalysisService {
   /// [fen] 当前局面的 FEN
   /// [currentNode] 当前的 GameTreeNode（用于写入分析结果）
   void onPositionChanged(String fen, GameTreeNode? currentNode) {
+    _analysisTargetNode = currentNode; // 记录分析目标节点
     _engineManager.analyze(fen: fen);
     _queryCloud(fen);
   }
@@ -88,30 +92,32 @@ class AnalysisService {
 
   // ──────────── 分析结果写入 ────────────
 
-  /// 将引擎分析结果写入当前节点
+  /// 将引擎分析结果写入分析开始时的目标节点
   ///
   /// 在 _onAnalysisChanged 中调用。
-  /// [currentNode] 当前 GameTreeNode（走子后的节点）
-  void writeAnalysisToNode(GameTreeNode? currentNode) {
-    if (currentNode == null) return;
+  /// 使用 [_analysisTargetNode] 而非当前节点，防止用户导航后
+  /// 将旧位置的分析结果写入新位置节点。
+  void writeAnalysisToNode() {
+    final targetNode = _analysisTargetNode;
+    if (targetNode == null) return;
 
-    // 保存引擎评分到当前节点
+    // 保存引擎评分到目标节点
     final score = _engineManager.getCurrentScore();
     if (score != null) {
-      currentNode.evaluation = score;
+      targetNode.evaluation = score;
     }
 
     // 保存引擎最佳着法
     final best = _engineManager.getCurrentBestMove();
     if (best != null) {
-      currentNode.engineBestMove = best;
+      targetNode.engineBestMove = best;
     }
 
     // 评估着法质量（需要父节点有评分 + 当前节点有走法）
-    if (currentNode.parent != null &&
-        currentNode.move != null &&
-        currentNode.moveAnnotation == null) {
-      MoveQualityAssessor.assess(currentNode);
+    if (targetNode.parent != null &&
+        targetNode.move != null &&
+        targetNode.moveAnnotation == null) {
+      MoveQualityAssessor.assess(targetNode);
     }
   }
 

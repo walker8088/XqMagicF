@@ -98,6 +98,13 @@ class GameController {
       if (piece == null) return false;
       if (piece.color != currentTurn) return false;
 
+      // 验证走法合法性（与 manualMove 一致）
+      final legalMoves = engine.getLegalMoves(from);
+      if (!legalMoves.any((m) => m.to == to)) {
+        AppLogger.warn('GameController', '引擎走法非法: $iccs');
+        return false;
+      }
+
       final move = MoveRecord(
         from: from,
         to: to,

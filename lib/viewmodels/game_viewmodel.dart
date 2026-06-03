@@ -557,7 +557,7 @@ class GameViewModel extends ChangeNotifier {
   }
 
   void _onAnalysisChanged() {
-    _analysisService.writeAnalysisToNode(_controller.gameTree.current);
+    _analysisService.writeAnalysisToNode();
     notifyListeners();
   }
 

@@ -981,17 +981,27 @@ class EngineInfo {
   final int multipv;
 
   /// Score adjusted to red's perspective (positive = red better).
+  /// For mate: maps to ±(30000 - distance) so mate scores are
+  /// far larger than any centipawn score and naturally sortable.
   int get adjustedScore {
     if (score == null) return 0;
     if (isMate) {
-      // score > 0: side to move can mate (winning)
-      // score < 0: side to move will be mated (losing)
-      // Convert to red's perspective: preserve sign, then flip for black
-      final mateScore = score!.abs();
+      // score > 0: side to move can mate in N (winning)
+      // score < 0: side to move will be mated in N (losing)
+      final distance = score!.abs();
+      final mateScore = 30000 - distance;
       final signed = score! > 0 ? mateScore : -mateScore;
       return moveColor == PieceColor.black ? -signed : signed;
     }
     return moveColor == PieceColor.black ? -score! : score!;
+  }
+
+  /// Reverse-maps an adjustedScore back to mate-in-N distance.
+  /// Returns null if the score is not in the mate range (|score| < 29000).
+  static int? mateDistanceFrom(int adjustedScore) {
+    final abs = adjustedScore.abs();
+    if (abs < 29000) return null;
+    return 30000 - abs;
   }
 
   /// Best move in ICCS format.

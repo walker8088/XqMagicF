@@ -53,7 +53,7 @@ class EnginePVLine {
     return EnginePVLine(
       depth: info.depth,
       score: convertedScore,
-      mateIn: info.isMate ? convertedScore : null,
+      mateIn: EngineInfo.mateDistanceFrom(convertedScore),
       pv: info.pv,
       nodes: info.nodes ?? 0,
       nps: info.nps ?? 0,
@@ -390,9 +390,10 @@ class ScoreDisplay extends StatelessWidget {
 
   /// 直接显示分数，不做单位转换
   String _formatScore() {
-    // Mate situation
-    if (mateIn != null) return '杀$mateIn';
-    // 分数直接显示，不做单位转换
+    // Mate situation: derive from score if mateIn not explicitly set
+    final effectiveMateIn = mateIn ?? EngineInfo.mateDistanceFrom(score);
+    if (effectiveMateIn != null) return '杀$effectiveMateIn';
+    // Centipawn score
     return score >= 0 ? '+$score' : '$score';
   }
 
@@ -512,9 +513,14 @@ class CloudMoveList extends StatelessWidget {
   }
 
   Widget _buildScoreDisplay(int score) {
-    final text = score >= 0 ? '+$score' : '$score';
+    final mateDistance = EngineInfo.mateDistanceFrom(score);
+    final text = mateDistance != null
+        ? '杀$mateDistance'
+        : (score >= 0 ? '+$score' : '$score');
     Color color;
-    if (score > 0) {
+    if (mateDistance != null) {
+      color = score > 0 ? const Color(0xFF00CC44) : const Color(0xFFFF4444);
+    } else if (score > 0) {
       color = const Color(0xFF00CC44);
     } else if (score < 0) {
       color = const Color(0xFFFF4444);

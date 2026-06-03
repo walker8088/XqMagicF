@@ -138,7 +138,7 @@ final bestColor = pvLine != null
 |------|-----|------|
 | `engine.dart` | `Engine` | UCI/UCCI 引擎进程通信：stdin/stdout、命令发送、事件流。状态：`isRunning/isReady/isAnalyzing` |
 | | `EngineEvent` | sealed class: `EngineReady`、`EngineBestMove`、`EngineAnalysisUpdate`、`EngineInfoEvent`、`EngineExited`、`EngineError`、`EngineUCIOk`、`EngineRawLine` |
-| | `EngineInfo` | 分析信息：depth、selDepth、score、isMate、pv、nodes、nps、timeMs、moveColor、multipv |
+| | `EngineInfo` | 分析信息：depth、selDepth、score、isMate、pv、nodes、nps、timeMs、moveColor、multipv。`adjustedScore` 将杀棋映射为 ±(30000-N) 以便排序；`mateDistanceFrom()` 反向映射回杀步数 |
 | | `UCIOption`、`UCIOptionType` | 引擎选项数据结构 |
 | | `EngineProtocol` | enum: `uci`、`ucci` |
 | `engine_manager.dart` | `EngineManager` | 引擎生命周期：加载/启动/重启 UCI 引擎，发送分析命令，事件订阅。状态机：`idle→loading→ready↔thinking/error` |

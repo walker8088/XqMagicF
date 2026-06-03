@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:xqmagic/models/move.dart';
+import 'package:xqmagic/services/engine.dart';
 import 'package:xqmagic/utils/constants.dart';
 
 /// 着法列表面板：显示走子历史、分数、注解
@@ -76,7 +77,9 @@ class _MoveHistoryPanelState extends State<MoveHistoryPanel> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.2),
-        border: Border(left: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
+        border: Border(
+          left: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -258,6 +261,8 @@ class _MoveHistoryPanelState extends State<MoveHistoryPanel> {
   }
 
   String _formatScore(int score) {
+    final mateDistance = EngineInfo.mateDistanceFrom(score);
+    if (mateDistance != null) return '杀$mateDistance';
     if (score > 0) return '+$score';
     return '$score';
   }
