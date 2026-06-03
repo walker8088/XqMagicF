@@ -54,8 +54,8 @@ MoveRecord(..., color: piece.color, ...)
 ```
 
 同样修复了：
-- `PVChineseConverter.singleMove()`
-- `PVChineseConverter.pvLine()`
+- `PVChineseConverter.singleMove()` （已删除，功能由 `MoveNotation.formatMoveDisplay` 覆盖）
+- `PVChineseConverter.pvLine()` （已删除，无外部调用方）
 
 ### Bug：分析面板 pvLines 为空时 bestColor 默认 Red
 
@@ -74,6 +74,7 @@ final bestColor = pvLine != null
 - 行序：从上到下（FEN row 0 = 黑方底线 = 内部 row 9）
 - 棋子：大写=红方，小写=黑方
 - 走子方：`w` = 红（white/red），`b` = 黑
+- 开局库内部 key 统一使用 `w`/`b`（与 UCI 标准一致）；`_normalizeFen` 将旧式 `r` 归一化为 `w`
 
 ---
 
@@ -170,8 +171,7 @@ final bestColor = pvLine != null
 | `move_notation.dart` | `MoveNotation` | **ICCS ↔ 内部坐标唯一入口**：`toICCS`、`fromICCS`（rank = row，无转换）；`formatMoveDisplay`（用棋子实际颜色）；`toText`/`toWXF` 委托给 ChineseNotation |
 | | `MoveQuality` | 着法质量标注辅助类（best/good/ok/bad 阈值） |
 | `chinese_notation.dart` | `ChineseNotation` | 中文记谱核心：`toText`（黑方走子时 normalizeCoord 旋转视角）、`toWXF`、`fromWXF`、`normalizeCoord`（仅黑方 `col'=8-col, row'=9-row`） |
-| `pv_chinese_converter.dart` | `PVChineseConverter` | PV 线路中文转换：单步 `singleMove`（用棋子实际颜色）、多步 `pvLine`（轻量级棋盘模拟）、`formatPVWithChinese` |
-| `move_quality_assessor.dart` | `MoveQualityAssessor` | 着法质量评估：比较实际走法与引擎推荐（静态方法 `assess(node)`） |
+| `move_quality_assessor.dart` | `MoveQualityAssessor` | 着法质量评估：比较实际走法与引擎推荐（静态方法 `assess(node)` ） |
 | `app_settings.dart` | `AppSettings` | 应用设置持久化：boardScale、engineDepth、multiPV、enginePath 等（单例，JSON 文件） |
 | `sound_manager.dart` | `SoundManager` | 音效管理：走子、吃子、将军、胜负音效（单例，自带默认蜂鸣 WAV） |
 | `storage_service.dart` | `StorageService` | 统一持久化存储服务（基于 `path_provider`） |
@@ -237,7 +237,6 @@ GameViewModel（协调器，ChangeNotifier）
 
 MoveNotation ← ICCS 坐标转换唯一入口
 ChineseNotation ← 中文记谱核心算法（含黑方视角旋转）
-PVChineseConverter ← 多步 PV 棋盘模拟
 MoveQualityAssessor ← 着法质量评估（基于引擎评分变化）
 ```
 
@@ -245,6 +244,5 @@ MoveQualityAssessor ← 着法质量评估（基于引擎评分变化）
 
 ## 待清理项
 
-- `lib/services/opening_book.dart.bak` 备份文件待删除（建议加入 `.gitignore`）
-- 之前 `AGENTS.md` 存在两处"禁止事项"重复章节，已合并
-- 之前文件路径描述错误（`uci_engine.dart` / `data/endgame_puzzles.dart`），已修正
+- `lib/data/endgame_puzzles.dart` 数据有严重 bug（纯数字假 ICCS、将帅对面 FEN、`r` 走子方），需改为从文件加载并重写数据
+- `GameMode.engineOnline` 和菜单
