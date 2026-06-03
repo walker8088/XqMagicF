@@ -6,6 +6,7 @@ import 'package:xqmagic/game/game_controller.dart';
 import 'package:xqmagic/game/game_engine.dart';
 import 'package:xqmagic/game/game_state_manager.dart';
 import 'package:xqmagic/models/board.dart';
+import 'package:xqmagic/models/board_render_data.dart';
 import 'package:xqmagic/models/chess_piece.dart';
 import 'package:xqmagic/models/game_state.dart';
 import 'package:xqmagic/models/game_mode.dart';
@@ -112,6 +113,15 @@ class GameViewModel extends ChangeNotifier {
   bool get canGoForward => _controller.canGoForward;
   int get depth => _controller.depth;
   Coord? get inCheckPosition => _controller.inCheckPosition;
+
+  /// 棋盘渲染数据（纯数据，供 ChessBoard widget 使用）
+  BoardRenderData get boardRenderData => BoardRenderData(
+    pieces: currentBoard.pieces.values.toList(),
+    selectedPosition: selectedPosition,
+    possibleMoves: possibleMoves,
+    lastMove: lastMove,
+    inCheckPosition: inCheckPosition,
+  );
 
   // StateManager 代理
   GameStateManager get stateManager => _stateManager;
@@ -456,9 +466,10 @@ class GameViewModel extends ChangeNotifier {
     final puzzle = _stateManager.currentPuzzle;
     if (puzzle == null) return;
 
-    _controller.gameTree.initFromFen(puzzle.fen);
-    _controller.syncEngineFromFen(puzzle.fen);
+    _controller.loadFromFen(puzzle.fen);
     _stateManager.clearSelection();
+    _analysisService.clearAnalysisResults();
+    _engineManager.newGame();
     _onPositionLoaded();
   }
 

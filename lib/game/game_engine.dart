@@ -169,13 +169,28 @@ class GameEngine {
   /// 检查某方是否被将杀（无合法走法且被将军）
   bool isCheckmate(PieceColor color) {
     if (!isInCheck(color)) return false;
-    return getAllLegalMoves(color).isEmpty;
+    return !hasAnyLegalMove(color);
   }
 
   /// 检查某方是否被困毙（无合法走法但未被将军）
   bool isStalemate(PieceColor color) {
     if (isInCheck(color)) return false;
-    return getAllLegalMoves(color).isEmpty;
+    return !hasAnyLegalMove(color);
+  }
+
+  /// 检查某方是否还有任何合法走法（遇到第一个即返回 true）
+  /// 比 [getAllLegalMoves].isEmpty 高效得多，避免收集全部走法
+  bool hasAnyLegalMove(PieceColor color) {
+    final pieces = _board.getPiecesOfColor(color);
+    for (final piece in pieces) {
+      final pieceMoves = _generateMovesFor(piece.coord, piece);
+      for (final move in pieceMoves) {
+        if (!_leavesKingInCheck(move, color)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /// 查找将/帅的位置（私有，供内部使用）

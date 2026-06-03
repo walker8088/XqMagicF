@@ -63,10 +63,23 @@ class _SettingsDialogState extends State<SettingsDialog> {
   late bool _soundEnabled;
   late double _volume;
 
+  // 控制器（避免在 build 中泄漏）
+  late TextEditingController _enginePathController;
+  late TextEditingController _skinNameController;
+
   @override
   void initState() {
     super.initState();
     _loadSettings();
+    _enginePathController = TextEditingController(text: _enginePath);
+    _skinNameController = TextEditingController(text: _skinName);
+  }
+
+  @override
+  void dispose() {
+    _enginePathController.dispose();
+    _skinNameController.dispose();
+    super.dispose();
   }
 
   /// Show dialog to select engine file or manually input path
@@ -84,7 +97,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
 
     if (result != null && result.files.single.path != null) {
       if (mounted) {
-        setState(() => _enginePath = result.files.single.path!);
+        setState(() {
+          _enginePath = result.files.single.path!;
+          _enginePathController.text = _enginePath;
+        });
       }
       return;
     }
@@ -120,7 +136,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
       );
 
       if (manualPath != null && manualPath.isNotEmpty) {
-        setState(() => _enginePath = manualPath);
+        setState(() {
+          _enginePath = manualPath;
+          _enginePathController.text = _enginePath;
+        });
       }
       controller.dispose();
     }
@@ -382,12 +401,21 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 onChanged: (v) => setState(() => _showCoordinates = v),
               ),
               const SizedBox(height: 12),
-              _buildTextField(
-                context: context,
-                label: '皮肤名称',
-                value: _skinName,
-                onChanged: (v) => setState(() => _skinName = v),
-                hintText: '请输入皮肤名称',
+              TextField(
+                controller: _skinNameController,
+                decoration: const InputDecoration(
+                  labelText: '皮肤名称',
+                  hintText: '请输入皮肤名称',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                ),
+                onChanged: (v) => setState(() {
+                  _skinName = v;
+                }),
               ),
             ],
           ),
@@ -448,7 +476,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
           children: [
             Expanded(
               child: TextField(
-                controller: TextEditingController(text: _enginePath),
+                controller: _enginePathController,
                 readOnly: true,
                 decoration: const InputDecoration(
                   hintText: '点击右侧按钮选择引擎或输入路径',
@@ -470,26 +498,6 @@ class _SettingsDialogState extends State<SettingsDialog> {
           ],
         ),
       ],
-    );
-  }
-
-  Widget _buildTextField({
-    required BuildContext context,
-    required String label,
-    required String value,
-    required ValueChanged<String> onChanged,
-    String? hintText,
-  }) {
-    return TextField(
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hintText,
-        border: const OutlineInputBorder(),
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      ),
-      controller: TextEditingController(text: value),
-      onChanged: onChanged,
     );
   }
 

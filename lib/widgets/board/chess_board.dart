@@ -2,34 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:xqmagic/models/board_render_data.dart';
 import 'package:xqmagic/utils/constants.dart';
 import 'package:xqmagic/utils/coord.dart';
-import '../../viewmodels/game_viewmodel.dart';
 import 'chess_board_painter.dart';
 
 class ChessBoard extends StatelessWidget {
   const ChessBoard({
     super.key,
     required this.cellSize,
-    required this.viewModel,
+    required this.renderData,
+    this.onTap,
   });
 
   final double cellSize;
-  final GameViewModel viewModel;
+  final BoardRenderData renderData;
+  final void Function(Coord)? onTap;
 
   double get boardWidth =>
       cellSize * (AppConstants.boardCols + AppConstants.paddingCells);
   double get boardHeight =>
       cellSize * (AppConstants.boardRows + AppConstants.paddingCells);
-
-  /// 构建渲染数据（从 ViewModel 提取纯数据）
-  BoardRenderData _buildRenderData() {
-    return BoardRenderData(
-      pieces: viewModel.currentBoard.pieces.values.toList(),
-      selectedPosition: viewModel.selectedPosition,
-      possibleMoves: viewModel.possibleMoves,
-      lastMove: viewModel.lastMove,
-      inCheckPosition: viewModel.inCheckPosition,
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +37,7 @@ class ChessBoard extends StatelessWidget {
             col < AppConstants.boardCols &&
             row >= 0 &&
             row < AppConstants.boardRows) {
-          viewModel.selectPiece(Coord(col, row));
+          onTap?.call(Coord(col, row));
         }
       },
       child: Container(
@@ -69,7 +59,7 @@ class ChessBoard extends StatelessWidget {
           painter: ChessBoardPainter(
             cellSize: cellSize,
             paddingCells: AppConstants.paddingCells,
-            renderData: _buildRenderData(),
+            renderData: renderData,
           ),
         ),
       ),

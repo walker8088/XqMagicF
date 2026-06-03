@@ -229,6 +229,8 @@ class GameController {
   void loadFromFen(String fen) {
     gameTree.initFromFen(fen);
     syncEngineFromFen(fen);
+    lastMove = null;
+    gameState = GameState.playing;
   }
 
   void reset() {

@@ -168,7 +168,11 @@ class _GameScreenState extends State<GameScreen> {
             ? cellSizeFromWidth
             : cellSizeFromHeight;
         return Center(
-          child: ChessBoard(cellSize: cellSize, viewModel: vm),
+          child: ChessBoard(
+            cellSize: cellSize,
+            renderData: vm.boardRenderData,
+            onTap: (coord) => vm.selectPiece(coord),
+          ),
         );
       },
     );

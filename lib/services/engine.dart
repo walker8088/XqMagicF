@@ -883,13 +883,15 @@ class Engine {
 
   /// Dispose resources.
   Future<void> dispose() async {
+    // 先停止引擎进程（会通过 _cleanupProcess 取消订阅）
+    await stop();
+    // 二次确保订阅已清理（stop 内部 _cleanupProcess 已取消，但防止异常路径遗漏）
     await _stdoutSubscription?.cancel();
     _stdoutSubscription = null;
     await _stderrSubscription?.cancel();
     _stderrSubscription = null;
     await _stdinSubscription?.cancel();
     _stdinSubscription = null;
-    await stop();
     await _eventController.close();
     await _stdinController.close();
   }
