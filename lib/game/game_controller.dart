@@ -78,7 +78,7 @@ class GameController {
       to: to,
       pieceType: piece.type,
       capturedPiece: engine.board.getPiece(to),
-      color: currentTurn,
+      color: piece.color,
     );
     _executeMove(move);
     return true;
@@ -103,7 +103,7 @@ class GameController {
         to: to,
         pieceType: piece.type,
         capturedPiece: engine.board.getPiece(to),
-        color: currentTurn,
+        color: piece.color,
       );
       _executeMove(move);
       return true;
