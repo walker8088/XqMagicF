@@ -116,9 +116,11 @@ void main() {
     });
 
     test('should throw ArgumentError for invalid ICCS format', () {
+      // 原实现 'abcd' 会透传 int.parse('c') 抛 FormatException，
+      // 修复后统一抛 ArgumentError（带明确错误信息），便于上游 catch。
       expect(() => MoveNotation.fromICCS('123'), throwsArgumentError);
       expect(() => MoveNotation.fromICCS('1234567'), throwsArgumentError);
-      expect(() => MoveNotation.fromICCS('abcd'), throwsFormatException);
+      expect(() => MoveNotation.fromICCS('abcd'), throwsArgumentError);
     });
 
     test('should round-trip: toICCS then fromICCS', () {
@@ -256,6 +258,50 @@ void main() {
     test('should return red color for bad move (diff < -70)', () {
       expect(MoveQuality.getColor(-71), 'red');
       expect(MoveQuality.getColor(-150), 'red');
+    });
+  });
+
+  group('MoveNotation.fromICCS - 畸形输入防护', () {
+    test('文件字符为数字时（特别是已坏 puzzle 数据使用的 "5152" 格式）应抛 ArgumentError', () {
+      // 旧实现：Coord.fileToCol('5') = '5'.codeUnitAt - 'a'.codeUnitAt = -44，
+      // 静默生成 Coord(-44, ...)，后续 List 访问会抛 RangeError。
+      // 修复后：明确检测非法文件字符，抛 ArgumentError。
+      expect(
+        () => MoveNotation.fromICCS('5152'),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('中文等非 ASCII 字符应抛 ArgumentError', () {
+      expect(
+        () => MoveNotation.fromICCS('车二平五'),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('空字符串应抛 ArgumentError（长度不为 4）', () {
+      expect(() => MoveNotation.fromICCS(''), throwsA(isA<ArgumentError>()));
+    });
+
+    test('长度超 4 的字符串应抛 ArgumentError', () {
+      expect(
+        () => MoveNotation.fromICCS('e0e10'),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('合法 ICCS 仍能正常解析（确保修复未打破正常路径）', () {
+      final (from, to) = MoveNotation.fromICCS('h2e2');
+      expect(from, const Coord(7, 2));
+      expect(to, const Coord(4, 2));
+    });
+
+    test('排名超出 0-9 范围应抛 ArgumentError', () {
+      // 'a' 后接 9+ 字符排名非法
+      expect(
+        () => MoveNotation.fromICCS('a9az'),
+        throwsA(isA<ArgumentError>()),
+      );
     });
   });
 }

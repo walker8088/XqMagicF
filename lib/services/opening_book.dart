@@ -98,10 +98,10 @@ class OpeningBookService {
     // ============================================================
     // 初始局面
     // ============================================================
-    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR r':
+    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w':
         OpeningInfo(
           positionFen:
-              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR r',
+              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w',
           eccoCode: null,
           eccoName: null,
           moves: [
@@ -177,10 +177,10 @@ class OpeningBookService {
     // 炮从 (7,7)→(4,7), row7: 1C5C1→1C2C4
     // ECCO: B00
     // ============================================================
-    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r':
+    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR w':
         OpeningInfo(
           positionFen:
-              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r',
+              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR w',
           eccoCode: 'B00',
           eccoName: '中炮局',
           moves: [
@@ -224,10 +224,10 @@ class OpeningBookService {
     // 黑炮从 (1,2)→(4,2), row2: 1c5c1→4c2c1
     // ECCO: B01
     // ============================================================
-    'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r':
+    'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR w':
         OpeningInfo(
           positionFen:
-              'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r',
+              'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR w',
           eccoCode: 'B01',
           eccoName: '中炮对顺手炮',
           moves: [
@@ -259,10 +259,10 @@ class OpeningBookService {
     // 中炮对顺手炮 - 红马八进七后
     // 红马从 (1,9)→(2,7), row9: RNBAKABNR→R1BAKABNR, row7: 1C2C4→1CN1C4
     // ============================================================
-    'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR r':
+    'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR w':
         OpeningInfo(
           positionFen:
-              'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR r',
+              'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR w',
           eccoCode: 'B01',
           eccoName: '中炮对顺手炮',
           moves: [
@@ -294,10 +294,10 @@ class OpeningBookService {
     // 中炮对顺手炮 - 黑马8进7后
     // 黑马从 (1,0)→(2,2), row0: rnbakabnr→r1bakabnr, row2: 4c2c1→2n1c2c1
     // ============================================================
-    'r1bakabnr/9/2n1c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR r':
+    'r1bakabnr/9/2n1c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR w':
         OpeningInfo(
           positionFen:
-              'r1bakabnr/9/2n1c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR r',
+              'r1bakabnr/9/2n1c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR w',
           eccoCode: 'B01',
           eccoName: '中炮对顺手炮',
           moves: [
@@ -323,10 +323,10 @@ class OpeningBookService {
     // 黑马从 (1,0)→(2,2), row0: rnbakabnr→r1bakabnr, row2: 1c5c1→1cn4c1
     // ECCO: B03
     // ============================================================
-    'r1bakabnr/9/1cn4c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r':
+    'r1bakabnr/9/1cn4c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR w':
         OpeningInfo(
           positionFen:
-              'r1bakabnr/9/1cn4c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r',
+              'r1bakabnr/9/1cn4c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR w',
           eccoCode: 'B03',
           eccoName: '中炮对屏风马',
           moves: [
@@ -358,10 +358,10 @@ class OpeningBookService {
     // 中炮对屏风马 - 红马八进七后
     // 红马从 (1,9)→(2,7), row9: RNBAKABNR→R1BAKABNR, row7: 1C2C4→1CN1C4
     // ============================================================
-    'r1bakabnr/9/1cn4c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR r':
+    'r1bakabnr/9/1cn4c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR w':
         OpeningInfo(
           positionFen:
-              'r1bakabnr/9/1cn4c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR r',
+              'r1bakabnr/9/1cn4c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR w',
           eccoCode: 'B03',
           eccoName: '中炮对屏风马',
           moves: [
@@ -393,10 +393,10 @@ class OpeningBookService {
     // 中炮对屏风马 - 黑马2进3后 (完成屏风马阵型)
     // 黑马从 (7,0)→(6,2), row0: r1bakabnr→r1bakab1r, row2: 1cn4c1→1cn3nc1
     // ============================================================
-    'r1bakab1r/9/1cn3nc1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR r':
+    'r1bakab1r/9/1cn3nc1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR w':
         OpeningInfo(
           positionFen:
-              'r1bakab1r/9/1cn3nc1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR r',
+              'r1bakab1r/9/1cn3nc1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR w',
           eccoCode: 'B03',
           eccoName: '屏风马',
           moves: [
@@ -421,10 +421,10 @@ class OpeningBookService {
     // 中炮对屏风马 - 红马二进三后 (双正马对屏风马)
     // 红马从 (7,9)→(6,7), row9: R1BAKABNR→R1BAKAB1R, row7: 1CN1C4→1CN1C1N2
     // ============================================================
-    'r1bakab1r/9/1cn3nc1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C1N2/9/R1BAKAB1R r':
+    'r1bakab1r/9/1cn3nc1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C1N2/9/R1BAKAB1R w':
         OpeningInfo(
           positionFen:
-              'r1bakab1r/9/1cn3nc1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C1N2/9/R1BAKAB1R r',
+              'r1bakab1r/9/1cn3nc1/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C1N2/9/R1BAKAB1R w',
           eccoCode: 'B03',
           eccoName: '屏风马',
           moves: [
@@ -457,10 +457,10 @@ class OpeningBookService {
     // 黑炮从 (7,2)→(4,2), row2: 1c5c1→1c2c4
     // ECCO: B02
     // ============================================================
-    'rnbakabnr/9/1c2c4/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r':
+    'rnbakabnr/9/1c2c4/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR w':
         OpeningInfo(
           positionFen:
-              'rnbakabnr/9/1c2c4/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r',
+              'rnbakabnr/9/1c2c4/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR w',
           eccoCode: 'B02',
           eccoName: '中炮对列手炮',
           moves: [
@@ -492,10 +492,10 @@ class OpeningBookService {
     // 中炮对列手炮 - 红马八进七后
     // 红马从 (1,9)→(2,7), row9: RNBAKABNR→R1BAKABNR, row7: 1C2C4→1CN1C4
     // ============================================================
-    'rnbakabnr/9/1c2c4/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR r':
+    'rnbakabnr/9/1c2c4/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR w':
         OpeningInfo(
           positionFen:
-              'rnbakabnr/9/1c2c4/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR r',
+              'rnbakabnr/9/1c2c4/p1p1p1p1p/9/9/P1P1P1P1P/1CN1C4/9/R1BAKABNR w',
           eccoCode: 'B02',
           eccoName: '中炮对列手炮',
           moves: [
@@ -521,10 +521,10 @@ class OpeningBookService {
     // 黑炮从 (7,2)→(5,2), row2: 1c5c1→1c3c1c1
     // ECCO: B04
     // ============================================================
-    'rnbakabnr/9/1c3c3/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r':
+    'rnbakabnr/9/1c3c3/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR w':
         OpeningInfo(
           positionFen:
-              'rnbakabnr/9/1c3c3/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r',
+              'rnbakabnr/9/1c3c3/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR w',
           eccoCode: 'B04',
           eccoName: '中炮对反宫马',
           moves: [
@@ -550,9 +550,9 @@ class OpeningBookService {
     // 黑马从 (1,0)→(0,2), row0: rnbakabnr→_nbakabnr, row2: 1c5c1→n6c1
     // ECCO: B05
     // ============================================================
-    '1nbakabnr/9/n6c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r': OpeningInfo(
+    '1nbakabnr/9/n6c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR w': OpeningInfo(
       positionFen:
-          '1nbakabnr/9/n6c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR r',
+          '1nbakabnr/9/n6c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR w',
       eccoCode: 'B05',
       eccoName: '中炮对单提马',
       moves: [
@@ -578,10 +578,10 @@ class OpeningBookService {
     // 红兵从 (2,6)→(2,5), row5: 9→2P6, row6: P1P1P1P1P→P3P1P1P
     // ECCO: A01
     // ============================================================
-    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/2P6/P3P1P1P/1C5C1/9/RNBAKABNR r':
+    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/2P6/P3P1P1P/1C5C1/9/RNBAKABNR w':
         OpeningInfo(
           positionFen:
-              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/2P6/P3P1P1P/1C5C1/9/RNBAKABNR r',
+              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/2P6/P3P1P1P/1C5C1/9/RNBAKABNR w',
           eccoCode: 'A01',
           eccoName: '仙人指路',
           moves: [
@@ -621,10 +621,10 @@ class OpeningBookService {
     // 黑卒从 (2,3)→(2,4), row3: p1p1p1p1p→p3p1p1p, row4: 9→2p6
     // ECCO: A02
     // ============================================================
-    'rnbakabnr/9/1c5c1/p3p1p1p/2p6/2P6/P3P1P1P/1C5C1/9/RNBAKABNR r':
+    'rnbakabnr/9/1c5c1/p3p1p1p/2p6/2P6/P3P1P1P/1C5C1/9/RNBAKABNR w':
         OpeningInfo(
           positionFen:
-              'rnbakabnr/9/1c5c1/p3p1p1p/2p6/2P6/P3P1P1P/1C5C1/9/RNBAKABNR r',
+              'rnbakabnr/9/1c5c1/p3p1p1p/2p6/2P6/P3P1P1P/1C5C1/9/RNBAKABNR w',
           eccoCode: 'A02',
           eccoName: '仙人指路对卒底炮',
           moves: [
@@ -656,10 +656,10 @@ class OpeningBookService {
     // 仙人指路转中炮 - 红炮二平五后
     // 红炮从 (7,7)→(4,7), row7: 1C5C1→1C2C4
     // ============================================================
-    'rnbakabnr/9/1c5c1/p3p1p1p/2p6/2P6/P3P1P1P/1C2C4/9/RNBAKABNR r':
+    'rnbakabnr/9/1c5c1/p3p1p1p/2p6/2P6/P3P1P1P/1C2C4/9/RNBAKABNR w':
         OpeningInfo(
           positionFen:
-              'rnbakabnr/9/1c5c1/p3p1p1p/2p6/2P6/P3P1P1P/1C2C4/9/RNBAKABNR r',
+              'rnbakabnr/9/1c5c1/p3p1p1p/2p6/2P6/P3P1P1P/1C2C4/9/RNBAKABNR w',
           eccoCode: 'A01',
           eccoName: '仙人指路转中炮',
           moves: [
@@ -692,10 +692,10 @@ class OpeningBookService {
     // 相从 (6,9)→(4,7), row9: RNBAKABNR→RNBAKA1NR, row7: 1C5C1→1C2B2C1
     // ECCO: C00
     // ============================================================
-    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2B2C1/9/RNBAKA1NR r':
+    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2B2C1/9/RNBAKA1NR w':
         OpeningInfo(
           positionFen:
-              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2B2C1/9/RNBAKA1NR r',
+              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2B2C1/9/RNBAKA1NR w',
           eccoCode: 'C00',
           eccoName: '飞相局',
           moves: [
@@ -737,10 +737,10 @@ class OpeningBookService {
     // 黑炮从 (1,2)→(4,2), row2: 1c5c1→4c2c1
     // ECCO: C01
     // ============================================================
-    'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2B2C1/9/RNBAKA1NR r':
+    'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2B2C1/9/RNBAKA1NR w':
         OpeningInfo(
           positionFen:
-              'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2B2C1/9/RNBAKA1NR r',
+              'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2B2C1/9/RNBAKA1NR w',
           eccoCode: 'C01',
           eccoName: '飞相对左中炮',
           moves: [
@@ -773,10 +773,10 @@ class OpeningBookService {
     // 炮从 (1,7)→(3,7), row7: 1C5C1→3C3C1
     // ECCO: D00
     // ============================================================
-    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/3C3C1/9/RNBAKABNR r':
+    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/3C3C1/9/RNBAKABNR w':
         OpeningInfo(
           positionFen:
-              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/3C3C1/9/RNBAKABNR r',
+              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/3C3C1/9/RNBAKABNR w',
           eccoCode: 'D00',
           eccoName: '士角炮',
           moves: [
@@ -817,10 +817,10 @@ class OpeningBookService {
     // 炮从 (7,7)→(3,7), row7: 1C5C1→1C1C5
     // ECCO: E00
     // ============================================================
-    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C1C5/9/RNBAKABNR r':
+    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C1C5/9/RNBAKABNR w':
         OpeningInfo(
           positionFen:
-              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C1C5/9/RNBAKABNR r',
+              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C1C5/9/RNBAKABNR w',
           eccoCode: 'E00',
           eccoName: '过宫炮',
           moves: [
@@ -861,10 +861,10 @@ class OpeningBookService {
     // 马从 (1,9)→(2,7), row9: RNBAKABNR→R1BAKABNR, row7: 1C5C1→1CN4C1
     // ECCO: F00
     // ============================================================
-    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN4C1/9/R1BAKABNR r':
+    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN4C1/9/R1BAKABNR w':
         OpeningInfo(
           positionFen:
-              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN4C1/9/R1BAKABNR r',
+              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN4C1/9/R1BAKABNR w',
           eccoCode: 'F00',
           eccoName: '起马局',
           moves: [
@@ -906,10 +906,10 @@ class OpeningBookService {
     // 黑炮从 (1,2)→(4,2), row2: 1c5c1→4c2c1
     // ECCO: F01
     // ============================================================
-    'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN4C1/9/R1BAKABNR r':
+    'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN4C1/9/R1BAKABNR w':
         OpeningInfo(
           positionFen:
-              'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN4C1/9/R1BAKABNR r',
+              'rnbakabnr/9/4c2c1/p1p1p1p1p/9/9/P1P1P1P1P/1CN4C1/9/R1BAKABNR w',
           eccoCode: 'F01',
           eccoName: '起马对中炮',
           moves: [
@@ -942,9 +942,9 @@ class OpeningBookService {
     // 炮从 (7,7)→(2,7), row7: 1C5C1→1CC6
     // ECCO: G00
     // ============================================================
-    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1CC6/9/RNBAKABNR r': OpeningInfo(
+    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1CC6/9/RNBAKABNR w': OpeningInfo(
       positionFen:
-          'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1CC6/9/RNBAKABNR r',
+          'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1CC6/9/RNBAKABNR w',
       eccoCode: 'G00',
       eccoName: '金钩炮',
       moves: [
@@ -978,10 +978,10 @@ class OpeningBookService {
     // 兵从 (8,6)→(8,5), row5: 9→8P, row6: P1P1P1P1P→P1P1P1P2
     // ECCO: H00
     // ============================================================
-    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/8P/P1P1P1P2/1C5C1/9/RNBAKABNR r':
+    'rnbakabnr/9/1c5c1/p1p1p1p1p/9/8P/P1P1P1P2/1C5C1/9/RNBAKABNR w':
         OpeningInfo(
           positionFen:
-              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/8P/P1P1P1P2/1C5C1/9/RNBAKABNR r',
+              'rnbakabnr/9/1c5c1/p1p1p1p1p/9/8P/P1P1P1P2/1C5C1/9/RNBAKABNR w',
           eccoCode: 'H00',
           eccoName: '边兵局',
           moves: [
@@ -1050,17 +1050,27 @@ class OpeningBookService {
   /// 开局库大小
   int get size => _openingBook.length;
 
-  /// 确保 FEN 包含走子方（r/b），若缺失则默认补 'r'
+  /// 确保 FEN 包含走子方（w/b），若缺失则默认补 'w'
   ///
   /// 正确处理多字段 FEN：只取第一个 token（走子方）来判断，保留原始 FEN
   /// 的所有后续字段（半回合计数、全回合计数等）。
+  ///
+  /// 将 'r'（旧式非标准表示红方走子）归一化为 UCI 标准的 'w'，
+  /// 与 [FenParser.generate] 产出的格式保持一致。
   static String _normalizeFen(String fen) {
     final trimmed = fen.trim();
     final firstSpace = trimmed.indexOf(' ');
-    if (firstSpace < 0) return '$trimmed r';
+    if (firstSpace < 0) return '$trimmed w';
     // splitOnce：仅在第一个空格处切分
     final activeColor = trimmed.substring(firstSpace + 1, firstSpace + 2);
-    if (activeColor == 'r' || activeColor == 'b') return trimmed;
-    return '$trimmed r';
+    if (activeColor == 'w' || activeColor == 'b') return trimmed;
+    if (activeColor == 'r') {
+      // 将旧式的 'r' 替换为 UCI 标准的 'w'，保留其他 token。
+      return '${trimmed.substring(0, firstSpace + 1)}w'
+          '${trimmed.substring(firstSpace + 2)}';
+    }
+    // 走子方缺失或未知：默认补 'w'
+    return '${trimmed.substring(0, firstSpace + 1)}w'
+        '${trimmed.substring(firstSpace + 1)}';
   }
 }

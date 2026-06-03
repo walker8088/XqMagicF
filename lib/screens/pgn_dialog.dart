@@ -19,6 +19,7 @@ class PGNOpenDialog extends StatefulWidget {
 
 class _PGNOpenDialogState extends State<PGNOpenDialog> {
   late String _currentPath;
+  late TextEditingController _pathController;
   List<FileSystemEntity> _entries = [];
   String? _selectedFile;
   List<GameRecord> _games = [];
@@ -35,7 +36,21 @@ class _PGNOpenDialogState extends State<PGNOpenDialog> {
         : Platform.isWindows
         ? Directory.current.path
         : '/';
+    _pathController = TextEditingController(text: _currentPath);
     _loadDirectory();
+  }
+
+  @override
+  void dispose() {
+    _pathController.dispose();
+    super.dispose();
+  }
+
+  void _syncPathController(String path) {
+    // 只在路径确实变化时同步，避免用户在文本框中输入时被打断。
+    if (_pathController.text != path) {
+      _pathController.text = path;
+    }
   }
 
   Future<void> _loadDirectory() async {
@@ -109,7 +124,10 @@ class _PGNOpenDialogState extends State<PGNOpenDialog> {
   }
 
   void _navigateTo(String path) {
-    setState(() => _currentPath = path);
+    setState(() {
+      _currentPath = path;
+      _syncPathController(path);
+    });
     _loadDirectory();
     AppSettings.instance.setLastOpenedDir(path);
   }
@@ -241,7 +259,7 @@ class _PGNOpenDialogState extends State<PGNOpenDialog> {
           const SizedBox(width: 4),
           Expanded(
             child: TextField(
-              controller: TextEditingController(text: _currentPath),
+              controller: _pathController,
               onSubmitted: (value) {
                 if (value.isNotEmpty) {
                   _navigateTo(value);
@@ -893,17 +911,12 @@ class _PGNSaveDialogState extends State<PGNSaveDialog> {
                       _browseNavigate(entity.path);
                     } else {
                       // Select file: update path field
-                      final currentPath = _filePathController.text;
-                      final dir = currentPath
-                          .split(Platform.pathSeparator)
-                          .sublist(
-                            0,
-                            currentPath.split(Platform.pathSeparator).length -
-                                1,
-                          )
-                          .join(Platform.pathSeparator);
+                      // 必须用当前浏览目录 _currentBrowsePath，
+                      // 不能用 _filePathController.text 推算的旧目录，
+                      // 否则用户在不同目录间浏览时，选中的文件会被错误地
+                      // 拼接到原路径所在的目录。
                       _filePathController.text =
-                          '$dir${Platform.pathSeparator}$name';
+                          '$_currentBrowsePath${Platform.pathSeparator}$name';
                     }
                   },
                 );

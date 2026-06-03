@@ -52,11 +52,35 @@ class MoveNotation {
   /// 示例：h0g2 → 马二进三，h7e7 → 炮８平５
   static (Coord, Coord) fromICCS(String iccs) {
     if (iccs.length != 4) throw ArgumentError('ICCS 格式应为4位: $iccs');
-    final fromCol = Coord.fileToCol(iccs[0]);
+    // 原有实现未验证文件字符是否是 a-i，传入数字或中文等会静默产生
+    // 负数 col（如 '5' → col=-44），下游 getPiece 返回 null 后能 throw
+    // RangeError（List index out of range），难以调试。
+    final fromFile = iccs[0];
+    final toFile = iccs[2];
+    if (!_isValidFile(fromFile) || !_isValidFile(toFile)) {
+      throw ArgumentError('ICCS 文件字符必须是 a-i: $iccs');
+    }
+    // 排名也要是 0-9 的数字字符，否则 int.parse('z') 抛 FormatException
+    if (!_isValidRank(iccs[1]) || !_isValidRank(iccs[3])) {
+      throw ArgumentError('ICCS 排名字符必须是 0-9: $iccs');
+    }
     final fromRow = int.parse(iccs[1]);
-    final toCol = Coord.fileToCol(iccs[2]);
     final toRow = int.parse(iccs[3]);
+    final fromCol = Coord.fileToCol(fromFile);
+    final toCol = Coord.fileToCol(toFile);
     return (Coord(fromCol, fromRow), Coord(toCol, toRow));
+  }
+
+  static bool _isValidFile(String ch) {
+    if (ch.isEmpty) return false;
+    final c = ch.toLowerCase().codeUnitAt(0);
+    return c >= 'a'.codeUnitAt(0) && c <= 'i'.codeUnitAt(0);
+  }
+
+  static bool _isValidRank(String ch) {
+    if (ch.isEmpty) return false;
+    final c = ch.codeUnitAt(0);
+    return c >= '0'.codeUnitAt(0) && c <= '9'.codeUnitAt(0);
   }
 
   // ========== 中文记谱法（人类阅读用） ==========

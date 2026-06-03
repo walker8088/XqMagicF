@@ -120,8 +120,13 @@ void main() {
       });
 
       test('free chariot has many legal moves', () {
-        // Place a red chariot in open space: (4, 4)
-        const fen = '4k4/9/9/9/9/4R4/9/9/9/4K4 r';
+        // Place a red chariot in open space at (4, 4).
+        // 将帅在不同列（红帅在 col3，黑将在 col5），避免 “飞将” 限制。
+        // FEN row 0=黑方底线，row 9=红方底线。
+        // row 0 = 5k4 → 黑将 at (5, 9)
+        // row 5 = 4R4 → 红车 at (4, 4)
+        // row 9 = 3K5 → 红帅 at (3, 0)
+        const fen = '5k4/9/9/9/9/4R4/9/9/9/3K5 r';
         final engine = GameEngine(fen);
         final moves = engine.getLegalMoves(const Coord(4, 4));
 
@@ -131,6 +136,28 @@ void main() {
         expect(moves.any((m) => m.to.col == 4 && m.to.row < 4), isTrue);
         expect(moves.any((m) => m.to.row == 4 && m.to.col > 4), isTrue);
         expect(moves.any((m) => m.to.row == 4 && m.to.col < 4), isTrue);
+      });
+
+      test('getLegalMoves filters moves that leave own king in check', () {
+        // 送将修复验证：红帅 (4, 0) 与黑将 (4, 9) 同列，
+        // 红炮 (4, 4) 是唯一的屏裁。
+        // 红炮若斜走出 file 4，会让黑将走 “飞将” 直接攻击红帅，违反象棋规则。
+        // FEN row 0=4k4 → 黑将 at (4, 9)。
+        // FEN row 5=4C4 → 红炮 at (4, 4)（FEN row 5 = our row 4）。
+        // FEN row 9=4K4 → 红帅 at (4, 0)。
+        const fen = '4k4/9/9/9/9/4C4/9/9/9/4K4 r';
+        final engine = GameEngine(fen);
+        final moves = engine.getLegalMoves(const Coord(4, 4));
+
+        // 留在 file 4 的走法合法：上下各 3 格（不能吃黑将、不能吃红帅）。
+        // (4, 0) 是红帅自己子、(4, 9) 是黑将（无屏裁不能炮打）。
+        expect(moves, isNotEmpty);
+        // 走出 file 4 的走法应被过滤（送将）。
+        expect(moves.any((m) => m.to.col != 4), isFalse);
+        // 走子后不会留下与黑将同列的走法。
+        for (final m in moves) {
+          expect(m.to.col, 4);
+        }
       });
 
       test('cannon can capture with exactly one mount', () {
@@ -168,20 +195,23 @@ void main() {
         expect(moves, isNotEmpty);
       });
 
-      test('minimal position: only generals, each has 2 moves (forward blocked by 飞将)', () {
-        const fen = '4k4/9/9/9/9/9/9/9/9/4K4 r';
-        final engine = GameEngine(fen);
+      test(
+        'minimal position: only generals, each has 2 moves (forward blocked by 飞将)',
+        () {
+          const fen = '4k4/9/9/9/9/9/9/9/9/4K4 r';
+          final engine = GameEngine(fen);
 
-        // Red general at (4,0): can move to (3,0), (5,0)
-        // (4,1) is illegal: flying generals rule — would leave king in check
-        final redMoves = engine.getAllLegalMoves(PieceColor.red);
-        expect(redMoves.length, 2);
+          // Red general at (4,0): can move to (3,0), (5,0)
+          // (4,1) is illegal: flying generals rule — would leave king in check
+          final redMoves = engine.getAllLegalMoves(PieceColor.red);
+          expect(redMoves.length, 2);
 
-        // Black general at (4,9): can move to (3,9), (5,9)
-        // (4,8) is illegal: same reason
-        final blackMoves = engine.getAllLegalMoves(PieceColor.black);
-        expect(blackMoves.length, 2);
-      });
+          // Black general at (4,9): can move to (3,9), (5,9)
+          // (4,8) is illegal: same reason
+          final blackMoves = engine.getAllLegalMoves(PieceColor.black);
+          expect(blackMoves.length, 2);
+        },
+      );
     });
 
     group('executeMove', () {

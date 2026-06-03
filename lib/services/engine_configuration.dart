@@ -13,10 +13,13 @@ import 'package:xqmagic/utils/app_logger.dart';
 /// - 分析触发（由 EngineManager 管理）
 /// - 分析模式/优先级模式（由 EngineManager 管理）
 class EngineConfiguration extends ChangeNotifier {
+  // 默认值与 [AppSettings] 保持一致（hash=256, threads=2, timeMs=5000），
+  // 避免 [EngineManager] 构造后未调用 [syncSettingsToEngine] 之前
+  // applyToEngine 把与用户持久化设置不一致的默认值灌给引擎。
   int _depth = 15;
-  int _timeMs = 3000;
-  int _threads = 1;
-  int _hash = 64;
+  int _timeMs = 5000;
+  int _threads = 2;
+  int _hash = 256;
   int _multiPV = 1;
   final Map<String, dynamic> _customOptions = {};
 
@@ -104,9 +107,9 @@ class EngineConfiguration extends ChangeNotifier {
   /// Reset to default values.
   void reset() {
     _depth = 15;
-    _timeMs = 3000;
-    _threads = 1;
-    _hash = 64;
+    _timeMs = 5000;
+    _threads = 2;
+    _hash = 256;
     _multiPV = 1;
     _customOptions.clear();
     notifyListeners();

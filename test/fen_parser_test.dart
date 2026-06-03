@@ -296,5 +296,34 @@ void main() {
         expect(hash, isNonZero);
       });
     });
+
+    group('parse - 畸形 FEN 防护', () {
+      test('缺少走子方字段时 release 模式下应抛 FormatException（不再是 RangeError）', () {
+        final board = Board();
+        // 原实现仅 assert(parts.length >= 2)，release 下会发出
+        // parts[1] 的 RangeError，错误信息与 FEN 无关。
+        // 修复后使用 if + FormatException 明确报错。
+        expect(
+          () => FenParser.parse('9/9/9/9/9/9/9/9/9/9', board),
+          throwsA(isA<FormatException>()),
+        );
+      });
+
+      test('完全空字符串 FEN 应抛 FormatException', () {
+        final board = Board();
+        expect(
+          () => FenParser.parse('', board),
+          throwsA(isA<FormatException>()),
+        );
+      });
+
+      test('只有空格的 FEN 应抛 FormatException', () {
+        final board = Board();
+        expect(
+          () => FenParser.parse('   ', board),
+          throwsA(isA<FormatException>()),
+        );
+      });
+    });
   });
 }

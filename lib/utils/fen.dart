@@ -84,7 +84,11 @@ class FenParser {
     board.clear();
 
     final parts = fen.trim().split(' ');
-    assert(parts.length >= 2, 'FEN 至少需要两个字段（布局 + 走子方），收到: "$fen"');
+    if (parts.length < 2) {
+      // 原来仅 assert，release 下会透传为 parts[1] 的 RangeError，
+      // 错误信息与 FEN 无关，难以诊断。改为明确的异常。
+      throw FormatException('FEN 至少需要两个字段（布局 + 走子方），收到: "$fen"');
+    }
     final boardStr = parts[0];
     // 兼容多种走子方表示：'w' (UCI 标准)、'r' (部分引擎)、其他默认为红方
     final activeColor = parts[1].toLowerCase() == 'b'

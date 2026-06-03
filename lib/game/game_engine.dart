@@ -24,10 +24,16 @@ class GameEngine {
   PieceColor get currentTurn => _currentTurn;
 
   /// 获取某位置所有合法走法（仅限当前回合方）
+  ///
+  /// 已过滤掉让本方将帅被攻击的"送将"走法，保证 [executeMove] 调用方拿到的
+  /// 走法表不会导致本方陷入被将军状态。
   List<MoveRecord> getLegalMoves(Coord from) {
     final piece = _board.getPiece(from);
     if (piece == null || piece.color != _currentTurn) return [];
-    return _generateMovesFor(from, piece);
+    final pieceMoves = _generateMovesFor(from, piece);
+    return pieceMoves
+        .where((m) => !_leavesKingInCheck(m, piece.color))
+        .toList();
   }
 
   /// 获取某方所有棋子的所有合法走法

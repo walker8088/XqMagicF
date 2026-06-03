@@ -36,10 +36,13 @@ class ChessBoard extends StatelessWidget {
     return GestureDetector(
       onTapDown: (details) {
         final localPosition = details.localPosition;
+        // 使用 floor() 而非 round()：点击落在某格右半部时
+        // round() 会四舍五入到下一格，导致用户点 cell 0 却被当成 cell 1。
+        // floor() 才是“以包含点击位置的最左侧格”为准的正确取整。
         final col =
-            (localPosition.dx / cellSize).round() - AppConstants.paddingCells;
+            (localPosition.dx / cellSize).floor() - AppConstants.paddingCells;
         final rawRow =
-            (localPosition.dy / cellSize).round() - AppConstants.paddingCells;
+            (localPosition.dy / cellSize).floor() - AppConstants.paddingCells;
         final row = (AppConstants.boardRows - 1) - rawRow;
 
         if (col >= 0 &&

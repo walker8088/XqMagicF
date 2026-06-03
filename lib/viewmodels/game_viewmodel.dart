@@ -565,6 +565,9 @@ class GameViewModel extends ChangeNotifier {
   void dispose() {
     // 重置回调，避免被多次调用
     _engineManager.onAnalysisUpdated = null;
+    // 同样重置云库回调，防止 dispose 后云库查询完成仍调用到已 dispose 的
+    // GameViewModel.notifyListeners()。
+    _analysisService.onCloudResultUpdated = null;
     _stateManager.removeListener(_onStateChanged);
     _engineManager.dispose();
     _stateManager.dispose();
