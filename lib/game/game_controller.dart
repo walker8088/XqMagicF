@@ -8,6 +8,7 @@ import 'package:xqmagic/utils/app_logger.dart';
 import 'package:xqmagic/utils/app_settings.dart';
 import 'package:xqmagic/utils/constants.dart';
 import 'package:xqmagic/utils/coord.dart';
+import 'package:xqmagic/utils/fen.dart';
 import 'package:xqmagic/utils/move_notation.dart';
 import 'package:xqmagic/utils/sound_manager.dart';
 
@@ -24,17 +25,20 @@ import 'package:xqmagic/utils/sound_manager.dart';
 /// - UI 交互状态管理（由 GameStateManager 负责）
 /// - 云库查询（由 AnalysisService 负责）
 class GameController {
-  GameController() {
+  GameController() : _engine = GameEngine(FenParser.initial) {
     gameTree = GameTree();
     gameTree.initStandard();
-    engine = GameEngine(gameTree.current!.fen);
+    _engine = GameEngine(gameTree.current!.fen);
   }
 
-  /// 游戏逻辑引擎
-  late GameEngine engine;
+  /// 游戏逻辑引擎（私有，通过只读 getter 暴露）
+  GameEngine _engine;
 
   /// 棋谱树
   late GameTree gameTree;
+
+  /// 只读访问引擎
+  GameEngine get engine => _engine;
 
   /// 上一步走法
   MoveRecord? lastMove;
@@ -47,16 +51,16 @@ class GameController {
 
   // ──────────── 访问器 ────────────
 
-  PieceColor get currentTurn => engine.currentTurn;
-  Board get currentBoard => engine.board;
+  PieceColor get currentTurn => _engine.currentTurn;
+  Board get currentBoard => _engine.board;
   bool get canGoBack => gameTree.current?.parent != null;
   bool get canGoForward => gameTree.current?.hasChildren ?? false;
   int get depth => gameTree.depth;
 
   /// 将帅是否被将军及被将军位置
   Coord? get inCheckPosition {
-    if (!engine.isInCheck(currentTurn)) return null;
-    return engine.kingPosition;
+    if (!_engine.isInCheck(currentTurn)) return null;
+    return _engine.kingPosition;
   }
 
   // ──────────── 走子 ────────────
@@ -67,17 +71,17 @@ class GameController {
       return false;
     }
 
-    final legalMoves = engine.getLegalMoves(from);
+    final legalMoves = _engine.getLegalMoves(from);
     if (!legalMoves.any((m) => m.to == to)) return false;
 
-    final piece = engine.board.getPiece(from);
+    final piece = _engine.board.getPiece(from);
     if (piece == null) return false;
 
     final move = MoveRecord(
       from: from,
       to: to,
       pieceType: piece.type,
-      capturedPiece: engine.board.getPiece(to),
+      capturedPiece: _engine.board.getPiece(to),
       color: piece.color,
     );
     _executeMove(move);
@@ -94,12 +98,12 @@ class GameController {
 
     try {
       final (from, to) = MoveNotation.fromICCS(iccs);
-      final piece = engine.board.getPiece(from);
+      final piece = _engine.board.getPiece(from);
       if (piece == null) return false;
       if (piece.color != currentTurn) return false;
 
       // 验证走法合法性（与 manualMove 一致）
-      final legalMoves = engine.getLegalMoves(from);
+      final legalMoves = _engine.getLegalMoves(from);
       if (!legalMoves.any((m) => m.to == to)) {
         AppLogger.warn('GameController', '引擎走法非法: $iccs');
         return false;
@@ -109,7 +113,7 @@ class GameController {
         from: from,
         to: to,
         pieceType: piece.type,
-        capturedPiece: engine.board.getPiece(to),
+        capturedPiece: _engine.board.getPiece(to),
         color: piece.color,
       );
       _executeMove(move);
@@ -123,8 +127,8 @@ class GameController {
 
   /// 不验证规则地直接走子（用于棋谱回放/导航时 force move）
   MoveRecord? forceNavigateMove(Coord from, Coord to) {
-    final piece = engine.board.getPiece(from);
-    final capturedPiece = engine.board.getPiece(to);
+    final piece = _engine.board.getPiece(from);
+    final capturedPiece = _engine.board.getPiece(to);
     if (piece == null) return null;
 
     final move = MoveRecord(
@@ -134,20 +138,20 @@ class GameController {
       capturedPiece: capturedPiece,
       color: piece.color,
     );
-    engine.forceMove(from, to);
+    _engine.forceMove(from, to);
     return move;
   }
 
   // ──────────── 核心走子 ────────────
 
   void _executeMove(MoveRecord move) {
-    final fenBefore = engine.currentFen;
-    final boardBefore = Map<Coord, ChessPiece>.from(engine.board.pieces);
+    final fenBefore = _engine.currentFen;
+    final boardBefore = Map<Coord, ChessPiece>.from(_engine.board.pieces);
 
     // 走子前生成中文记谱
     String notation;
     try {
-      notation = MoveNotation.toText(engine.board.pieces, move);
+      notation = MoveNotation.toText(_engine.board.pieces, move);
     } catch (e, st) {
       // 记谱生成失败不阻塞走子——fallback 到 ICCS 字符串
       AppLogger.warn(
@@ -162,9 +166,9 @@ class GameController {
         ? PieceColor.black
         : PieceColor.red;
 
-    engine.forceMove(move.from, move.to);
-    final fenAfter = engine.currentFen;
-    final boardAfter = Map<Coord, ChessPiece>.from(engine.board.pieces);
+    _engine.forceMove(move.from, move.to);
+    final fenAfter = _engine.currentFen;
+    final boardAfter = Map<Coord, ChessPiece>.from(_engine.board.pieces);
 
     final moveWithState = move
         .withNotation(notation)
@@ -212,14 +216,14 @@ class GameController {
   void _syncAfterNavigate() {
     final fen = gameTree.currentFen;
     if (fen != null) {
-      engine = GameEngine(fen);
+      _engine = GameEngine(fen);
     }
   }
 
   // ──────────── 局面管理 ────────────
 
   void syncEngineFromFen(String fen) {
-    engine = GameEngine(fen);
+    _engine = GameEngine(fen);
   }
 
   void newGame() {
@@ -233,17 +237,41 @@ class GameController {
     gameState = GameState.playing;
   }
 
+  /// 加载完整的棋谱树（PGN 导入后使用）
+  ///
+  /// [newRoot] 新的根节点，[targetNode] 要定位到的目标节点（默认 root）
+  void loadGameTree(GameTreeNode newRoot, {GameTreeNode? targetNode}) {
+    gameTree.root = newRoot;
+    gameTree.goToStart();
+
+    // 导航到目标节点
+    if (targetNode != null && targetNode != gameTree.current) {
+      final path = targetNode.getPathFromRoot();
+      for (final index in path) {
+        gameTree.goForward(variationIndex: index);
+      }
+    }
+
+    // 同步引擎到当前节点
+    final fen = gameTree.currentFen;
+    if (fen != null) {
+      _engine = GameEngine(fen);
+    }
+    lastMove = null;
+    gameState = GameState.playing;
+  }
+
   void reset() {
     gameTree.initStandard();
-    engine = GameEngine(gameTree.current!.fen);
+    _engine = GameEngine(gameTree.current!.fen);
     lastMove = null;
     gameState = GameState.playing;
   }
 
   // ──────────── 辅助方法 ────────────
 
-  List<MoveRecord> getLegalMoves(Coord from) => engine.getLegalMoves(from);
-  ChessPiece? getPieceAt(Coord pos) => engine.board.getPiece(pos);
+  List<MoveRecord> getLegalMoves(Coord from) => _engine.getLegalMoves(from);
+  ChessPiece? getPieceAt(Coord pos) => _engine.board.getPiece(pos);
 
   void _checkGameEnd() {
     if (lastMove?.capturedPiece?.type == PieceType.king) {
@@ -251,12 +279,12 @@ class GameController {
       _playEndSound();
       return;
     }
-    if (engine.isCheckmate(engine.currentTurn)) {
+    if (_engine.isCheckmate(_engine.currentTurn)) {
       gameState = GameState.checkmate;
       _playEndSound();
       return;
     }
-    if (engine.isStalemate(engine.currentTurn)) {
+    if (_engine.isStalemate(_engine.currentTurn)) {
       gameState = GameState.draw;
       return;
     }
@@ -266,7 +294,7 @@ class GameController {
   void _playEndSound() {
     if (!soundEnabled) return;
     // 刚走子的一方获胜（对方被将杀 → 对方是 currentTurn）
-    final winner = engine.currentTurn == PieceColor.red
+    final winner = _engine.currentTurn == PieceColor.red
         ? PieceColor.black
         : PieceColor.red;
     if (winner == PieceColor.red) {
@@ -280,7 +308,7 @@ class GameController {
     if (!soundEnabled) return;
 
     // 检查对方是否被将军
-    if (engine.isInCheck(engine.currentTurn)) {
+    if (_engine.isInCheck(_engine.currentTurn)) {
       SoundManager.instance.playCheck();
       return;
     }

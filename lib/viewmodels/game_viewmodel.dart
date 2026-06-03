@@ -103,8 +103,7 @@ class GameViewModel extends ChangeNotifier {
   // ────────────────── 外部可见属性（保持 GameScreen 兼容） ──────────────────
 
   // GameController 代理
-  GameEngine get engine => _controller.engine;
-  GameTree get gameTree => _controller.gameTree;
+  // 注意：engine 和 gameTree 不再对外暴露，UI 应通过 ViewModel 门面方法访问
   MoveRecord? get lastMove => _controller.lastMove;
   GameState get gameState => _controller.gameState;
   PieceColor get currentTurn => _controller.currentTurn;
@@ -118,7 +117,13 @@ class GameViewModel extends ChangeNotifier {
   Map<Coord, ChessPiece> get currentPieces => currentBoard.pieces;
 
   /// 当前局面 FEN
-  String? get currentFen => gameTree.currentFen;
+  String? get currentFen => _controller.gameTree.currentFen;
+
+  /// 根节点 FEN（用于 PGN 保存）
+  String? get rootFen => _controller.gameTree.root.fen;
+
+  /// 棋谱树引用（仅供 PGN 保存等需要读取完整树的场景）
+  GameTree get gameTreeForRead => _controller.gameTree;
 
   /// 当前残局谜题名称
   String? get currentPuzzleName => _stateManager.currentPuzzle?.name;
@@ -368,6 +373,15 @@ class GameViewModel extends ChangeNotifier {
   void loadFromFen(String fen) {
     _controller.loadFromFen(fen);
     _stateManager.clearSelection();
+    _onPositionLoaded();
+  }
+
+  /// 加载完整棋谱树（PGN 导入后使用）
+  void loadGameTree(GameTreeNode newRoot, {GameTreeNode? targetNode}) {
+    _controller.loadGameTree(newRoot, targetNode: targetNode);
+    _stateManager.clearSelection();
+    _analysisService.clearAnalysisResults();
+    _engineManager.newGame();
     _onPositionLoaded();
   }
 

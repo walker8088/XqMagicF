@@ -178,21 +178,9 @@ class _PGNOpenDialogState extends State<PGNOpenDialog> {
 
     final game = _games[_selectedGameIndex!];
     final targetNode = game.gameTree.current;
-    final targetFen = targetNode?.fen ?? (game.fen ?? FenParser.initial);
-    final targetPath = targetNode?.getPathFromRoot() ?? [];
 
-    // Load the target position (sets up board, engine, and state correctly)
-    widget.viewModel.loadFromFen(targetFen);
-
-    // Replace the tree root with the PGN game's full tree
-    widget.viewModel.gameTree.root = game.gameTree.root;
-
-    // Navigate from root to the target position
-    widget.viewModel.gameTree.goToStart();
-    for (final index in targetPath) {
-      widget.viewModel.gameTree.goForward(variationIndex: index);
-    }
-    // goForward already calls notifyListeners internally
+    // 通过 ViewModel 门面方法加载，确保引擎/树/状态同步
+    widget.viewModel.loadGameTree(game.gameTree.root, targetNode: targetNode);
 
     if (mounted) {
       Navigator.of(context).pop();
@@ -570,10 +558,10 @@ class _PGNSaveDialogState extends State<PGNSaveDialog> {
       redPlayer: _redPlayerController.text,
       blackPlayer: _blackPlayerController.text,
       result: _result,
-      fen: widget.viewModel.gameTree.root.fen != FenParser.initial
-          ? widget.viewModel.gameTree.root.fen
+      fen: widget.viewModel.rootFen != FenParser.initial
+          ? widget.viewModel.rootFen
           : null,
-      gameTree: widget.viewModel.gameTree,
+      gameTree: widget.viewModel.gameTreeForRead,
     );
 
     return PGNService().writeSingle(game);
@@ -600,10 +588,10 @@ class _PGNSaveDialogState extends State<PGNSaveDialog> {
         redPlayer: _redPlayerController.text,
         blackPlayer: _blackPlayerController.text,
         result: _result,
-        fen: widget.viewModel.gameTree.root.fen != FenParser.initial
-            ? widget.viewModel.gameTree.root.fen
+        fen: widget.viewModel.rootFen != FenParser.initial
+            ? widget.viewModel.rootFen
             : null,
-        gameTree: widget.viewModel.gameTree,
+        gameTree: widget.viewModel.gameTreeForRead,
       );
 
       final content = PGNService().writeSingle(game);

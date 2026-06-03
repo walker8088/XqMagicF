@@ -260,8 +260,4 @@ MoveQualityAssessor ← 着法质量评估（基于引擎评分变化）
 
 - `lib/data/endgame_puzzles.dart` 数据有严重 bug（纯数字假 ICCS、将帅对面 FEN、`r` 走子方），需改为从文件加载并重写数据
 - `GameMode.engineOnline` 和菜单
-- PGN 对话框直接操作 `gameTree.root` 绕过 `GameController` → 加载后引擎/树不同步
-- `game_screen.dart` 仍直接访问 `vm.engine.*`/`vm.gameTree.*`/`vm.stateManager.*` → 应通过 ViewModel 门面方法
 - `EngineManager` 职责过多（生命周期+配置代理+分析编排+对战模式）→ 考虑拆分
-- `GameController.engine` 是 public mutable `late` 字段 → 导航后外部引用失效
-- `MoveValidator.obstacles` 参数名误导（实际需包含目标位置）→ 重命名或分离参数
