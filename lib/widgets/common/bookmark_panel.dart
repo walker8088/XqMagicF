@@ -93,7 +93,7 @@ class _BookmarkPanelState extends State<BookmarkPanel>
 
   Future<void> _addBookmark() async {
     final vm = context.read<GameViewModel>();
-    final fen = vm.gameTree.currentFen;
+    final fen = vm.currentFen;
     if (fen == null) return;
 
     final moveCount = vm.depth;

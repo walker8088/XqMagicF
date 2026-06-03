@@ -67,7 +67,7 @@ class GameEngine {
         ? PieceColor.black
         : PieceColor.red;
     final allPieces = _board.pieceList;
-    final obstacles = allPieces.map((p) => p.coord).toList();
+    final allPiecePositions = allPieces.map((p) => p.coord).toList();
 
     for (final piece in allPieces) {
       if (piece.color != opponentColor) continue;
@@ -98,7 +98,7 @@ class GameEngine {
         color: piece.color,
         from: piece.coord,
         to: kingPos,
-        obstacles: obstacles,
+        allPiecePositions: allPiecePositions,
       )) {
         return true;
       }
@@ -109,11 +109,7 @@ class GameEngine {
   /// 内部：生成指定棋子的所有合法走法（不限制回合）
   List<MoveRecord> _generateMovesFor(Coord from, ChessPiece piece) {
     final allPieces = _board.pieceList;
-    // Pass full obstacles list (including target) — cannon needs this
-    // to distinguish between moving (count=0) and capturing (count=1).
-    // _countPiecesBetween only counts pieces BETWEEN from and to,
-    // so including the target position doesn't affect path checks.
-    final obstacles = allPieces.map((p) => p.coord).toList();
+    final allPiecePositions = allPieces.map((p) => p.coord).toList();
     final moves = <MoveRecord>[];
 
     for (int col = 0; col < AppConstants.boardCols; col++) {
@@ -129,7 +125,7 @@ class GameEngine {
           color: piece.color,
           from: from,
           to: to,
-          obstacles: obstacles,
+          allPiecePositions: allPiecePositions,
         )) {
           moves.add(
             MoveRecord(

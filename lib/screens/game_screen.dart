@@ -445,7 +445,7 @@ class _GameScreenState extends State<GameScreen> {
           Expanded(
             child: vm.cloudResult != null
                 ? CloudMoveList(
-                    pieces: vm.engine.board.pieces,
+                    pieces: vm.currentPieces,
                     moves: vm.cloudResult!.moves,
                     onMoveTap: (iccs) => vm.engineMove(iccs),
                   )
@@ -544,8 +544,8 @@ class _GameScreenState extends State<GameScreen> {
             child: LiveAnalysisPanel(
               engineInfos: vm.engineInfos,
               bestMove: vm.engineBestMove,
-              board: vm.lastMove?.boardAfter ?? vm.engine.board.pieces,
-              activeColor: vm.lastMove?.nextColor ?? vm.engine.currentTurn,
+              board: vm.lastMove?.boardAfter ?? vm.currentPieces,
+              activeColor: vm.lastMove?.nextColor ?? vm.currentTurn,
               onBestMoveTap: (iccs) => vm.engineMove(iccs),
             ),
           ),
@@ -618,13 +618,13 @@ class _GameScreenState extends State<GameScreen> {
               ),
             ),
           if (vm.mode == GameMode.engineEndGame &&
-              vm.stateManager.currentPuzzle != null) ...[
+              vm.currentPuzzleName != null) ...[
             const SizedBox(width: 16),
             Text(
-              '杀法挑战: ${vm.stateManager.currentPuzzle!.name}',
+              '杀法挑战: ${vm.currentPuzzleName}',
               style: const TextStyle(color: Color(0xFFF5DEB3), fontSize: 12),
             ),
-            if (vm.stateManager.puzzleCompleted) ...[
+            if (vm.isPuzzleCompleted) ...[
               const SizedBox(width: 8),
               const Icon(Icons.check_circle, color: Colors.green, size: 16),
               const Text(
@@ -672,8 +672,7 @@ class _GameScreenState extends State<GameScreen> {
     // 避免以前那种每次打开都泄漏一个 ChangeNotifier 的问题。
     showDialog(
       context: context,
-      builder: (ctx) =>
-          _EditFenDialog(initialFen: vm.gameTree.currentFen ?? ''),
+      builder: (ctx) => _EditFenDialog(initialFen: vm.currentFen ?? ''),
     ).then((result) {
       if (result is String && result.trim().isNotEmpty) {
         vm.loadFromFen(result);
@@ -682,7 +681,7 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _copyFen(BuildContext context, GameViewModel vm) async {
-    final fen = vm.gameTree.currentFen ?? '';
+    final fen = vm.currentFen ?? '';
     final messenger = ScaffoldMessenger.of(context);
     try {
       await Clipboard.setData(ClipboardData(text: fen));

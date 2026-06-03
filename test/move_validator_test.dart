@@ -13,7 +13,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(4, 0),
             to: const Coord(4, 1),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isTrue,
         );
@@ -26,7 +26,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(4, 1),
             to: const Coord(4, 0),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isTrue,
         );
@@ -39,7 +39,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(4, 0),
             to: const Coord(3, 0),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isTrue,
         );
@@ -52,7 +52,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(4, 0),
             to: const Coord(5, 0),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isTrue,
         );
@@ -65,7 +65,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(4, 0),
             to: const Coord(4, 2),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isFalse,
         );
@@ -78,7 +78,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(4, 0),
             to: const Coord(3, 1),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isFalse,
         );
@@ -91,7 +91,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(4, 2),
             to: const Coord(4, 3),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isFalse,
         );
@@ -104,7 +104,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(4, 0),
             to: const Coord(4, 0),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isFalse,
         );
@@ -117,7 +117,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(3, 0),
             to: const Coord(2, 0),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isFalse,
         );
@@ -131,7 +131,7 @@ void main() {
               color: PieceColor.black,
               from: const Coord(4, 9),
               to: const Coord(4, 8),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isTrue,
           );
@@ -144,7 +144,7 @@ void main() {
               color: PieceColor.black,
               from: const Coord(4, 7),
               to: const Coord(4, 6),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isFalse,
           );
@@ -160,7 +160,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(4, 0),
             to: const Coord(3, 1),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isTrue,
         );
@@ -173,7 +173,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(3, 1),
             to: const Coord(4, 2),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isTrue,
         );
@@ -186,7 +186,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(4, 0),
             to: const Coord(4, 1),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isFalse,
         );
@@ -199,7 +199,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(5, 1),
             to: const Coord(6, 2),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isFalse,
         );
@@ -212,7 +212,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(4, 0),
             to: const Coord(2, 2),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isFalse,
         );
@@ -227,7 +227,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(2, 0),
             to: const Coord(4, 2),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isTrue,
         );
@@ -241,7 +241,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(2, 2),
             to: const Coord(4, 4),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isTrue,
         );
@@ -256,7 +256,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(2, 3),
             to: const Coord(4, 5),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isFalse,
         );
@@ -269,7 +269,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(2, 0),
             to: const Coord(4, 2),
-            obstacles: [const Coord(3, 1)], // eye center
+            allPiecePositions: [const Coord(3, 1)], // eye center
           ),
           isFalse,
         );
@@ -282,7 +282,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(2, 0),
             to: const Coord(3, 1),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isFalse,
         );
@@ -296,7 +296,7 @@ void main() {
               color: PieceColor.black,
               from: const Coord(2, 9),
               to: const Coord(0, 7),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isTrue,
           );
@@ -311,7 +311,7 @@ void main() {
               color: PieceColor.black,
               from: const Coord(2, 6),
               to: const Coord(0, 4),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isFalse,
           );
@@ -324,7 +324,7 @@ void main() {
               color: PieceColor.black,
               from: const Coord(2, 9),
               to: const Coord(0, 7),
-              obstacles: [const Coord(1, 8)],
+              allPiecePositions: [const Coord(1, 8)],
             ),
             isFalse,
           );
@@ -340,7 +340,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(1, 0),
             to: const Coord(2, 2),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isTrue,
         );
@@ -353,7 +353,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(1, 0),
             to: const Coord(3, 1),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isTrue,
         );
@@ -367,7 +367,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(1, 0),
             to: const Coord(2, 2),
-            obstacles: [const Coord(1, 1)],
+            allPiecePositions: [const Coord(1, 1)],
           ),
           isFalse,
         );
@@ -381,7 +381,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(1, 0),
             to: const Coord(3, 1),
-            obstacles: [const Coord(2, 0)],
+            allPiecePositions: [const Coord(2, 0)],
           ),
           isFalse,
         );
@@ -394,7 +394,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(1, 0),
             to: const Coord(1, 2),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isFalse,
         );
@@ -407,7 +407,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(1, 0),
             to: const Coord(3, 0),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isFalse,
         );
@@ -421,7 +421,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(1, 0),
             to: const Coord(2, 2),
-            obstacles: [const Coord(2, 2)], // destination obstacle
+            allPiecePositions: [const Coord(2, 2)], // destination obstacle
           ),
           isTrue,
         );
@@ -446,7 +446,7 @@ void main() {
               color: PieceColor.red,
               from: from,
               to: to,
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isTrue,
             reason: 'Horse should move from $from to $to',
@@ -463,7 +463,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(0, 0),
             to: const Coord(0, 5),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isTrue,
         );
@@ -476,7 +476,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(0, 0),
             to: const Coord(8, 0),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isTrue,
         );
@@ -489,7 +489,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(0, 0),
             to: const Coord(3, 3),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isFalse,
         );
@@ -502,7 +502,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(0, 0),
             to: const Coord(0, 5),
-            obstacles: [const Coord(0, 2)],
+            allPiecePositions: [const Coord(0, 2)],
           ),
           isFalse,
         );
@@ -515,7 +515,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(0, 0),
             to: const Coord(0, 5),
-            obstacles: [const Coord(0, 5)], // obstacle at destination only
+            allPiecePositions: [const Coord(0, 5)], // obstacle at destination only
           ),
           isTrue,
         );
@@ -528,7 +528,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(0, 0),
             to: const Coord(0, 3),
-            obstacles: [const Coord(0, 5)],
+            allPiecePositions: [const Coord(0, 5)],
           ),
           isTrue,
         );
@@ -543,7 +543,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(1, 2),
             to: const Coord(1, 5),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isTrue,
         );
@@ -556,7 +556,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(1, 2),
             to: const Coord(1, 5),
-            obstacles: [
+            allPiecePositions: [
               const Coord(1, 4), // cannon mount
               const Coord(1, 5), // enemy piece at target
             ],
@@ -572,7 +572,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(1, 2),
             to: const Coord(1, 6),
-            obstacles: [const Coord(1, 3), const Coord(1, 4)],
+            allPiecePositions: [const Coord(1, 3), const Coord(1, 4)],
           ),
           isFalse,
         );
@@ -586,7 +586,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(1, 2),
             to: const Coord(1, 4),
-            obstacles: [const Coord(1, 4)], // piece at target, but no mount
+            allPiecePositions: [const Coord(1, 4)], // piece at target, but no mount
           ),
           isFalse,
         );
@@ -599,7 +599,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(1, 2),
             to: const Coord(3, 4),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isFalse,
         );
@@ -612,7 +612,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(1, 2),
             to: const Coord(5, 2),
-            obstacles: [],
+            allPiecePositions: [],
           ),
           isTrue,
         );
@@ -625,7 +625,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(1, 2),
             to: const Coord(5, 2),
-            obstacles: [const Coord(3, 2)],
+            allPiecePositions: [const Coord(3, 2)],
           ),
           isFalse,
         );
@@ -638,7 +638,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(1, 2),
             to: const Coord(5, 2),
-            obstacles: [const Coord(3, 2), const Coord(5, 2)],
+            allPiecePositions: [const Coord(3, 2), const Coord(5, 2)],
           ),
           isTrue,
         );
@@ -651,7 +651,7 @@ void main() {
             color: PieceColor.red,
             from: const Coord(1, 2),
             to: const Coord(5, 2),
-            obstacles: [const Coord(5, 2)],
+            allPiecePositions: [const Coord(5, 2)],
           ),
           isFalse,
         );
@@ -667,7 +667,7 @@ void main() {
               color: PieceColor.red,
               from: const Coord(0, 3),
               to: const Coord(0, 4),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isTrue,
           );
@@ -680,7 +680,7 @@ void main() {
               color: PieceColor.red,
               from: const Coord(0, 3),
               to: const Coord(0, 2),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isFalse,
           );
@@ -693,7 +693,7 @@ void main() {
               color: PieceColor.red,
               from: const Coord(0, 3),
               to: const Coord(1, 3),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isFalse,
           );
@@ -706,7 +706,7 @@ void main() {
               color: PieceColor.red,
               from: const Coord(0, 3),
               to: const Coord(1, 4),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isFalse,
           );
@@ -721,7 +721,7 @@ void main() {
               color: PieceColor.red,
               from: const Coord(0, 5),
               to: const Coord(0, 6),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isTrue,
           );
@@ -734,7 +734,7 @@ void main() {
               color: PieceColor.red,
               from: const Coord(0, 5),
               to: const Coord(1, 5),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isTrue,
           );
@@ -748,7 +748,7 @@ void main() {
               color: PieceColor.red,
               from: const Coord(0, 5),
               to: const Coord(0, 4),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isFalse,
           );
@@ -761,7 +761,7 @@ void main() {
               color: PieceColor.red,
               from: const Coord(0, 5),
               to: const Coord(1, 6),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isFalse,
           );
@@ -776,7 +776,7 @@ void main() {
               color: PieceColor.black,
               from: const Coord(0, 6),
               to: const Coord(0, 5),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isTrue,
           );
@@ -789,7 +789,7 @@ void main() {
               color: PieceColor.black,
               from: const Coord(0, 6),
               to: const Coord(0, 7),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isFalse,
           );
@@ -802,7 +802,7 @@ void main() {
               color: PieceColor.black,
               from: const Coord(0, 6),
               to: const Coord(1, 6),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isFalse,
           );
@@ -817,7 +817,7 @@ void main() {
               color: PieceColor.black,
               from: const Coord(0, 4),
               to: const Coord(1, 4),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isTrue,
           );
@@ -832,7 +832,7 @@ void main() {
               color: PieceColor.red,
               from: const Coord(4, 4),
               to: const Coord(4, 5),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isTrue,
           );
@@ -844,7 +844,7 @@ void main() {
               color: PieceColor.red,
               from: const Coord(4, 4),
               to: const Coord(5, 4),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isFalse,
           );
@@ -856,7 +856,7 @@ void main() {
               color: PieceColor.red,
               from: const Coord(4, 5),
               to: const Coord(5, 5),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isTrue,
           );
@@ -871,7 +871,7 @@ void main() {
               color: PieceColor.black,
               from: const Coord(4, 5),
               to: const Coord(4, 4),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isTrue,
           );
@@ -883,7 +883,7 @@ void main() {
               color: PieceColor.black,
               from: const Coord(4, 5),
               to: const Coord(5, 5),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isFalse,
           );
@@ -895,7 +895,7 @@ void main() {
               color: PieceColor.black,
               from: const Coord(4, 4),
               to: const Coord(5, 4),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isTrue,
           );
@@ -912,7 +912,7 @@ void main() {
               color: PieceColor.red,
               from: const Coord(4, 4),
               to: const Coord(4, 4),
-              obstacles: [],
+              allPiecePositions: [],
             ),
             isFalse,
             reason: '$type should not allow staying in place',

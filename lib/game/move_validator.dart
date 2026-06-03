@@ -10,12 +10,17 @@ class MoveValidator {
   MoveValidator._();
 
   /// 判断指定棋子在当前位置是否能走到目标位置
+  ///
+  /// [allPiecePositions] 必须包含**所有**棋子的坐标，包括目标位置的棋子。
+  /// 炮的吃子判断依赖 `allPiecePositions.contains(to)` 来区分走子和吃子，
+  /// 如果不包含目标位置棋子，炮的吃子判断会出错。
+  /// 其他棋子仅使用中间位置的坐标进行路径/蹩腿检查。
   static bool isValidMove({
     required PieceType type,
     required PieceColor color,
     required Coord from,
     required Coord to,
-    required List<Coord> obstacles,
+    required List<Coord> allPiecePositions,
   }) {
     final colDiff = to.col - from.col;
     final rowDiff = to.row - from.row;
@@ -29,13 +34,20 @@ class MoveValidator {
       case PieceType.advisor:
         return _isValidAdvisorMove(from, to, absCol, absRow, color);
       case PieceType.bishop:
-        return _isValidBishopMove(from, to, absCol, absRow, color, obstacles);
+        return _isValidBishopMove(
+          from,
+          to,
+          absCol,
+          absRow,
+          color,
+          allPiecePositions,
+        );
       case PieceType.knight:
-        return _isValidKnightMove(from, to, absCol, absRow, obstacles);
+        return _isValidKnightMove(from, to, absCol, absRow, allPiecePositions);
       case PieceType.rook:
-        return _isValidRookMove(from, to, obstacles);
+        return _isValidRookMove(from, to, allPiecePositions);
       case PieceType.cannon:
-        return _isValidCannonMove(from, to, obstacles);
+        return _isValidCannonMove(from, to, allPiecePositions);
       case PieceType.pawn:
         return _isValidPawnMove(from, to, absCol, absRow, color);
     }
@@ -73,13 +85,13 @@ class MoveValidator {
     int absCol,
     int absRow,
     PieceColor color,
-    List<Coord> obstacles,
+    List<Coord> allPiecePositions,
   ) {
     if (absCol != 2 || absRow != 2) return false;
     if (color == PieceColor.red && to.row > 4) return false;
     if (color == PieceColor.black && to.row < 5) return false;
     final eyeCenter = Coord((from.col + to.col) ~/ 2, (from.row + to.row) ~/ 2);
-    if (obstacles.contains(eyeCenter)) return false;
+    if (allPiecePositions.contains(eyeCenter)) return false;
     return true;
   }
 
@@ -88,7 +100,7 @@ class MoveValidator {
     Coord to,
     int absCol,
     int absRow,
-    List<Coord> obstacles,
+    List<Coord> allPiecePositions,
   ) {
     if (!((absCol == 1 && absRow == 2) || (absCol == 2 && absRow == 1))) {
       return false;
@@ -99,18 +111,26 @@ class MoveValidator {
     } else {
       legPos = Coord(from.col, (from.row + to.row) ~/ 2);
     }
-    return !obstacles.contains(legPos);
+    return !allPiecePositions.contains(legPos);
   }
 
-  static bool _isValidRookMove(Coord from, Coord to, List<Coord> obstacles) {
+  static bool _isValidRookMove(
+    Coord from,
+    Coord to,
+    List<Coord> allPiecePositions,
+  ) {
     if (from.col != to.col && from.row != to.row) return false;
-    return _isPathClear(from, to, obstacles);
+    return _isPathClear(from, to, allPiecePositions);
   }
 
-  static bool _isValidCannonMove(Coord from, Coord to, List<Coord> obstacles) {
+  static bool _isValidCannonMove(
+    Coord from,
+    Coord to,
+    List<Coord> allPiecePositions,
+  ) {
     if (from.col != to.col && from.row != to.row) return false;
-    final count = _countPiecesBetween(from, to, obstacles);
-    final hasTargetPiece = obstacles.contains(to);
+    final count = _countPiecesBetween(from, to, allPiecePositions);
+    final hasTargetPiece = allPiecePositions.contains(to);
     return hasTargetPiece ? count == 1 : count == 0;
   }
 
@@ -139,24 +159,32 @@ class MoveValidator {
   }
 
   /// 检查路径是否畅通（不含起点和终点）
-  static bool _isPathClear(Coord from, Coord to, List<Coord> obstacles) {
-    return _countPiecesBetween(from, to, obstacles) == 0;
+  static bool _isPathClear(
+    Coord from,
+    Coord to,
+    List<Coord> allPiecePositions,
+  ) {
+    return _countPiecesBetween(from, to, allPiecePositions) == 0;
   }
 
   /// 计算两点之间的棋子数量（不含起点和终点）
-  static int _countPiecesBetween(Coord from, Coord to, List<Coord> obstacles) {
+  static int _countPiecesBetween(
+    Coord from,
+    Coord to,
+    List<Coord> allPiecePositions,
+  ) {
     int count = 0;
     if (from.col == to.col) {
       final minRow = from.row < to.row ? from.row : to.row;
       final maxRow = from.row < to.row ? to.row : from.row;
       for (int r = minRow + 1; r < maxRow; r++) {
-        if (obstacles.contains(Coord(from.col, r))) count++;
+        if (allPiecePositions.contains(Coord(from.col, r))) count++;
       }
     } else if (from.row == to.row) {
       final minCol = from.col < to.col ? from.col : to.col;
       final maxCol = from.col < to.col ? to.col : from.col;
       for (int c = minCol + 1; c < maxCol; c++) {
-        if (obstacles.contains(Coord(c, from.row))) count++;
+        if (allPiecePositions.contains(Coord(c, from.row))) count++;
       }
     }
     return count;

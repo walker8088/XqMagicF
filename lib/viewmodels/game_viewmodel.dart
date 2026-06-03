@@ -114,6 +114,18 @@ class GameViewModel extends ChangeNotifier {
   int get depth => _controller.depth;
   Coord? get inCheckPosition => _controller.inCheckPosition;
 
+  /// 当前棋盘棋子映射（供 UI 显示云库着法、分析面板等）
+  Map<Coord, ChessPiece> get currentPieces => currentBoard.pieces;
+
+  /// 当前局面 FEN
+  String? get currentFen => gameTree.currentFen;
+
+  /// 当前残局谜题名称
+  String? get currentPuzzleName => _stateManager.currentPuzzle?.name;
+
+  /// 当前残局谜题是否已完成
+  bool get isPuzzleCompleted => _stateManager.puzzleCompleted;
+
   /// 棋盘渲染数据（纯数据，供 ChessBoard widget 使用）
   BoardRenderData get boardRenderData => BoardRenderData(
     pieces: currentBoard.pieces.values.toList(),

@@ -242,7 +242,26 @@ MoveQualityAssessor ← 着法质量评估（基于引擎评分变化）
 
 ---
 
+## 已修复项（本轮）
+
+- ✅ `loadFromFen` 不重置 `gameState`/`lastMove` → 将杀后棋盘冻结
+- ✅ `_loadPuzzle` 绕过 `GameController` → 缺少 `newGame()`/`clearAnalysisResults()`
+- ✅ `isCheckmate`/`isStalemate` 收集全部走法 → 新增 `hasAnyLegalMove()` 提前退出
+- ✅ `Engine.dispose()` 先取消订阅再 `stop()` → 引擎永远被 force-kill
+- ✅ `ChessBoard` 接收整个 `GameViewModel` → 改为 `BoardRenderData` + `onTap` 回调
+- ✅ `settings_dialog.dart` `TextEditingController` 在 `build()` 中泄漏
+- ✅ `GameController.engineMove` 缺少合法性校验 → 添加 `getLegalMoves` 检查
+- ✅ `AnalysisService.writeAnalysisToNode` 用 `gameTree.current` → 改用分析目标节点防导航竞争
+- ✅ `EngineInfo.adjustedScore` 杀棋返回原始步数 → 映射为 `±(30000-N)` 并添加 `mateDistanceFrom()`
+- ✅ `MoveHistoryPanel`/`CloudMoveList` 不显示杀棋 → 添加 `mateDistanceFrom` 判断
+- ✅ 棋盘点击偏移 → `floor()` 改 `round()` 以交叉点为中心
+
 ## 待清理项
 
 - `lib/data/endgame_puzzles.dart` 数据有严重 bug（纯数字假 ICCS、将帅对面 FEN、`r` 走子方），需改为从文件加载并重写数据
 - `GameMode.engineOnline` 和菜单
+- PGN 对话框直接操作 `gameTree.root` 绕过 `GameController` → 加载后引擎/树不同步
+- `game_screen.dart` 仍直接访问 `vm.engine.*`/`vm.gameTree.*`/`vm.stateManager.*` → 应通过 ViewModel 门面方法
+- `EngineManager` 职责过多（生命周期+配置代理+分析编排+对战模式）→ 考虑拆分
+- `GameController.engine` 是 public mutable `late` 字段 → 导航后外部引用失效
+- `MoveValidator.obstacles` 参数名误导（实际需包含目标位置）→ 重命名或分离参数
