@@ -21,7 +21,9 @@ class CloudQueryResult {
   /// 解析 chessdb.cn queryall 返回的文本响应
   ///
   /// 格式: move:c3c4,score:1,rank:2,note:! (44-02),winrate:50.08|move:...
-  /// [moveColor] 当前走子方，用于将得分转换为红方视角
+  ///
+  /// chessdb.cn 返回的 `score` 已经是红方视角（红优势为正、黑优势为负），
+  /// 不需要额外的走子方转换。
   static CloudQueryResult? parseResponse(String body, String position) {
     if (body.isEmpty) return null;
 

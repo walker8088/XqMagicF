@@ -246,10 +246,11 @@ class EngineManager extends ChangeNotifier {
         'Engine loaded successfully: ${_engine!.engineName}',
       );
 
-      // Apply analysis mode settings after successful load
-      setDepth(_analysisMode.depth);
-      setTimeMs(_analysisMode.timeMs);
-      await setMultiPV(_config.multiPV);
+      // Apply user settings (AppSettings) to the freshly loaded engine.
+      // 优先于 analysisMode 默认值，因为 AppSettings 表达了用户的明确偏好。
+      // 此前使用 `_analysisMode.depth/timeMs` 会覆盖用户设置（例如
+      // 用户调低 timeMs 但调高 analysisMode 为“精准”会被重置为 5s）。
+      await syncSettingsToEngine();
 
       return true;
     } catch (e, st) {

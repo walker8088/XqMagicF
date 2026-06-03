@@ -729,17 +729,14 @@ class PGNService {
     return buffer.toString();
   }
 
-  /// 递归写入一条主变线（及其所有变着）到 buffer。
-  ///
-  /// 合并原 `_writeVariation` 与 `_writeVariationLine`：二者 95% 逻辑相同。
-  /// 区别仅在于：主变着走到末尾写完结果后返回；嵌套变着走到末尾不加结果。
-  /// 以 `_isMainLine` 参数区分。
+  /// 递归写入一条变着线到 [buffer]。主变着与嵌套变着共用同一逻辑：
+  /// 区别在于调用方是否在函数返回后写 result symbol（主变着会，变着不会）。
+  /// 由调用方（[_generateMoveText] / 递归本身）决定，而不是由参数控制。
   void _writeLine(
     StringBuffer buffer,
     GameTree gameTree,
-    _MoveTextWriterState state, {
-    bool isMainLine = true,
-  }) {
+    _MoveTextWriterState state,
+  ) {
     while (gameTree.current?.hasChildren == true) {
       final node = gameTree.current!;
       final child = node.mainLineChild!;
@@ -783,7 +780,7 @@ class PGNService {
         );
         gameTree.goForward(variationIndex: i);
         try {
-          _writeLine(buffer, gameTree, variationState, isMainLine: false);
+          _writeLine(buffer, gameTree, variationState);
         } finally {
           gameTree.goBack();
         }

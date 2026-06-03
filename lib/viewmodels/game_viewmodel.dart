@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:xqmagic/data/endgame_puzzles.dart';
 import 'package:xqmagic/game/analysis_service.dart';
+import 'package:xqmagic/game/board_edit_controller.dart';
 import 'package:xqmagic/game/game_controller.dart';
 import 'package:xqmagic/game/game_engine.dart';
 import 'package:xqmagic/game/game_state_manager.dart';
@@ -19,7 +20,6 @@ import 'package:xqmagic/utils/app_logger.dart';
 import 'package:xqmagic/utils/app_settings.dart';
 import 'package:xqmagic/utils/constants.dart';
 import 'package:xqmagic/utils/coord.dart';
-import 'package:xqmagic/utils/fen.dart';
 import 'package:xqmagic/utils/move_notation.dart';
 
 /// 游戏视图模型：协调 GameController、AnalysisService、EngineManager 和 GameStateManager
@@ -54,21 +54,23 @@ class GameViewModel extends ChangeNotifier {
 
   // ──────────── 棋盘编辑状态 ────────────
 
-  PieceType _editPieceType = PieceType.pawn;
-  PieceColor _editPieceColor = PieceColor.red;
-  PieceColor _editSideToMove = PieceColor.red;
-  bool _editPlacing = true; // true = 放置模式, false = 删除模式
+  late final BoardEditController _editController;
 
-  PieceType get editPieceType => _editPieceType;
-  PieceColor get editPieceColor => _editPieceColor;
-  PieceColor get editSideToMove => _editSideToMove;
-  bool get editPlacing => _editPlacing;
+  /// 进入棋盘编辑模式前保存的原始 FEN，供 [editCancel] 恢复使用。
+  /// null 表示当前未处于编辑模式快照点。
+  String? _editOriginalFen;
+
+  PieceType get editPieceType => _editController.pieceType;
+  PieceColor get editPieceColor => _editController.pieceColor;
+  PieceColor get editSideToMove => _editController.sideToMove;
+  bool get editPlacing => _editController.placing;
   bool get isBoardEditMode => _mode == GameMode.boardEdit;
 
   // ──────────── 初始化 ────────────
 
   void _init() {
     _controller = GameController();
+    _editController = BoardEditController();
 
     _engineManager = EngineManager(logEnabled: true);
     _analysisService = AnalysisService(
@@ -363,13 +365,12 @@ class GameViewModel extends ChangeNotifier {
           _analysisService.queryCloud(fen);
         }
       } else if (mode == GameMode.boardEdit) {
-        // 进入棋盘编辑模式：停止分析，清除选择
+        // 进入棋盘编辑模式：保存原始 FEN 以供 cancel 恢复，
+        // 停止分析，清除选择，重置编辑偏好。
+        _editOriginalFen = _controller.gameTree.currentFen;
         _analysisService.stopAnalysis();
         _stateManager.clearSelection();
-        _editPieceType = PieceType.pawn;
-        _editPieceColor = PieceColor.red;
-        _editSideToMove = PieceColor.red;
-        _editPlacing = true;
+        _editController.reset();
       }
     });
     notifyListeners();
@@ -378,76 +379,76 @@ class GameViewModel extends ChangeNotifier {
   // ──────────── 棋盘编辑操作 ────────────
 
   void setEditPieceType(PieceType type) {
-    _editPieceType = type;
+    _editController.setPieceType(type);
     notifyListeners();
   }
 
   void setEditPieceColor(PieceColor color) {
-    _editPieceColor = color;
+    _editController.setPieceColor(color);
     notifyListeners();
   }
 
   void setEditSideToMove(PieceColor color) {
-    _editSideToMove = color;
+    _editController.setSideToMove(color);
     notifyListeners();
   }
 
   void setEditPlacing(bool placing) {
-    _editPlacing = placing;
+    _editController.setPlacing(placing);
     notifyListeners();
   }
 
   /// 编辑模式下的点击：放置或删除棋子
   void editTap(Coord pos) {
     if (!isBoardEditMode) return;
-    if (!_controller.currentBoard.isValidPosition(pos)) return;
-
-    if (_editPlacing) {
-      // 放置模式：在目标位置放置选定的棋子（覆盖已有棋子）
-      final piece = ChessPiece(
-        type: _editPieceType,
-        color: _editPieceColor,
-        coord: pos,
-      );
-      _controller.currentBoard.putPiece(piece);
-    } else {
-      // 删除模式：移除目标位置的棋子
-      _controller.currentBoard.removePiece(pos);
-    }
+    _editController.tap(_controller.currentBoard, pos);
     _stateManager.clearSelection();
     notifyListeners();
   }
 
   /// 清空棋盘
   void editClearBoard() {
-    _controller.currentBoard.clear();
+    _editController.clearBoard(_controller.currentBoard);
     _stateManager.clearSelection();
     notifyListeners();
   }
 
   /// 初始化标准局面
   void editInitStandard() {
-    _controller.currentBoard.initialize();
-    _editSideToMove = PieceColor.red;
+    _editController.initStandard(_controller.currentBoard);
     _stateManager.clearSelection();
     notifyListeners();
   }
 
   /// 应用编辑：从当前棋盘生成 FEN 并开始新局
   void editApply() {
-    final fen = FenParser.generate(_controller.currentBoard, _editSideToMove);
+    final fen = _editController.toFen(_controller.currentBoard);
     _mode = GameMode.free;
     _controller.loadFromFen(fen);
     _stateManager.clearSelection();
     _analysisService.clearAnalysisResults();
     _engineManager.newGame();
     _onPositionLoaded();
+    // Apply 后快照不再有意义（局面已被 FEN 覆写），释放防止误导
+    _editOriginalFen = null;
   }
 
-  /// 取消编辑：恢复到自由模式
+  /// 取消编辑：恢复到自由模式并恢复原始局面
+  ///
+  /// 之前在 setMode(boardEdit) 时保存的 FEN 在此复原棋盘。引擎、云库、
+  /// 选择状态一并重置，保证“取消”语义与 UI 一致。
   void editCancel() {
     _mode = GameMode.free;
-    _stateManager.clearSelection();
+    if (_editOriginalFen != null) {
+      _controller.loadFromFen(_editOriginalFen!);
+      _stateManager.clearSelection();
+      _analysisService.clearAnalysisResults();
+      _engineManager.newGame();
+      _onPositionLoaded();
+    } else {
+      _stateManager.clearSelection();
+    }
+    _editOriginalFen = null;
     notifyListeners();
   }
 

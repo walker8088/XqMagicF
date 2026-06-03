@@ -74,6 +74,19 @@ class SoundManager {
     if (!await checkFile.exists()) {
       await checkFile.writeAsBytes(_generateBeep(880, 200)); // A5, 200ms
     }
+
+    // 胜负音效：使用明显区分的频率与时长
+    // win  高频长音 (C6 1046Hz, 400ms) → 胜利感
+    // lose 低频长音 (A3 220Hz, 500ms)  → 挫败感
+    final winFile = File('${soundsDir.path}/win.wav');
+    if (!await winFile.exists()) {
+      await winFile.writeAsBytes(_generateBeep(1046, 400));
+    }
+
+    final loseFile = File('${soundsDir.path}/lose.wav');
+    if (!await loseFile.exists()) {
+      await loseFile.writeAsBytes(_generateBeep(220, 500));
+    }
   }
 
   /// 生成简单 WAV 蜂鸣（44.1kHz, 16-bit, mono）
