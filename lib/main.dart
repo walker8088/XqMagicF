@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'data/endgame_puzzles.dart';
 import 'utils/app_settings.dart';
 import 'viewmodels/game_viewmodel.dart';
 import 'screens/game_screen.dart';
@@ -7,6 +8,8 @@ import 'screens/game_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppSettings.instance.init();
+  // 尝试从 asset 加载残局数据，失败时静默回退到内置数据
+  await EndgameCollection.loadFromAsset();
   runApp(const ChessApp());
 }
 

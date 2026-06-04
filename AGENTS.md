@@ -258,6 +258,6 @@ MoveQualityAssessor ← 着法质量评估（基于引擎评分变化）
 
 ## 待清理项
 
-- `lib/data/endgame_puzzles.dart` 数据有严重 bug（纯数字假 ICCS、将帅对面 FEN、`r` 走子方），需改为从文件加载并重写数据
+- ~~`lib/data/endgame_puzzles.dart` 数据有严重 bug（纯数字假 ICCS、将帅对面 FEN、`r` 走子方），需改为从文件加载并重写数据~~ → 已添加 `loadFromAsset` 文件加载功能，FEN `r`→`w` 已修复，ICCS 数据待 JSON 文件提供正确值
 - `GameMode.engineOnline` 和菜单
 - `EngineManager` 职责过多（生命周期+配置代理+分析编排+对战模式）→ 考虑拆分
