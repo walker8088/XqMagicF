@@ -92,7 +92,7 @@ class GameViewModel extends ChangeNotifier {
     _stateManager.addListener(_onStateChanged);
 
     // 初始云库查询
-    final fen = _controller.gameTree.currentFen;
+    final fen = currentFen;
     if (fen != null) {
       _analysisService.queryCloud(fen);
     }
@@ -185,7 +185,7 @@ class GameViewModel extends ChangeNotifier {
   String? _currentOpeningFen;
 
   OpeningInfo? get currentOpening {
-    final fen = _controller.gameTree.currentFen;
+    final fen = currentFen;
     if (fen == null) {
       _currentOpeningCache = null;
       _currentOpeningFen = null;
@@ -396,14 +396,14 @@ class GameViewModel extends ChangeNotifier {
         _loadPuzzle();
       } else if (mode == GameMode.engineOnline) {
         // 连线分析模式：手动触发云库查询
-        final fen = _controller.gameTree.currentFen;
+        final fen = currentFen;
         if (fen != null) {
           _analysisService.queryCloud(fen);
         }
       } else if (mode == GameMode.boardEdit) {
         // 进入棋盘编辑模式：保存原始 FEN 以供 cancel 恢复，
         // 停止分析，清除选择，重置编辑偏好。
-        _editOriginalFen = _controller.gameTree.currentFen;
+        _editOriginalFen = currentFen;
         _analysisService.stopAnalysis();
         _stateManager.clearSelection();
         _editController.reset();
@@ -557,12 +557,9 @@ class GameViewModel extends ChangeNotifier {
   // ──────────── 回调 ────────────
 
   void _onMoveExecuted() {
-    final currentFen = _controller.gameTree.currentFen;
-    if (currentFen != null) {
-      _analysisService.onPositionChanged(
-        currentFen,
-        _controller.gameTree.current,
-      );
+    final fen = currentFen;
+    if (fen != null) {
+      _analysisService.onPositionChanged(fen, _controller.gameTree.current);
     }
     notifyListeners();
   }
@@ -571,7 +568,7 @@ class GameViewModel extends ChangeNotifier {
   /// 重新触发分析与节点质量评估，与 _onMoveExecuted 行为一致。
   void _onPositionLoaded() {
     _analysisService.onPositionChanged(
-      _controller.gameTree.currentFen ?? '',
+      currentFen ?? '',
       _controller.gameTree.current,
     );
     notifyListeners();
@@ -579,12 +576,9 @@ class GameViewModel extends ChangeNotifier {
 
   void _onNavigate() {
     _analysisService.clearAnalysisResults();
-    final currentFen = _controller.gameTree.currentFen;
-    if (currentFen != null) {
-      _analysisService.onPositionChanged(
-        currentFen,
-        _controller.gameTree.current,
-      );
+    final fen = currentFen;
+    if (fen != null) {
+      _analysisService.onPositionChanged(fen, _controller.gameTree.current);
     }
     notifyListeners();
   }
