@@ -150,6 +150,7 @@ class GameStateManager extends ChangeNotifier {
     _puzzleSolutionIndex++;
     if (_puzzleSolutionIndex >= _currentPuzzle!.solution.length) {
       _puzzleCompleted = true;
+      EndgameCollection.markSolved(_currentPuzzle!.id);
     }
     notifyListeners();
   }

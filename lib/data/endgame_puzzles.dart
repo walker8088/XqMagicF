@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:xqmagic/utils/app_logger.dart';
+import 'package:xqmagic/utils/app_settings.dart';
 
 /// 残局练习数据
 /// 每个残局包含：名称、FEN 局面、解法（着法序列）
@@ -14,6 +15,7 @@ class EndgamePuzzle {
     required this.solution,
     this.difficulty = 1,
     this.hint = '',
+    this.solved = false,
   });
 
   final String id;
@@ -23,6 +25,9 @@ class EndgamePuzzle {
   final List<String> solution; // ICCS 着法序列
   final int difficulty; // 1-5
   final String hint;
+
+  /// 是否已解决
+  final bool solved;
 
   /// 从 JSON Map 创建
   factory EndgamePuzzle.fromJson(Map<String, dynamic> json) {
@@ -34,6 +39,7 @@ class EndgamePuzzle {
       solution: (json['solution'] as List).cast<String>(),
       difficulty: json['difficulty'] as int? ?? 1,
       hint: json['hint'] as String? ?? '',
+      solved: json['solved'] as bool? ?? false,
     );
   }
 }
@@ -50,6 +56,35 @@ class EndgameCollection {
 
   /// 是否已尝试加载（防止重复加载）
   static bool _loadAttempted = false;
+
+  /// 已解决的残局 ID 集合（持久化到 AppSettings）
+  static Set<String> _solvedIds = {};
+
+  // ──────────── 已解决状态持久化 ────────────
+
+  static const _solvedIdsKey = 'endgame_solved_ids';
+
+  /// 从 AppSettings 加载已解决状态
+  static void loadSolvedState() {
+    final list = AppSettings.instance.get<List<dynamic>>(_solvedIdsKey, []);
+    _solvedIds = list.cast<String>().toSet();
+  }
+
+  /// 标记残局为已解决并持久化
+  static Future<void> markSolved(String id) async {
+    if (_solvedIds.add(id)) {
+      await AppSettings.instance.set(_solvedIdsKey, _solvedIds.toList());
+    }
+  }
+
+  /// 清除所有已解决状态
+  static Future<void> clearSolvedState() async {
+    _solvedIds.clear();
+    await AppSettings.instance.set(_solvedIdsKey, <String>[]);
+  }
+
+  /// 检查残局是否已解决
+  static bool isSolved(String id) => _solvedIds.contains(id);
 
   // ──────────── 文件加载 ────────────
 

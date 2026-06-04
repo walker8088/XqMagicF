@@ -8,7 +8,8 @@ import 'screens/game_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppSettings.instance.init();
-  // 尝试从 asset 加载残局数据，失败时静默回退到内置数据
+  // 加载残局数据及已解决状态
+  EndgameCollection.loadSolvedState();
   await EndgameCollection.loadFromAsset();
   runApp(const ChessApp());
 }
